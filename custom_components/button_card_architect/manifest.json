@@ -2,7 +2,7 @@
   "domain": "button_card_architect",
   "name": "Button Builder",
   "codeowners": ["@aspenrt78"],
-  "config_flow": false,
+  "config_flow": true,
   "dependencies": ["frontend"],
   "documentation": "https://github.com/aspenrt78/button-builder",
   "integration_type": "system",
