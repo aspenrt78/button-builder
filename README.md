@@ -7,6 +7,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/aspenrt78/ha-custom-button-architect.svg)](https://github.com/aspenrt78/ha-custom-button-architect/releases)
 [![License](https://img.shields.io/github/license/aspenrt78/ha-custom-button-architect.svg)](LICENSE)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/aspenrt78)
 
 A visual designer for Home Assistant's [custom:button-card](https://github.com/custom-cards/button-card) integration. Design your buttons visually with live preview, or use AI to generate designs from natural language descriptions, then export the YAML configuration.
 
@@ -160,6 +161,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🐛 Issues & Support
 
 If you encounter any issues or have questions, please [open an issue](https://github.com/aspenrt78/ha-custom-button-architect/issues) on GitHub.
+
+---
+
+## ☕ Support the Project
+
+If you find this tool useful, consider buying me a coffee! It helps keep the project maintained and motivates new features.
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-yellow.svg?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/aspenrt78)
 
 ---
 
