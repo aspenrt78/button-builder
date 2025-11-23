@@ -4,10 +4,10 @@
   "codeowners": ["@aspenrt78"],
   "config_flow": false,
   "dependencies": ["frontend"],
-  "documentation": "https://github.com/aspenrt78/ha-custom-button-architect",
+  "documentation": "https://github.com/aspenrt78/button-builder",
   "integration_type": "system",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/aspenrt78/ha-custom-button-architect/issues",
+  "issue_tracker": "https://github.com/aspenrt78/button-builder/issues",
   "requirements": [],
   "version": "1.1.0"
 }

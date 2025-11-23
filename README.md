@@ -5,8 +5,8 @@
 # 🎨 Button Card Architect for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/aspenrt78/ha-custom-button-architect.svg)](https://github.com/aspenrt78/ha-custom-button-architect/releases)
-[![License](https://img.shields.io/github/license/aspenrt78/ha-custom-button-architect.svg)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/release/aspenrt78/button-builder.svg)](https://github.com/aspenrt78/button-builder/releases)
+[![License](https://img.shields.io/github/license/aspenrt78/button-builder.svg)](LICENSE)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/aspenrt78)
 
 A visual designer for Home Assistant's [custom:button-card](https://github.com/custom-cards/button-card) integration. Design your buttons visually with live preview, or use AI to generate designs from natural language descriptions, then export the YAML configuration.
@@ -35,7 +35,7 @@ A visual designer for Home Assistant's [custom:button-card](https://github.com/c
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/aspenrt78/ha-custom-button-architect/releases)
+1. Download the latest release from the [releases page](https://github.com/aspenrt78/button-builder/releases)
 2. Extract the `button_card_architect` folder from the archive
 3. Copy it to your Home Assistant `custom_components` directory:
    ```
@@ -115,8 +115,8 @@ Choose from 10+ animations for both the card and icon:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/aspenrt78/ha-custom-button-architect.git
-   cd ha-custom-button-architect
+   git clone https://github.com/aspenrt78/button-builder.git
+   cd button-builder
    ```
 
 2. Install dependencies:
@@ -160,7 +160,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🐛 Issues & Support
 
-If you encounter any issues or have questions, please [open an issue](https://github.com/aspenrt78/ha-custom-button-architect/issues) on GitHub.
+If you encounter any issues or have questions, please [open an issue](https://github.com/aspenrt78/button-builder/issues) on GitHub.
 
 ---
 

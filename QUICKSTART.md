@@ -10,7 +10,7 @@ This guide will help you get Button Card Architect up and running in minutes.
 3. Find "Button Architect" in your sidebar
 
 ### Option 2: Manual (5 minutes)
-1. Download the [latest release](https://github.com/aspen/ha-custom-button-architect/releases)
+1. Download the [latest release](https://github.com/aspenrt78/button-builder/releases)
 2. Extract and copy `custom_components/button_card_architect` to your HA config folder
 3. Restart Home Assistant
 
@@ -132,7 +132,7 @@ state:
 
 - [Full Documentation](README.md)
 - [Detailed Installation Guide](INSTALLATION.md)
-- [Report Issues](https://github.com/aspen/ha-custom-button-architect/issues)
+- [Report Issues](https://github.com/aspenrt78/button-builder/issues)
 
 ## 🎉 You're Ready!
 

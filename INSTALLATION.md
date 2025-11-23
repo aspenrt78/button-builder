@@ -26,7 +26,7 @@
 
 ### Method 2: Manual Installation
 
-1. **Download** the latest release from the [releases page](https://github.com/aspen/ha-custom-button-architect/releases)
+1. **Download** the latest release from the [releases page](https://github.com/aspenrt78/button-builder/releases)
 
 2. **Extract** the archive and locate the `custom_components/button_card_architect` folder
 
@@ -128,6 +128,6 @@ HACS will notify you when updates are available. Click "Update" and restart Home
 
 ## Support
 
-- 🐛 [Report an issue](https://github.com/aspen/ha-custom-button-architect/issues)
-- 💬 [Discussions](https://github.com/aspen/ha-custom-button-architect/discussions)
+- 🐛 [Report an issue](https://github.com/aspenrt78/button-builder/issues)
+- 💬 [Discussions](https://github.com/aspenrt78/button-builder/discussions)
 - 📖 [Full Documentation](README.md)
