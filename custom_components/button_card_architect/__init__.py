@@ -17,6 +17,11 @@ PANEL_ID = "button-builder"
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Button Builder component."""
     hass.data.setdefault(DOMAIN, {})
+    # Register panel immediately so users see sidebar without adding config entry
+    try:
+        await async_register_panel(hass)
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Failed initial Button Builder panel registration")
     return True
 
 
