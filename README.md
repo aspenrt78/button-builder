@@ -1,8 +1,8 @@
 <div align="center">
-<img width="1920" height="500" alt="Button Card Architect Banner" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg" />
+<img width="1920" height="500" alt="Button Builder Banner" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg" />
 </div>
 
-# 🎨 Button Card Architect for Home Assistant
+# 🎨 Button Builder for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/aspenrt78/button-builder.svg)](https://github.com/aspenrt78/button-builder/releases)
@@ -28,7 +28,7 @@ A visual designer for Home Assistant's [custom:button-card](https://github.com/c
 1. Open HACS in your Home Assistant instance
 2. Click on "Integrations"
 3. Click the "+" button
-4. Search for "Button Card Architect"
+4. Search for "Button Builder"
 5. Click "Download"
 6. Restart Home Assistant
 7. The "Button Architect" panel will appear in your sidebar

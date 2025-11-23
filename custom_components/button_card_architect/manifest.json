@@ -1,6 +1,6 @@
 {
   "domain": "button_card_architect",
-  "name": "Button Card Architect",
+  "name": "Button Builder",
   "codeowners": ["@aspenrt78"],
   "config_flow": false,
   "dependencies": ["frontend"],
