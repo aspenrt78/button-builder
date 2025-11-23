@@ -2,5 +2,6 @@
   "name": "Button Card Architect",
   "render_readme": true,
   "content_in_root": false,
-  "filename": "button_card_architect"
+  "filename": "button_card_architect",
+  "homeassistant": "2024.1.0"
 }
