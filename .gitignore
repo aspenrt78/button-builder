@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build output
+custom_components/button_card_architect/www/index.js
+custom_components/button_card_architect/www/index.css
+custom_components/button_card_architect/www/index.html
+custom_components/button_card_architect/www/assets/
+!custom_components/button_card_architect/www/panel.html
+
+# Environment variables
+.env
+.env.local
+.env.*.local

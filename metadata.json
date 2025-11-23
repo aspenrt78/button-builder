@@ -1,0 +1,5 @@
+{
+  "name": "HA Custom Button Architect",
+  "description": "A visual designer for Home Assistant's custom:button-card integration. Design your buttons visually or with AI, then export the YAML.",
+  "requestFramePermissions": []
+}
