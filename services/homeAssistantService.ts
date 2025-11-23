@@ -30,8 +30,8 @@ class HomeAssistantService {
   private detectHomeAssistant(): boolean {
     // Check if we're in an iframe with HA parent
     try {
-      return window.parent !== window && 
-             window.location.pathname.includes('button-architect');
+            return window.parent !== window && 
+              window.location.pathname.includes('button-builder');
     } catch {
       return false;
     }

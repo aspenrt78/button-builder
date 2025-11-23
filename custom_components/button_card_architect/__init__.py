@@ -15,6 +15,7 @@ DOMAIN = "button_card_architect"
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Button Builder component."""
+    await async_register_panel(hass)
     return True
 
 
@@ -32,6 +33,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the Button Builder panel."""
+    hass.data.setdefault(DOMAIN, {})
+
+    if hass.data[DOMAIN].get("panel_registered"):
+        return
+
     path = Path(__file__).parent / "www"
     
     # Register the panel's static files
@@ -44,13 +50,14 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     # Add the panel to the sidebar
     hass.components.frontend.async_register_built_in_panel(
         component_name="iframe",
-        sidebar_title="Button Architect",
+        sidebar_title="Button Builder",
         sidebar_icon="mdi:gesture-tap-button",
-        frontend_url_path="button-architect",
+        frontend_url_path="button-builder",
         config={
             "url": "/button_card_architect/panel.html"
         },
         require_admin=False,
     )
     
+    hass.data[DOMAIN]["panel_registered"] = True
     _LOGGER.info("Button Builder panel registered")
