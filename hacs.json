@@ -3,5 +3,6 @@
   "render_readme": true,
   "content_in_root": false,
   "filename": "button_card_architect",
-  "homeassistant": "2024.1.0"
+  "homeassistant": "2024.1.0",
+  "image": "https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg"
 }
