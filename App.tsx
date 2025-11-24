@@ -18,10 +18,10 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-white">
-            HA
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-white text-xs">
+            BB
           </div>
-          <h1 className="font-bold text-lg tracking-tight text-gray-200">Custom Button Architect</h1>
+          <h1 className="font-bold text-lg tracking-tight text-gray-200">Button Builder</h1>
         </div>
         <div className="flex items-center gap-4">
           <button 

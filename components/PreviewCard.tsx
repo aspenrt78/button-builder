@@ -200,7 +200,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
 
   return (
     <div 
-      className="w-full h-full relative flex items-center justify-center transition-colors duration-500"
+      className="absolute inset-0 flex items-center justify-center transition-colors duration-500"
       style={{ backgroundColor: canvasColor }}
     >
       {/* Canvas Color Control */}
