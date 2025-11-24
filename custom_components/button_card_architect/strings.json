@@ -1,0 +1,15 @@
+{
+  "title": "Button Builder",
+  "config": {
+    "flow_title": "Button Builder",
+    "step": {
+      "user": {
+        "title": "Button Builder",
+        "description": "Adds the Button Builder design panel to the sidebar."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Button Builder integration is allowed."
+    }
+  }
+}
