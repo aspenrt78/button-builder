@@ -97,15 +97,15 @@ body, html {
   to { transform: rotate(360deg); }
 }
 
-.cba-animate-spin { animation: cba-rotate 2s linear infinite; }
-.cba-animate-rotate { animation: cba-rotate 2s linear infinite; }
+.cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
+.cba-animate-rotate { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
 .cba-animate-flash { animation: cba-flash 2s ease infinite; }
-.cba-animate-pulse { animation: cba-pulse 2s infinite; }
-.cba-animate-jiggle { animation: cba-jiggle 0.3s ease infinite; }
-.cba-animate-shake { animation: cba-shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite; }
+.cba-animate-pulse { animation: cba-pulse 2s infinite; will-change: transform; }
+.cba-animate-jiggle { animation: cba-jiggle 0.3s ease infinite; will-change: transform; display: inline-block; }
+.cba-animate-shake { animation: cba-shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite; will-change: transform; }
 .cba-animate-bounce { animation: cba-bounce 1s infinite; will-change: transform; }
 .cba-animate-blink { animation: cba-blink 1s infinite; }
-.cba-animate-marquee { animation: marquee-spin 2s linear infinite; }
+.cba-animate-marquee { animation: marquee-spin 2s linear infinite; will-change: transform; }
 
 /* Fade in animation */
 @keyframes fadeIn {
