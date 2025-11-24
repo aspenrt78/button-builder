@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from homeassistant.components.frontend import async_register_built_in_panel
-from homeassistant.components.http.static import CACHE_HEADERS, CachingStaticResource
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.event import async_call_later
@@ -55,12 +55,16 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         return
 
     path = Path(__file__).parent / "www"
-    
-    # Register the panel's static files using the simple method
-    hass.http.register_static_path(
-        "/button_card_architect",
-        str(path),
-        cache_headers=False,
+
+    # Register static assets via Home Assistant's async helper to ensure compatibility
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path="/button_card_architect",
+                path=str(path),
+                cache_headers=False,
+            )
+        ]
     )
     _LOGGER.info("Static path registered for Button Builder at %s", path)
     
