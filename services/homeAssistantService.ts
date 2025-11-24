@@ -17,21 +17,25 @@ export interface EntityInfo {
   icon?: string;
 }
 
+const IS_DEV_ENV = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.DEV;
+
 class HomeAssistantService {
-  private isInsideHA: boolean = false;
+  private readonly isInsideHA: boolean;
+  private readonly isDevEnv: boolean;
   private entities: EntityInfo[] = [];
-  private connection: any = null;
 
   constructor() {
     // Detect if we're running inside Home Assistant
+    this.isDevEnv = Boolean(IS_DEV_ENV);
     this.isInsideHA = this.detectHomeAssistant();
   }
 
   private detectHomeAssistant(): boolean {
     // Check if we're in an iframe with HA parent
     try {
-            return window.parent !== window && 
-              window.location.pathname.includes('button-builder');
+      const inIframe = window.parent !== window;
+      const path = window.location.pathname ?? '';
+      return inIframe && (path.includes('/button_card_architect') || path.includes('/local/button_card_architect'));
     } catch {
       return false;
     }
@@ -39,16 +43,22 @@ class HomeAssistantService {
 
   async getEntities(): Promise<EntityInfo[]> {
     if (!this.isInsideHA) {
-      // Return mock entities for development
-      return this.getMockEntities();
+      if (this.isDevEnv) {
+        return this.getMockEntities();
+      }
+      return [];
     }
 
     try {
       // Try to get entities from Home Assistant
+      const token = this.getAuthToken();
       const response = await fetch('/api/states', {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`,
-        },
+        credentials: 'same-origin',
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
       });
 
       if (response.ok) {
@@ -66,13 +76,18 @@ class HomeAssistantService {
       console.warn('Failed to fetch HA entities, using mock data:', error);
     }
 
-    return this.getMockEntities();
+    return this.isDevEnv ? this.getMockEntities() : [];
   }
 
   private getAuthToken(): string {
     // Try to get auth token from HA
     try {
-      return localStorage.getItem('hassTokens') || '';
+      const tokens = localStorage.getItem('hassTokens');
+      if (!tokens) {
+        return '';
+      }
+      const parsed = JSON.parse(tokens);
+      return parsed?.access_token || parsed?.token || parsed?.refresh_token || '';
     } catch {
       return '';
     }
