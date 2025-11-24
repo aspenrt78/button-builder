@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from pathlib import Path
 
 from homeassistant.components.frontend import async_register_built_in_panel
@@ -55,6 +56,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         return
 
     path = Path(__file__).parent / "www"
+    version = _integration_version()
 
     # Register static assets via Home Assistant's async helper to ensure compatibility
     await hass.http.async_register_static_paths(
@@ -76,10 +78,21 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         sidebar_icon="mdi:gesture-tap-button",
         frontend_url_path=PANEL_ID,
         config={
-            "url": "/button_card_architect/panel.html"
+            "url": f"/button_card_architect/panel.html?v={version}"
         },
         require_admin=False,
     )
     
     hass.data[DOMAIN]["panel_registered"] = True
     _LOGGER.info("Button Builder panel registered")
+
+
+def _integration_version() -> str:
+    """Return the integration version for cache busting."""
+    manifest_path = Path(__file__).parent / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return manifest.get("version", "0")
+    except Exception as err:  # pragma: no cover - best effort only
+        _LOGGER.debug("Failed to read manifest for version: %s", err)
+        return "0"
