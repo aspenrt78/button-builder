@@ -32,20 +32,32 @@ const getShadowStyle = (size: string, color: string, opacity: number) => {
   }
 };
 
-const IconMapper = ({ name, size, color, animationClass }: { name: string, size: string, color: string, animationClass: string }) => {
+const IconMapper = ({ name, size, color, animationClass, animationDuration }: { name: string, size: string, color: string, animationClass: string, animationDuration: string }) => {
   const style = { width: size.includes('%') ? size : size, height: size.includes('%') ? size : size, color };
-  const iconProps = { style, strokeWidth: 2, className: animationClass };
+  const iconProps = { style, strokeWidth: 2 };
   
   const n = name ? name.toLowerCase() : '';
-  if (n.includes('sofa')) return <Sofa {...iconProps} />;
-  if (n.includes('light')) return <Lightbulb {...iconProps} />;
-  if (n.includes('fan')) return <Fan {...iconProps} />;
-  if (n.includes('lock')) return <Lock {...iconProps} />;
-  if (n.includes('garage') || n.includes('home')) return <Home {...iconProps} />;
-  if (n.includes('music') || n.includes('play')) return <Music {...iconProps} />;
-  if (n.includes('power') || n.includes('switch')) return <Power {...iconProps} />;
+  let IconComponent = HelpCircle;
   
-  return <HelpCircle {...iconProps} />;
+  if (n.includes('sofa')) IconComponent = Sofa;
+  else if (n.includes('light')) IconComponent = Lightbulb;
+  else if (n.includes('fan')) IconComponent = Fan;
+  else if (n.includes('lock')) IconComponent = Lock;
+  else if (n.includes('garage') || n.includes('home')) IconComponent = Home;
+  else if (n.includes('music') || n.includes('play')) IconComponent = Music;
+  else if (n.includes('power') || n.includes('switch')) IconComponent = Power;
+  
+  const spanStyle: React.CSSProperties = {
+    display: 'inline-block',
+    lineHeight: 0,
+    animationDuration: animationClass ? animationDuration : undefined,
+  };
+
+  return (
+    <span className={animationClass} style={spanStyle}>
+      <IconComponent {...iconProps} />
+    </span>
+  );
 };
 
 const getGridTemplate = (layout: string) => {
@@ -160,7 +172,13 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   };
 
   const cardAnimationClass = getAnimationClass(config.cardAnimation, config.cardAnimationTrigger);
-  const iconAnimationClass = getAnimationClass(config.iconAnimation, config.iconAnimationTrigger);
+  const cardAnimationDuration = config.cardAnimationSpeed || '2s';
+
+  const iconAnimationFromSelect = getAnimationClass(config.iconAnimation, config.iconAnimationTrigger);
+  const iconAnimationClass = [config.spin ? 'cba-animate-spin' : '', iconAnimationFromSelect]
+    .filter(Boolean)
+    .join(' ');
+  const iconAnimationDuration = (config.spin ? config.spinDuration : config.iconAnimationSpeed) || '2s';
 
   // Marquee Logic: If marquee is active and valid
   const isMarquee = config.cardAnimation === 'marquee' && 
@@ -196,6 +214,8 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     position: 'relative',
     zIndex: 1,
     overflow: 'hidden', // Needed for marquee mask
+    opacity: Math.min(100, Math.max(0, config.cardOpacity)) / 100,
+    animationDuration: cardAnimationClass ? cardAnimationDuration : undefined,
   };
 
   return (
@@ -271,7 +291,15 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                   <User className="text-gray-500 w-2/3 h-2/3" />
                 </div>
               ) : (
-                config.showIcon && <IconMapper name={config.icon} size={config.size} color={actualIconColor} animationClass={iconAnimationClass} />
+                config.showIcon && (
+                  <IconMapper 
+                    name={config.icon}
+                    size={config.size}
+                    color={actualIconColor}
+                    animationClass={iconAnimationClass}
+                    animationDuration={iconAnimationDuration}
+                  />
+                )
               )}
             </div>
           )}
@@ -365,12 +393,12 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
           50% { opacity: 0; }
         }
 
-        .cba-animate-spin { animation: cba-rotate 2s linear infinite; }
-        .cba-animate-rotate { animation: cba-rotate 2s linear infinite; }
+        .cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
+        .cba-animate-rotate { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
         .cba-animate-flash { animation: cba-flash 2s ease infinite; }
-        .cba-animate-pulse { animation: cba-pulse 2s infinite; }
-        .cba-animate-jiggle { animation: cba-jiggle 0.3s ease infinite; }
-        .cba-animate-shake { animation: cba-shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite; }
+        .cba-animate-pulse { animation: cba-pulse 2s infinite; will-change: transform; }
+        .cba-animate-jiggle { animation: cba-jiggle 0.3s ease infinite; will-change: transform; display: inline-block; }
+        .cba-animate-shake { animation: cba-shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite; will-change: transform; }
         .cba-animate-bounce { animation: cba-bounce 1s infinite; will-change: transform; }
         .cba-animate-blink { animation: cba-blink 1s infinite; }
       `}</style>

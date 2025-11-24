@@ -3,9 +3,10 @@ import { Copy, Check } from 'lucide-react';
 
 interface Props {
   yaml: string;
+  className?: string;
 }
 
-export const YamlViewer: React.FC<Props> = ({ yaml }) => {
+export const YamlViewer: React.FC<Props> = ({ yaml, className = '' }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -15,7 +16,7 @@ export const YamlViewer: React.FC<Props> = ({ yaml }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1e1e1e] text-gray-300 rounded-lg border border-gray-700 shadow-xl">
+    <div className={`flex flex-col h-full min-h-0 bg-[#1e1e1e] text-gray-300 rounded-lg border border-gray-700 shadow-xl ${className}`}>
       <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-gray-700 shrink-0">
         <span className="text-xs font-mono text-gray-400">button-card-config.yaml</span>
         <button 

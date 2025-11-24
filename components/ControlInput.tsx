@@ -4,10 +4,13 @@ interface Props {
   label: string;
   value: any;
   onChange: (val: any) => void;
-  type?: 'text' | 'color' | 'number' | 'select' | 'checkbox';
+  type?: 'text' | 'color' | 'number' | 'select' | 'checkbox' | 'slider';
   options?: { value: string; label: string }[];
   className?: string;
   placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
 }
 
 export const ControlInput: React.FC<Props> = ({ 
@@ -17,7 +20,10 @@ export const ControlInput: React.FC<Props> = ({
   type = 'text', 
   options = [], 
   className = '',
-  placeholder = ''
+  placeholder = '',
+  min = 0,
+  max = 100,
+  step = 1
 }) => {
   
   if (type === 'checkbox') {
@@ -31,6 +37,26 @@ export const ControlInput: React.FC<Props> = ({
           className="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-0 w-4 h-4" 
         />
       </label>
+    );
+  }
+
+  if (type === 'slider') {
+    return (
+      <div className={`flex flex-col gap-2 ${className}`}>
+        <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+          <span>{label}</span>
+          <span className="text-gray-400 font-mono text-[11px]">{value}</span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-blue-500"
+        />
+      </div>
     );
   }
 

@@ -156,8 +156,8 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
-                      <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
-                      <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} onChange={(v) => update('backgroundColorOpacity', Number(v))} />
+                        <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
+                          <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
                    </div>
                    <ControlInput label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
                 </div>
@@ -213,7 +213,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                   <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} onChange={(v) => update('shadowOpacity', Number(v))} />
+                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
               </div>
            </div>
         </Section>
@@ -282,11 +282,11 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                  <ControlInput label="ON: Color" type="color" value={config.stateOnColor} onChange={(v) => update('stateOnColor', v)} />
-                 <ControlInput label="Opacity" type="slider" value={config.stateOnOpacity} onChange={(v) => update('stateOnOpacity', Number(v))} />
+                 <ControlInput label="Opacity" type="slider" value={config.stateOnOpacity} min={0} max={100} onChange={(v) => update('stateOnOpacity', v)} />
               </div>
               <div className="space-y-2">
                  <ControlInput label="OFF: Color" type="color" value={config.stateOffColor} onChange={(v) => update('stateOffColor', v)} />
-                 <ControlInput label="Opacity" type="slider" value={config.stateOffOpacity} onChange={(v) => update('stateOffOpacity', Number(v))} />
+                 <ControlInput label="Opacity" type="slider" value={config.stateOffOpacity} min={0} max={100} onChange={(v) => update('stateOffOpacity', v)} />
               </div>
             </div>
           </div>
@@ -425,7 +425,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <Section title="Advanced Settings" icon={Settings}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} onChange={(v) => update('cardOpacity', Number(v))} />
+              <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
               <ControlInput label="Hold Time (ms)" value={config.holdTime.toString()} onChange={(v) => update('holdTime', Number(v) || 500)} placeholder="500" />
             </div>
             
