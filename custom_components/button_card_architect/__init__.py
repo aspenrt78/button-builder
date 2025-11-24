@@ -15,6 +15,8 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "button_card_architect"
 PANEL_ID = "button-builder"
+DATA_PANEL_REGISTERED = "panel_registered"
+DATA_STATIC_REGISTERED = "static_path_registered"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -42,9 +44,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if hass.data.get(DOMAIN, {}).get("panel_registered"):
+    if hass.data.get(DOMAIN, {}).get(DATA_PANEL_REGISTERED):
         hass.components.frontend.async_remove_panel(PANEL_ID)
-        hass.data[DOMAIN]["panel_registered"] = False
+        hass.data[DOMAIN][DATA_PANEL_REGISTERED] = False
     return True
 
 
@@ -52,14 +54,18 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the Button Builder panel."""
     hass.data.setdefault(DOMAIN, {})
 
-    if hass.data[DOMAIN].get("panel_registered"):
+        if hass.data[DOMAIN].get(DATA_PANEL_REGISTERED):
         return
 
     path = Path(__file__).parent / "www"
     version = _integration_version()
 
     # Register static assets via Home Assistant's async helper to ensure compatibility
-    await hass.http.async_register_static_paths(
+        domain_data = hass.data[DOMAIN]
+
+        if not domain_data.get(DATA_STATIC_REGISTERED):
+            try:
+                await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
                 url_path="/button_card_architect",
@@ -69,6 +75,9 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         ]
     )
     _LOGGER.info("Static path registered for Button Builder at %s", path)
+            except ValueError:
+                _LOGGER.debug("Static path already registered for Button Builder")
+            domain_data[DATA_STATIC_REGISTERED] = True
     
     # Add the panel to the sidebar using built-in panel (like HACS does)
     async_register_built_in_panel(
@@ -83,7 +92,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         require_admin=False,
     )
     
-    hass.data[DOMAIN]["panel_registered"] = True
+        hass.data[DOMAIN][DATA_PANEL_REGISTERED] = True
     _LOGGER.info("Button Builder panel registered")
 
 
