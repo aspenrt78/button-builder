@@ -1,7 +1,7 @@
 # Build and Release Script
 # This script builds the app and prepares it for release
 
-Write-Host "Building Button Card Architect..." -ForegroundColor Cyan
+Write-Host "Building Button Builder..." -ForegroundColor Cyan
 
 # Check if node_modules exists
 if (-not (Test-Path "node_modules")) {

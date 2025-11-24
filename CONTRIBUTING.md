@@ -1,6 +1,6 @@
-# Contributing to Button Card Architect
+# Contributing to Button Builder
 
-Thank you for your interest in contributing to Button Card Architect! 
+Thank you for your interest in contributing to Button Builder! 
 
 ## How to Contribute
 

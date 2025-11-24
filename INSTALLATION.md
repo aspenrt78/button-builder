@@ -19,10 +19,10 @@
 1. **Open HACS** in your Home Assistant instance
 2. Click on **"Integrations"**
 3. Click the **"+"** button in the bottom right
-4. Search for **"Button Card Architect"**
+4. Search for **"Button Builder"**
 5. Click **"Download"**
 6. **Restart Home Assistant**
-7. The **"Button Architect"** panel will appear in your sidebar
+7. The **"Button Builder"** panel will appear in your sidebar
 
 ### Method 2: Manual Installation
 

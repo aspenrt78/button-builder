@@ -1,11 +1,11 @@
 # Quick Start Guide
 
-This guide will help you get Button Card Architect up and running in minutes.
+This guide will help you get Button Builder up and running in minutes.
 
 ## 🚀 Quick Installation
 
 ### Option 1: HACS (Easiest)
-1. Open HACS → Integrations → "+" → Search "Button Card Architect" → Download
+1. Open HACS → Integrations → "+" → Search "Button Builder" → Download
 2. Restart Home Assistant
 3. Find "Button Architect" in your sidebar
 
