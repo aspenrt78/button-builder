@@ -1,5 +1,7 @@
 {
+  "title": "Button Builder",
   "config": {
+    "flow_title": "Button Builder",
     "step": {
       "user": {
         "title": "Button Builder",

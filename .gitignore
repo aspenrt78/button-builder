@@ -23,13 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Build output
-custom_components/button_card_architect/www/index.js
-custom_components/button_card_architect/www/index.css
-custom_components/button_card_architect/www/index.html
-custom_components/button_card_architect/www/assets/
-!custom_components/button_card_architect/www/panel.html
-
 # Environment variables
 .env
 .env.local
