@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
+import { Palette, User, HelpCircle } from 'lucide-react';
 import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
-import { Sofa, Lightbulb, Fan, Lock, Home, Music, Power, HelpCircle, User, Palette } from 'lucide-react';
+import { getIconComponent } from '../services/iconMapper';
 
 interface Props {
   config: ButtonConfig;
@@ -33,20 +34,8 @@ const getShadowStyle = (size: string, color: string, opacity: number) => {
 };
 
 const IconMapper = ({ name, size, color, animationClass, animationDuration }: { name: string, size: string, color: string, animationClass: string, animationDuration: string }) => {
-  const style = { width: size.includes('%') ? size : size, height: size.includes('%') ? size : size, color };
-  const iconProps = { style, strokeWidth: 2 };
-  
-  const n = name ? name.toLowerCase() : '';
-  let IconComponent = HelpCircle;
-  
-  if (n.includes('sofa')) IconComponent = Sofa;
-  else if (n.includes('light')) IconComponent = Lightbulb;
-  else if (n.includes('fan')) IconComponent = Fan;
-  else if (n.includes('lock')) IconComponent = Lock;
-  else if (n.includes('garage') || n.includes('home')) IconComponent = Home;
-  else if (n.includes('music') || n.includes('play')) IconComponent = Music;
-  else if (n.includes('power') || n.includes('switch')) IconComponent = Power;
-  
+  const style = { width: size, height: size, color };
+  const IconComponent = getIconComponent(name) ?? HelpCircle;
   const spanStyle: React.CSSProperties = {
     display: 'inline-block',
     lineHeight: 0,
@@ -55,7 +44,7 @@ const IconMapper = ({ name, size, color, animationClass, animationDuration }: { 
 
   return (
     <span className={animationClass} style={spanStyle}>
-      <IconComponent {...iconProps} />
+      <IconComponent style={style} />
     </span>
   );
 };
