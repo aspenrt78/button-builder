@@ -1,3 +1,7 @@
+<div align="center">
+<img width="1920" height="500" alt="Button Builder Banner" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg" />
+</div>
+
 # 🎨 Button Builder for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
