@@ -50,15 +50,16 @@ async def async_register_panel(hass: HomeAssistant) -> None:
 
     path = Path(__file__).parent / "www"
     
-    # Register the panel's static files; ignore if already registered
-    try:
-        hass.http.register_static_path(
-            "/button_card_architect",
-            str(path),
-            cache_headers=False,
-        )
-    except ValueError:
-        _LOGGER.debug("Static path already registered for Button Builder")
+    # Register the panel's static files
+    await hass.http.async_register_static_paths(
+        [
+            {
+                "url_path": "/button_card_architect",
+                "path": str(path),
+            }
+        ]
+    )
+    _LOGGER.debug("Static path registered for Button Builder")
     
     # Add the panel to the sidebar using built-in panel (like HACS does)
     async_register_built_in_panel(
