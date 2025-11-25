@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Palette, User, HelpCircle } from 'lucide-react';
+import { Palette, User, HelpCircle, Lock, Loader2 } from 'lucide-react';
 import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
 import { getIconComponent } from '../services/iconMapper';
 
@@ -173,10 +173,11 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const cardAnimationDuration = config.cardAnimationSpeed || '2s';
 
   const iconAnimationFromSelect = getAnimationClass(config.iconAnimation, config.iconAnimationTrigger);
-  const iconAnimationClass = [config.spin ? 'cba-animate-spin' : '', iconAnimationFromSelect]
+  // Include rotate flag (same as spin)
+  const iconAnimationClass = [(config.spin || config.rotate) ? 'cba-animate-spin' : '', iconAnimationFromSelect]
     .filter(Boolean)
     .join(' ');
-  const iconAnimationDuration = (config.spin ? config.spinDuration : config.iconAnimationSpeed) || '2s';
+  const iconAnimationDuration = ((config.spin || config.rotate) ? config.spinDuration : config.iconAnimationSpeed) || '2s';
 
   // Marquee Logic: If marquee is active and valid
   const isMarquee = config.cardAnimation === 'marquee' && 
@@ -273,9 +274,22 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
         {/* Main Card */}
         <div 
           style={containerStyle}
-          className={`hover:brightness-110 w-full ${cardAnimationClass}`}
+          className={`hover:brightness-110 w-full ${cardAnimationClass} group`}
           onClick={() => setSimulatedState(s => s === 'on' ? 'off' : 'on')}
+          title={config.tooltip.enabled ? config.tooltip.content : undefined}
         >
+           {/* Tooltip */}
+           {config.tooltip.enabled && config.tooltip.content && (
+             <div className={`absolute z-50 px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
+               config.tooltip.position === 'bottom' ? 'top-full mt-2 left-1/2 -translate-x-1/2' :
+               config.tooltip.position === 'left' ? 'right-full mr-2 top-1/2 -translate-y-1/2' :
+               config.tooltip.position === 'right' ? 'left-full ml-2 top-1/2 -translate-y-1/2' :
+               'bottom-full mb-2 left-1/2 -translate-x-1/2' /* top (default) */
+             }`}>
+               {config.tooltip.content}
+             </div>
+           )}
+
            {/* Marquee Inner Cover to create border effect (Only if marquee is on) */}
            {isMarquee && (
              <div className="absolute inset-[2px] bg-black z-[-1]" style={{ 
@@ -313,8 +327,11 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
           )}
 
           {config.showState && (
-            <div style={{ gridArea: 's', color: actualStateColor, opacity: 0.8, fontSize: '0.85em' }} className="text-center">
-              {simulatedState.toUpperCase()}
+            <div style={{ gridArea: 's', color: actualStateColor, opacity: 0.8, fontSize: '0.85em' }} className="text-center flex items-center justify-center gap-1">
+              <span>{config.stateDisplay || simulatedState.toUpperCase()}</span>
+              {config.showUnits && config.units && (
+                <span className="opacity-70">{config.units}</span>
+              )}
             </div>
           )}
 
@@ -323,7 +340,42 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
               {config.label || 'Label Text'}
             </div>
           )}
+
+          {/* Custom Fields */}
+          {config.customFields.length > 0 && (
+            <div className="absolute bottom-1 right-1 text-[8px] text-gray-400 opacity-50">
+              +{config.customFields.length} field{config.customFields.length > 1 ? 's' : ''}
+            </div>
+          )}
+
+          {/* Spinner Overlay */}
+          {config.spinner && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-inherit z-10">
+              <Loader2 className="w-8 h-8 text-white animate-spin" />
+            </div>
+          )}
+
+          {/* Lock Overlay */}
+          {config.lock.enabled && (
+            <div className="absolute top-1 right-1 z-10">
+              <Lock size={14} className="text-white/70" />
+            </div>
+          )}
+
+          {/* Ripple Effect Indicator */}
+          {config.showRipple && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-inherit">
+              <div className="absolute inset-0 bg-white/0 hover:bg-white/5 transition-colors" />
+            </div>
+          )}
         </div>
+
+        {/* Hidden Indicator */}
+        {config.hidden && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-xl z-20">
+            <span className="text-xs text-gray-400 uppercase tracking-wider">Hidden</span>
+          </div>
+        )}
 
         {config.showLastChanged && (
            <div className="absolute -bottom-6 text-[10px] text-gray-500 font-mono">
