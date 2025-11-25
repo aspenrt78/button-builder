@@ -50,6 +50,7 @@ export interface ProtectConfig {
 export interface TooltipConfig {
   enabled: boolean;
   content: string;
+  position: 'top' | 'bottom' | 'left' | 'right';
 }
 
 export interface ToastConfig {
@@ -279,6 +280,29 @@ export interface ButtonConfig {
   entityPictureStyles: string;
   gridStyles: string;
   imgCellStyles: string;
+  lockStyles: string;
+  tooltipStyles: string;
+  
+  // Advanced Trigger Options
+  triggerEntity: string;
+  triggersUpdate: string[];
+  
+  // Live Stream
+  liveStreamFitMode: string;
+  
+  // Timing
+  holdTime: number;
+  
+  // Haptic
+  hapticFeedback: boolean;
+  
+  // Spinner Template
+  spinnerTemplate: string;
+  
+  // Conditional Display
+  conditionalEntity: string;
+  conditionalState: string;
+  conditionalOperator: string;
 }
 
 export const DEFAULT_TOAST_CONFIG: ToastConfig = {
@@ -308,6 +332,7 @@ export const DEFAULT_PROTECT_CONFIG: ProtectConfig = {
 export const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
   enabled: false,
   content: '',
+  position: 'top',
 };
 
 export const DEFAULT_CONFIG: ButtonConfig = {
@@ -484,4 +509,27 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   entityPictureStyles: '',
   gridStyles: '',
   imgCellStyles: '',
+  lockStyles: '',
+  tooltipStyles: '',
+  
+  // Advanced Trigger Options
+  triggerEntity: '',
+  triggersUpdate: [],
+  
+  // Live Stream
+  liveStreamFitMode: '',
+  
+  // Timing
+  holdTime: 500,
+  
+  // Haptic
+  hapticFeedback: false,
+  
+  // Spinner Template
+  spinnerTemplate: '',
+  
+  // Conditional Display
+  conditionalEntity: '',
+  conditionalState: '',
+  conditionalOperator: 'equals',
 };

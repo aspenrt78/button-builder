@@ -449,6 +449,19 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
           80% { transform: perspective(400px) rotateY(360deg); }
           100% { transform: perspective(400px) rotateY(360deg); }
         }
+        @keyframes cba-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes cba-breathe {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(0.98); }
+        }
+        @keyframes cba-ripple {
+          0% { box-shadow: 0 0 0 0 currentColor; }
+          70% { box-shadow: 0 0 0 10px transparent; }
+          100% { box-shadow: 0 0 0 0 transparent; }
+        }
 
         .cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
         .cba-animate-rotate { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
@@ -462,7 +475,11 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
         .cba-animate-swing { animation: cba-swing 1s ease-in-out infinite; will-change: transform; display: inline-block; transform-origin: top center; }
         .cba-animate-heartbeat { animation: cba-heartbeat 1.5s ease-in-out infinite; will-change: transform; }
         .cba-animate-rubber { animation: cba-rubber 1s ease infinite; will-change: transform; }
+        .cba-animate-rubberBand { animation: cba-rubber 1s ease infinite; will-change: transform; }
         .cba-animate-fade { animation: cba-fade 2s ease-in-out infinite; }
+        .cba-animate-float { animation: cba-float 2s ease-in-out infinite; will-change: transform; }
+        .cba-animate-breathe { animation: cba-breathe 3s ease-in-out infinite; }
+        .cba-animate-ripple { animation: cba-ripple 1.5s ease-out infinite; }
         .cba-animate-slide-up { animation: cba-slide-up 1s ease infinite; will-change: transform; }
         .cba-animate-slide-down { animation: cba-slide-down 1s ease infinite; will-change: transform; }
         .cba-animate-tada { animation: cba-tada 1s ease infinite; will-change: transform; }
