@@ -61,7 +61,11 @@ export function getIconComponent(name: string): IconComponent | undefined {
     return undefined;
   }
 
-  const component: IconComponent = ({ style }) => React.createElement(Icon, { path, size: '1em', style });
+  const component: IconComponent = ({ style }) => {
+    // Extract size from style, default to 1em
+    const size = style?.width || style?.height || '1em';
+    return React.createElement(Icon, { path, size, style });
+  };
   cache.set(normalized, component);
   return component;
 }
