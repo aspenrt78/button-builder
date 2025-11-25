@@ -13,7 +13,7 @@ from homeassistant.helpers.event import async_call_later
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "button_card_architect"
+DOMAIN = "button_builder"
 PANEL_ID = "button-builder"
 DATA_PANEL_REGISTERED = "panel_registered"
 DATA_STATIC_REGISTERED = "static_path_registered"
@@ -28,7 +28,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Button Builder from a config entry."""
     _LOGGER.info("Setting up Button Builder config entry")
-    
+
     async def register_panel_later(_now):
         """Register panel after a delay."""
         try:
@@ -36,7 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.info("Panel registration completed successfully")
         except Exception as err:
             _LOGGER.error("Failed to register panel: %s", err, exc_info=True)
-    
+
     # Register panel with 2 second delay to ensure frontend is ready
     async_call_later(hass, 2, register_panel_later)
     return True
@@ -54,31 +54,30 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the Button Builder panel."""
     hass.data.setdefault(DOMAIN, {})
 
-        if hass.data[DOMAIN].get(DATA_PANEL_REGISTERED):
+    if hass.data[DOMAIN].get(DATA_PANEL_REGISTERED):
         return
 
     path = Path(__file__).parent / "www"
     version = _integration_version()
+    domain_data = hass.data[DOMAIN]
 
-    # Register static assets via Home Assistant's async helper to ensure compatibility
-        domain_data = hass.data[DOMAIN]
-
-        if not domain_data.get(DATA_STATIC_REGISTERED):
-            try:
-                await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                url_path="/button_card_architect",
-                path=str(path),
-                cache_headers=False,
+    # Register static assets via Home Assistant's async helper
+    if not domain_data.get(DATA_STATIC_REGISTERED):
+        try:
+            await hass.http.async_register_static_paths(
+                [
+                    StaticPathConfig(
+                        url_path="/button_builder",
+                        path=str(path),
+                        cache_headers=False,
+                    )
+                ]
             )
-        ]
-    )
-    _LOGGER.info("Static path registered for Button Builder at %s", path)
-            except ValueError:
-                _LOGGER.debug("Static path already registered for Button Builder")
-            domain_data[DATA_STATIC_REGISTERED] = True
-    
+            _LOGGER.info("Static path registered for Button Builder at %s", path)
+        except ValueError:
+            _LOGGER.debug("Static path already registered for Button Builder")
+        domain_data[DATA_STATIC_REGISTERED] = True
+
     # Add the panel to the sidebar using built-in panel (like HACS does)
     async_register_built_in_panel(
         hass,
@@ -87,12 +86,12 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         sidebar_icon="mdi:gesture-tap-button",
         frontend_url_path=PANEL_ID,
         config={
-            "url": f"/button_card_architect/panel.html?v={version}"
+            "url": f"/button_builder/panel.html?v={version}"
         },
         require_admin=False,
     )
-    
-        hass.data[DOMAIN][DATA_PANEL_REGISTERED] = True
+
+    hass.data[DOMAIN][DATA_PANEL_REGISTERED] = True
     _LOGGER.info("Button Builder panel registered")
 
 

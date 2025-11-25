@@ -381,6 +381,64 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
         }
+        @keyframes cba-glow {
+          0%, 100% { box-shadow: 0 0 5px currentColor, 0 0 10px currentColor; }
+          50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+        }
+        @keyframes cba-swing {
+          0%, 100% { transform: rotate(0deg); transform-origin: top center; }
+          25% { transform: rotate(15deg); }
+          75% { transform: rotate(-15deg); }
+        }
+        @keyframes cba-heartbeat {
+          0%, 100% { transform: scale(1); }
+          14% { transform: scale(1.3); }
+          28% { transform: scale(1); }
+          42% { transform: scale(1.3); }
+          70% { transform: scale(1); }
+        }
+        @keyframes cba-rubber {
+          0% { transform: scale(1, 1); }
+          30% { transform: scale(1.25, 0.75); }
+          40% { transform: scale(0.75, 1.25); }
+          50% { transform: scale(1.15, 0.85); }
+          65% { transform: scale(0.95, 1.05); }
+          75% { transform: scale(1.05, 0.95); }
+          100% { transform: scale(1, 1); }
+        }
+        @keyframes cba-fade {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        @keyframes cba-slide-up {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        @keyframes cba-slide-down {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(5px); }
+        }
+        @keyframes cba-tada {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          10%, 20% { transform: scale(0.9) rotate(-3deg); }
+          30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
+          40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
+        }
+        @keyframes cba-wobble {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          15% { transform: translateX(-5px) rotate(-5deg); }
+          30% { transform: translateX(4px) rotate(3deg); }
+          45% { transform: translateX(-3px) rotate(-3deg); }
+          60% { transform: translateX(2px) rotate(2deg); }
+          75% { transform: translateX(-1px) rotate(-1deg); }
+        }
+        @keyframes cba-flip {
+          0% { transform: perspective(400px) rotateY(0); }
+          40% { transform: perspective(400px) rotateY(170deg); }
+          50% { transform: perspective(400px) rotateY(190deg); }
+          80% { transform: perspective(400px) rotateY(360deg); }
+          100% { transform: perspective(400px) rotateY(360deg); }
+        }
 
         .cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
         .cba-animate-rotate { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
@@ -390,6 +448,16 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
         .cba-animate-shake { animation: cba-shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite; will-change: transform; }
         .cba-animate-bounce { animation: cba-bounce 1s infinite; will-change: transform; }
         .cba-animate-blink { animation: cba-blink 1s infinite; }
+        .cba-animate-glow { animation: cba-glow 2s ease-in-out infinite; }
+        .cba-animate-swing { animation: cba-swing 1s ease-in-out infinite; will-change: transform; display: inline-block; transform-origin: top center; }
+        .cba-animate-heartbeat { animation: cba-heartbeat 1.5s ease-in-out infinite; will-change: transform; }
+        .cba-animate-rubber { animation: cba-rubber 1s ease infinite; will-change: transform; }
+        .cba-animate-fade { animation: cba-fade 2s ease-in-out infinite; }
+        .cba-animate-slide-up { animation: cba-slide-up 1s ease infinite; will-change: transform; }
+        .cba-animate-slide-down { animation: cba-slide-down 1s ease infinite; will-change: transform; }
+        .cba-animate-tada { animation: cba-tada 1s ease infinite; will-change: transform; }
+        .cba-animate-wobble { animation: cba-wobble 1s ease infinite; will-change: transform; }
+        .cba-animate-flip { animation: cba-flip 2s ease infinite; will-change: transform; }
       `}</style>
     </div>
   );

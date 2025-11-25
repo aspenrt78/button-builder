@@ -1,5 +1,4 @@
 
-
 export const LAYOUT_OPTIONS = [
   { value: 'vertical', label: 'Vertical (Default)' },
   { value: 'icon_name_state', label: 'Icon - Name - State' },
@@ -11,14 +10,34 @@ export const LAYOUT_OPTIONS = [
 ];
 
 export const ACTION_OPTIONS = [
+  { value: 'none', label: 'None' },
   { value: 'toggle', label: 'Toggle' },
   { value: 'more-info', label: 'More Info' },
   { value: 'call-service', label: 'Call Service' },
+  { value: 'perform-action', label: 'Perform Action' },
   { value: 'navigate', label: 'Navigate' },
   { value: 'url', label: 'URL' },
   { value: 'assist', label: 'Assist' },
   { value: 'fire-dom-event', label: 'Fire DOM Event' },
-  { value: 'none', label: 'None' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'multi-actions', label: 'Multi-Actions' },
+  { value: 'toast', label: 'Toast Notification' },
+];
+
+export const LOCK_UNLOCK_OPTIONS = [
+  { value: 'tap', label: 'Tap' },
+  { value: 'hold', label: 'Hold' },
+  { value: 'double_tap', label: 'Double Tap' },
+];
+
+export const STATE_OPERATOR_OPTIONS = [
+  { value: 'equals', label: 'Equals (=)' },
+  { value: 'not_equals', label: 'Not Equals (≠)' },
+  { value: 'above', label: 'Above (>)' },
+  { value: 'below', label: 'Below (<)' },
+  { value: 'regex', label: 'Regex Match' },
+  { value: 'template', label: 'Template' },
+  { value: 'default', label: 'Default (Fallback)' },
 ];
 
 export const CONDITIONAL_OPERATORS = [
@@ -26,7 +45,9 @@ export const CONDITIONAL_OPERATORS = [
   { value: 'not_equals', label: 'Not Equals (≠)' },
   { value: 'above', label: 'Above (>)' },
   { value: 'below', label: 'Below (<)' },
-  { value: 'contains', label: 'Contains' },
+  { value: 'regex', label: 'Regex Match' },
+  { value: 'template', label: 'Template' },
+  { value: 'default', label: 'Default (Fallback)' },
 ];
 
 export const TRANSFORM_OPTIONS = [
@@ -52,16 +73,34 @@ export const BORDER_STYLE_OPTIONS = [
   { value: 'groove', label: 'Groove' },
 ];
 
+export const COLOR_TYPE_OPTIONS = [
+  { value: 'card', label: 'Card (Default)' },
+  { value: 'icon', label: 'Icon Only' },
+  { value: 'blank-card', label: 'Blank Card' },
+  { value: 'label-card', label: 'Label Card' },
+];
+
 export const ANIMATION_OPTIONS = [
   { value: 'none', label: 'None' },
-  { value: 'spin', label: 'Spin (Rotate)' },
+  { value: 'spin', label: 'Spin' },
+  { value: 'rotate', label: 'Rotate (Same as Spin)' },
   { value: 'blink', label: 'Blink' },
-  { value: 'pulse', label: 'Pulse (Glow)' },
-  { value: 'flash', label: 'Flash' },
+  { value: 'pulse', label: 'Pulse (Scale)' },
+  { value: 'flash', label: 'Flash (Opacity)' },
   { value: 'jiggle', label: 'Jiggle' },
   { value: 'shake', label: 'Shake' },
   { value: 'bounce', label: 'Bounce' },
-  { value: 'marquee', label: 'Marquee (Card Only)' },
+  { value: 'glow', label: 'Glow (Shadow Pulse)' },
+  { value: 'float', label: 'Float (Up/Down)' },
+  { value: 'swing', label: 'Swing (Pendulum)' },
+  { value: 'rubberBand', label: 'Rubber Band' },
+  { value: 'tada', label: 'Tada (Attention)' },
+  { value: 'heartbeat', label: 'Heartbeat' },
+  { value: 'flip', label: 'Flip (3D)' },
+  { value: 'wobble', label: 'Wobble' },
+  { value: 'breathe', label: 'Breathe (Opacity)' },
+  { value: 'ripple', label: 'Ripple Effect' },
+  { value: 'marquee', label: 'Marquee Border (Card Only)' },
 ];
 
 export const TRIGGER_OPTIONS = [
@@ -85,6 +124,11 @@ export const SHADOW_SIZE_OPTIONS = [
   { value: 'lg', label: 'Large' },
   { value: 'xl', label: 'Extra Large' },
   { value: 'inner', label: 'Inner Shadow' },
+];
+
+export const PROTECT_TYPE_OPTIONS = [
+  { value: 'pin', label: 'PIN Code' },
+  { value: 'password', label: 'Password' },
 ];
 
 // Mock icons for preview mapping (since we don't load all MDIs)

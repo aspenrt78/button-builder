@@ -1,5 +1,5 @@
 
-import { ButtonConfig, AnimationType, CustomField } from "../types";
+import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig } from "../types";
 
 // Helper to convert hex + opacity (0-100) to RGBA string
 const hexToRgba = (hex: string, opacity: number) => {
@@ -33,8 +33,83 @@ const getAnimationCSS = (type: AnimationType, speed: string = '2s') => {
     case 'blink': return `animation: cba-blink 1s infinite`;
     case 'rotate':
     case 'spin': return `animation: cba-rotate ${speed} linear infinite`;
+    case 'glow': return `animation: cba-glow ${speed} ease-in-out infinite`;
+    case 'float': return `animation: cba-float ${speed} ease-in-out infinite`;
+    case 'swing': return `animation: cba-swing ${speed} ease-in-out infinite`;
+    case 'rubberBand': return `animation: cba-rubberBand 1s ease infinite`;
+    case 'tada': return `animation: cba-tada 1s ease infinite`;
+    case 'heartbeat': return `animation: cba-heartbeat 1.5s ease-in-out infinite`;
+    case 'flip': return `animation: cba-flip ${speed} ease-in-out infinite`;
+    case 'wobble': return `animation: cba-wobble 1s ease infinite`;
+    case 'breathe': return `animation: cba-breathe ${speed} ease-in-out infinite`;
+    case 'ripple': return `animation: cba-ripple 1.5s ease-out infinite`;
     default: return null;
   }
+};
+
+// Helper to generate action YAML
+const generateActionYaml = (
+  actionType: string,
+  actionData: string,
+  actionNavigation: string,
+  actionJavascript?: string,
+  actionToast?: ToastConfig,
+  repeatMs?: number,
+  repeatLimit?: number
+): string => {
+  let yaml = `  action: ${actionType}\n`;
+  
+  if (actionType === 'call-service' && actionData) {
+    try {
+      const data = JSON.parse(actionData);
+      yaml += `  service: ${data.service || ''}\n`;
+      if (data.service_data) {
+        yaml += `  service_data:\n`;
+        Object.entries(data.service_data).forEach(([key, value]) => {
+          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
+        });
+      }
+      if (data.target) {
+        yaml += `  target:\n`;
+        Object.entries(data.target).forEach(([key, value]) => {
+          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
+        });
+      }
+    } catch (e) {
+      yaml += `  # Invalid JSON in action_data\n`;
+    }
+  }
+  
+  if (actionType === 'navigate' && actionNavigation) {
+    yaml += `  navigation_path: ${actionNavigation}\n`;
+  }
+  
+  if (actionType === 'url' && actionNavigation) {
+    yaml += `  url_path: ${actionNavigation}\n`;
+  }
+  
+  if (actionType === 'javascript' && actionJavascript) {
+    yaml += `  code: |\n    ${actionJavascript.split('\n').join('\n    ')}\n`;
+  }
+  
+  if (actionType === 'toast' && actionToast) {
+    yaml += `  message: "${actionToast.message}"\n`;
+    if (actionToast.duration !== 3000) {
+      yaml += `  duration: ${actionToast.duration}\n`;
+    }
+    if (actionToast.dismissable === false) {
+      yaml += `  dismissable: false\n`;
+    }
+  }
+  
+  if (repeatMs && repeatMs > 0) {
+    yaml += `  repeat: ${repeatMs}\n`;
+    if (repeatLimit && repeatLimit > 0) {
+      yaml += `  repeat_limit: ${repeatLimit}\n`;
+    }
+  }
+  
+  return yaml;
 };
 
 export const generateYaml = (config: ButtonConfig): string => {
@@ -81,7 +156,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.iconColorAuto) iconStyles.push(`color: var(--button-card-light-color)`);
   else if (config.iconColor) iconStyles.push(`color: ${config.iconColor}`);
   
-  if (config.spin) {
+  if (config.spin || config.rotate) {
     iconStyles.push(`animation: cba-rotate ${config.spinDuration} linear infinite`);
   }
 
@@ -99,6 +174,24 @@ export const generateYaml = (config: ButtonConfig): string => {
   let yaml = `type: custom:button-card
 entity: ${config.entity}
 `;
+
+  // Trigger Entity
+  if (config.triggerEntity) {
+    yaml += `trigger_entity: ${config.triggerEntity}\n`;
+  }
+
+  // Triggers Update (array of entities)
+  if (config.triggersUpdate && config.triggersUpdate.length > 0) {
+    yaml += `triggers_update:\n`;
+    config.triggersUpdate.forEach(entity => {
+      yaml += `  - ${entity}\n`;
+    });
+  }
+
+  // Units override
+  if (config.units) {
+    yaml += `units: "${config.units}"\n`;
+  }
 
   // Core fields with templates
   if (config.nameTemplate) {
@@ -125,6 +218,21 @@ entity: ${config.entity}
     yaml += `entity_picture: ${config.entityPicture}\n`;
   }
 
+  // State Display
+  if (config.stateDisplayTemplate) {
+    yaml += `state_display: ${config.stateDisplayTemplate}\n`;
+  } else if (config.stateDisplay) {
+    yaml += `state_display: "${config.stateDisplay}"\n`;
+  }
+
+  // Variables
+  if (config.variables && config.variables.length > 0) {
+    yaml += `variables:\n`;
+    config.variables.forEach(v => {
+      yaml += `  ${v.name}: ${v.value}\n`;
+    });
+  }
+
   // Show options
   yaml += `show_name: ${config.showName}
 show_icon: ${config.showIcon}
@@ -133,7 +241,23 @@ show_label: ${config.showLabel}
 show_entity_picture: ${config.showEntityPicture}
 show_last_changed: ${config.showLastChanged}
 show_units: ${config.showUnits}
-size: ${config.size}
+`;
+
+  // New show options
+  if (config.showRipple === false) {
+    yaml += `show_ripple: false\n`;
+  }
+  if (config.showLiveStream) {
+    yaml += `show_live_stream: true\n`;
+    if (config.liveStreamAspectRatio) {
+      yaml += `live_stream_aspect_ratio: ${config.liveStreamAspectRatio}\n`;
+    }
+    if (config.liveStreamFitMode) {
+      yaml += `live_stream_fit: ${config.liveStreamFitMode}\n`;
+    }
+  }
+
+  yaml += `size: ${config.size}
 layout: ${config.layout}
 color_type: ${config.colorType}
 `;
@@ -146,16 +270,80 @@ color_type: ${config.colorType}
     yaml += `aspect_ratio: ${config.aspectRatio}\n`;
   }
 
-  // Tooltip
-  if (config.tooltip) {
-    yaml += `tooltip: "${config.tooltip}"\n`;
+  // Card Size
+  if (config.cardSize !== 3) {
+    yaml += `card_size: ${config.cardSize}\n`;
   }
 
-  // Lock
-  if (config.lock) {
-    yaml += `lock:\n  enabled: true\n`;
-    if (config.lockCode) {
-      yaml += `  code: "${config.lockCode}"\n`;
+  // Section Mode / Grid Options
+  if (config.sectionMode) {
+    yaml += `section_mode: true\n`;
+    yaml += `grid_options:\n`;
+    yaml += `  rows: ${config.gridRows}\n`;
+    yaml += `  columns: ${config.gridColumns}\n`;
+  }
+
+  // Numeric Precision
+  if (config.numericPrecision >= 0) {
+    yaml += `numeric_precision: ${config.numericPrecision}\n`;
+  }
+
+  // Hidden
+  if (config.hidden) {
+    if (config.hiddenTemplate) {
+      yaml += `hidden: ${config.hiddenTemplate}\n`;
+    } else {
+      yaml += `hidden: true\n`;
+    }
+  }
+
+  // Spinner
+  if (config.spinner) {
+    if (config.spinnerTemplate) {
+      yaml += `spinner: ${config.spinnerTemplate}\n`;
+    } else {
+      yaml += `spinner: true\n`;
+    }
+  }
+
+  // Group Expand
+  if (config.groupExpand) {
+    yaml += `group_expand: true\n`;
+  }
+
+  // Tooltip (object-style)
+  if (config.tooltip.enabled && config.tooltip.content) {
+    yaml += `tooltip:\n`;
+    yaml += `  content: "${config.tooltip.content}"\n`;
+    if (config.tooltip.position !== 'top') {
+      yaml += `  position: ${config.tooltip.position}\n`;
+    }
+  }
+
+  // Lock (full config)
+  if (config.lock.enabled) {
+    yaml += `lock:\n`;
+    yaml += `  enabled: true\n`;
+    if (config.lock.duration !== 5) {
+      yaml += `  duration: ${config.lock.duration}\n`;
+    }
+    if (config.lock.unlock !== 'tap') {
+      yaml += `  unlock: ${config.lock.unlock}\n`;
+    }
+    if (config.lock.lockIcon !== 'mdi:lock-outline') {
+      yaml += `  lock_icon: ${config.lock.lockIcon}\n`;
+    }
+    if (config.lock.unlockIcon !== 'mdi:lock-open-outline') {
+      yaml += `  unlock_icon: ${config.lock.unlockIcon}\n`;
+    }
+    if (config.lock.keepUnlockIcon) {
+      yaml += `  keep_unlock_icon: true\n`;
+    }
+    if (config.lock.exemptions && config.lock.exemptions.length > 0) {
+      yaml += `  exemptions:\n`;
+      config.lock.exemptions.forEach(e => {
+        yaml += `    - user: ${e}\n`;
+      });
     }
   }
 
@@ -164,80 +352,162 @@ color_type: ${config.colorType}
     yaml += `hold_time: ${config.holdTime}\n`;
   }
 
+  // Update Timer
+  if (config.updateTimer > 0) {
+    yaml += `update_timer: ${config.updateTimer}\n`;
+  }
+
+  // Template
+  if (config.template) {
+    yaml += `template: ${config.template}\n`;
+  }
+
   // Haptic
   if (config.hapticFeedback) {
     yaml += `haptic: true\n`;
   }
 
-  // Actions
-  yaml += `tap_action:
-  action: ${config.tapAction}
-`;
-  if (config.tapAction === 'call-service' && config.tapActionData) {
-    try {
-      const data = JSON.parse(config.tapActionData);
-      yaml += `  service: ${data.service || ''}\n`;
-      if (data.service_data) {
-        yaml += `  service_data:\n`;
-        Object.entries(data.service_data).forEach(([key, value]) => {
-          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
-        });
-      }
-    } catch (e) {
-      yaml += `  # Invalid JSON in tap_action_data\n`;
-    }
-  }
-  if ((config.tapAction === 'navigate' || config.tapAction === 'url') && config.tapActionNavigation) {
-    yaml += `  navigation_path: ${config.tapActionNavigation}\n`;
+  // Disable Keyboard
+  if (config.disableKeyboard) {
+    yaml += `disable_keyboard: true\n`;
   }
 
-  yaml += `hold_action:
-  action: ${config.holdAction}
-`;
-  if (config.holdAction === 'call-service' && config.holdActionData) {
-    try {
-      const data = JSON.parse(config.holdActionData);
-      yaml += `  service: ${data.service || ''}\n`;
-      if (data.service_data) {
-        yaml += `  service_data:\n`;
-        Object.entries(data.service_data).forEach(([key, value]) => {
-          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
-        });
-      }
-    } catch (e) {
-      yaml += `  # Invalid JSON in hold_action_data\n`;
-    }
-  }
-  if ((config.holdAction === 'navigate' || config.holdAction === 'url') && config.holdActionNavigation) {
-    yaml += `  navigation_path: ${config.holdActionNavigation}\n`;
+  // Actions - Tap
+  yaml += `tap_action:\n`;
+  yaml += generateActionYaml(
+    config.tapAction,
+    config.tapActionData,
+    config.tapActionNavigation,
+    config.tapActionJavascript,
+    config.tapActionToast
+  );
+  if (config.tapActionSound) {
+    yaml += `  haptic: ${config.tapActionSound}\n`;
   }
 
-  yaml += `double_tap_action:
-  action: ${config.doubleTapAction}
-`;
-  if (config.doubleTapAction === 'call-service' && config.doubleTapActionData) {
-    try {
-      const data = JSON.parse(config.doubleTapActionData);
-      yaml += `  service: ${data.service || ''}\n`;
-      if (data.service_data) {
-        yaml += `  service_data:\n`;
-        Object.entries(data.service_data).forEach(([key, value]) => {
-          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
-        });
-      }
-    } catch (e) {
-      yaml += `  # Invalid JSON in double_tap_action_data\n`;
-    }
+  // Actions - Hold
+  yaml += `hold_action:\n`;
+  yaml += generateActionYaml(
+    config.holdAction,
+    config.holdActionData,
+    config.holdActionNavigation,
+    config.holdActionJavascript,
+    config.holdActionToast,
+    config.holdActionRepeat,
+    config.holdActionRepeatLimit
+  );
+  if (config.holdActionSound) {
+    yaml += `  haptic: ${config.holdActionSound}\n`;
   }
-  if ((config.doubleTapAction === 'navigate' || config.doubleTapAction === 'url') && config.doubleTapActionNavigation) {
-    yaml += `  navigation_path: ${config.doubleTapActionNavigation}\n`;
+
+  // Actions - Double Tap
+  yaml += `double_tap_action:\n`;
+  yaml += generateActionYaml(
+    config.doubleTapAction,
+    config.doubleTapActionData,
+    config.doubleTapActionNavigation,
+    config.doubleTapActionJavascript,
+    config.doubleTapActionToast
+  );
+  if (config.doubleTapActionSound) {
+    yaml += `  haptic: ${config.doubleTapActionSound}\n`;
+  }
+
+  // Momentary Actions - Press
+  if (config.pressAction !== 'none') {
+    yaml += `press_action:\n`;
+    yaml += generateActionYaml(
+      config.pressAction,
+      config.pressActionData,
+      config.pressActionNavigation,
+      config.pressActionJavascript
+    );
+  }
+
+  // Momentary Actions - Release
+  if (config.releaseAction !== 'none') {
+    yaml += `release_action:\n`;
+    yaml += generateActionYaml(
+      config.releaseAction,
+      config.releaseActionData,
+      config.releaseActionNavigation,
+      config.releaseActionJavascript
+    );
+  }
+
+  // Icon Actions
+  if (config.iconTapAction !== 'none') {
+    yaml += `icon_tap_action:\n`;
+    yaml += generateActionYaml(
+      config.iconTapAction,
+      config.iconTapActionData,
+      config.iconTapActionNavigation,
+      config.iconTapActionJavascript
+    );
+  }
+
+  if (config.iconHoldAction !== 'none') {
+    yaml += `icon_hold_action:\n`;
+    yaml += generateActionYaml(
+      config.iconHoldAction,
+      config.iconHoldActionData,
+      config.iconHoldActionNavigation,
+      config.iconHoldActionJavascript
+    );
+  }
+
+  if (config.iconDoubleTapAction !== 'none') {
+    yaml += `icon_double_tap_action:\n`;
+    yaml += generateActionYaml(
+      config.iconDoubleTapAction,
+      config.iconDoubleTapActionData,
+      config.iconDoubleTapActionNavigation,
+      config.iconDoubleTapActionJavascript
+    );
+  }
+
+  // Icon Momentary Actions
+  if (config.iconPressAction !== 'none') {
+    yaml += `icon_press_action:\n`;
+    yaml += generateActionYaml(
+      config.iconPressAction,
+      config.iconPressActionData,
+      config.iconPressActionNavigation
+    );
+  }
+
+  if (config.iconReleaseAction !== 'none') {
+    yaml += `icon_release_action:\n`;
+    yaml += generateActionYaml(
+      config.iconReleaseAction,
+      config.iconReleaseActionData,
+      config.iconReleaseActionNavigation
+    );
   }
 
   // Confirmation
   if (config.confirmation.enabled) {
-    yaml += `confirmation:
-  text: "${config.confirmation.text}"
-`;
+    yaml += `confirmation:\n`;
+    yaml += `  text: "${config.confirmation.text}"\n`;
+    if (config.confirmation.exemptions && config.confirmation.exemptions.length > 0) {
+      yaml += `  exemptions:\n`;
+      config.confirmation.exemptions.forEach(e => {
+        yaml += `    - user: ${e}\n`;
+      });
+    }
+  }
+
+  // Protect (PIN/Password)
+  if (config.protect.enabled) {
+    yaml += `protect:\n`;
+    yaml += `  type: ${config.protect.type}\n`;
+    yaml += `  code: "${config.protect.value}"\n`;
+    if (config.protect.failureMessage) {
+      yaml += `  failure_message: "${config.protect.failureMessage}"\n`;
+    }
+    if (config.protect.successMessage) {
+      yaml += `  success_message: "${config.protect.successMessage}"\n`;
+    }
   }
 
   // Custom Fields
@@ -269,7 +539,7 @@ color_type: ${config.colorType}
 `;
   }
   // Add generic keyframes if any animation is used
-  const needsGenericKeyframes = (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') || config.iconAnimation !== 'none' || config.spin;
+  const needsGenericKeyframes = (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') || config.iconAnimation !== 'none' || config.spin || config.rotate;
   if (needsGenericKeyframes) {
      extraStyles += `  @keyframes cba-flash {
     0%, 50%, 100% { opacity: 1; }
@@ -303,6 +573,64 @@ color_type: ${config.colorType}
   @keyframes cba-rotate {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  @keyframes cba-glow {
+    0%, 100% { box-shadow: 0 0 5px currentColor, 0 0 10px currentColor; }
+    50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+  }
+  @keyframes cba-swing {
+    0%, 100% { transform: rotate(0deg); transform-origin: top center; }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-15deg); }
+  }
+  @keyframes cba-heartbeat {
+    0%, 100% { transform: scale(1); }
+    14% { transform: scale(1.3); }
+    28% { transform: scale(1); }
+    42% { transform: scale(1.3); }
+    70% { transform: scale(1); }
+  }
+  @keyframes cba-rubber {
+    0% { transform: scale(1, 1); }
+    30% { transform: scale(1.25, 0.75); }
+    40% { transform: scale(0.75, 1.25); }
+    50% { transform: scale(1.15, 0.85); }
+    65% { transform: scale(0.95, 1.05); }
+    75% { transform: scale(1.05, 0.95); }
+    100% { transform: scale(1, 1); }
+  }
+  @keyframes cba-fade {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  @keyframes cba-slide-up {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes cba-slide-down {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(5px); }
+  }
+  @keyframes cba-tada {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    10%, 20% { transform: scale(0.9) rotate(-3deg); }
+    30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
+    40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
+  }
+  @keyframes cba-wobble {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    15% { transform: translateX(-5px) rotate(-5deg); }
+    30% { transform: translateX(4px) rotate(3deg); }
+    45% { transform: translateX(-3px) rotate(-3deg); }
+    60% { transform: translateX(2px) rotate(2deg); }
+    75% { transform: translateX(-1px) rotate(-1deg); }
+  }
+  @keyframes cba-flip {
+    0% { transform: perspective(400px) rotateY(0); }
+    40% { transform: perspective(400px) rotateY(170deg); }
+    50% { transform: perspective(400px) rotateY(190deg); }
+    80% { transform: perspective(400px) rotateY(360deg); }
+    100% { transform: perspective(400px) rotateY(360deg); }
   }
 `;
   }
@@ -356,10 +684,68 @@ ${stateColorLine}
 `;
   }
 
+  // Entity Picture Styles
+  if (config.entityPictureStyles) {
+    yaml += `  entity_picture:\n`;
+    config.entityPictureStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        yaml += `    - ${line.trim()}\n`;
+      }
+    });
+  }
+
+  // Grid Styles
+  if (config.gridStyles) {
+    yaml += `  grid:\n`;
+    config.gridStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        yaml += `    - ${line.trim()}\n`;
+      }
+    });
+  }
+
+  // Custom Field Styles
+  const fieldsWithStyles = config.customFields.filter(f => f.styles);
+  if (fieldsWithStyles.length > 0) {
+    yaml += `  custom_fields:\n`;
+    fieldsWithStyles.forEach(field => {
+      yaml += `    ${field.name}:\n`;
+      field.styles!.split('\n').forEach(line => {
+        if (line.trim()) {
+          yaml += `      - ${line.trim()}\n`;
+        }
+      });
+    });
+  }
+
+  // Lock Styles
+  if (config.lock.enabled && config.lockStyles) {
+    yaml += `  lock:\n`;
+    config.lockStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        yaml += `    - ${line.trim()}\n`;
+      }
+    });
+  }
+
+  // Tooltip Styles
+  if (config.tooltip.enabled && config.tooltipStyles) {
+    yaml += `  tooltip:\n`;
+    config.tooltipStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        yaml += `    - ${line.trim()}\n`;
+      }
+    });
+  }
+
+  // --- Resolve onColor/offColor for state logic ---
+  const onColorResolved = hexToRgba(config.stateOnColor, config.stateOnOpacity);
+  const offColorResolved = hexToRgba(config.stateOffColor, config.stateOffOpacity);
+
   // --- Conditional State Logic ---
   const getStateLogic = (stateVal: 'on' | 'off', bgColor: string) => {
      const stateCardStyles = [`background-color: ${bgColor}`];
-     const stateIconStyles = [];
+     const stateIconStyles: string[] = [];
      
      // Conditional Card Animation
      if (config.cardAnimation !== 'none' && config.cardAnimationTrigger === stateVal) {
@@ -384,7 +770,7 @@ ${stateColorLine}
             - inset: -4px
             - z-index: -1
             - background: conic-gradient(transparent 20%, var(--button-card-light-color, ${config.borderColor || '#FFC107'}))
-            - animation: cba-marquee-spin 4s linear infinite`;
+            - animation: cba-marquee-spin ${config.cardAnimationSpeed || '4s'} linear infinite`;
      }
 
      return `  - value: '${stateVal}'
@@ -397,9 +783,140 @@ ${stateIconStyles.map(s => `        - ${s}`).join('\n')}` : ''}`;
   };
 
   yaml += `state:
-${getStateLogic('on', onColor)}
-${getStateLogic('off', offColor)}
+${getStateLogic('on', onColorResolved)}
+${getStateLogic('off', offColorResolved)}
 `;
+
+  // Custom State Styles / Conditionals
+  if (config.stateStyles && config.stateStyles.length > 0) {
+    config.stateStyles.forEach(stateStyle => {
+      yaml += `  - `;
+      
+      // Operator
+      if (stateStyle.operator === 'default') {
+        yaml += `operator: default\n`;
+      } else if (stateStyle.operator === 'template') {
+        yaml += `value: ${stateStyle.value}\n`;
+      } else if (stateStyle.operator === 'regex') {
+        yaml += `operator: regex\n`;
+        yaml += `    value: "${stateStyle.value}"\n`;
+      } else if (stateStyle.operator === 'above') {
+        yaml += `operator: '>'\n`;
+        yaml += `    value: ${stateStyle.value}\n`;
+      } else if (stateStyle.operator === 'below') {
+        yaml += `operator: '<'\n`;
+        yaml += `    value: ${stateStyle.value}\n`;
+      } else if (stateStyle.operator === 'not_equals') {
+        yaml += `operator: '!='\n`;
+        yaml += `    value: '${stateStyle.value}'\n`;
+      } else {
+        yaml += `value: '${stateStyle.value}'\n`;
+      }
+      
+      // Basic Overrides
+      if (stateStyle.name) {
+        yaml += `    name: "${stateStyle.name}"\n`;
+      }
+      if (stateStyle.icon) {
+        yaml += `    icon: ${stateStyle.icon}\n`;
+      }
+      if (stateStyle.color) {
+        yaml += `    color: "${stateStyle.color}"\n`;
+      }
+      if (stateStyle.entityPicture) {
+        yaml += `    entity_picture: ${stateStyle.entityPicture}\n`;
+      }
+      if (stateStyle.label) {
+        yaml += `    label: "${stateStyle.label}"\n`;
+      }
+      if (stateStyle.stateDisplay) {
+        yaml += `    state_display: "${stateStyle.stateDisplay}"\n`;
+      }
+      if (stateStyle.spin) {
+        yaml += `    spin: true\n`;
+      }
+      
+      // Build styles for conditional colors and animations
+      const conditionalCardStyles: string[] = [];
+      const conditionalIconStyles: string[] = [];
+      const conditionalNameStyles: string[] = [];
+      const conditionalLabelStyles: string[] = [];
+      
+      // Conditional Colors
+      if (stateStyle.backgroundColor) {
+        conditionalCardStyles.push(`background-color: ${stateStyle.backgroundColor}`);
+      }
+      if (stateStyle.borderColor) {
+        conditionalCardStyles.push(`border-color: ${stateStyle.borderColor}`);
+      }
+      if (stateStyle.iconColor) {
+        conditionalIconStyles.push(`color: ${stateStyle.iconColor}`);
+      }
+      if (stateStyle.nameColor) {
+        conditionalNameStyles.push(`color: ${stateStyle.nameColor}`);
+      }
+      if (stateStyle.labelColor) {
+        conditionalLabelStyles.push(`color: ${stateStyle.labelColor}`);
+      }
+      
+      // Conditional Animations
+      if (stateStyle.cardAnimation && stateStyle.cardAnimation !== 'none') {
+        const cardAnimCSS = getAnimationCSS(stateStyle.cardAnimation, stateStyle.cardAnimationSpeed || '2s');
+        if (cardAnimCSS) {
+          conditionalCardStyles.push(cardAnimCSS);
+        }
+      }
+      if (stateStyle.iconAnimation && stateStyle.iconAnimation !== 'none') {
+        const iconAnimCSS = getAnimationCSS(stateStyle.iconAnimation, stateStyle.iconAnimationSpeed || '2s');
+        if (iconAnimCSS) {
+          conditionalIconStyles.push(iconAnimCSS);
+        }
+      }
+      
+      // Output styles section if any conditional styles exist
+      const hasConditionalStyles = conditionalCardStyles.length > 0 || conditionalIconStyles.length > 0 || 
+                                   conditionalNameStyles.length > 0 || conditionalLabelStyles.length > 0 || 
+                                   stateStyle.styles;
+      
+      if (hasConditionalStyles) {
+        yaml += `    styles:\n`;
+        
+        if (conditionalCardStyles.length > 0) {
+          yaml += `      card:\n`;
+          conditionalCardStyles.forEach(s => {
+            yaml += `        - ${s}\n`;
+          });
+        }
+        if (conditionalIconStyles.length > 0) {
+          yaml += `      icon:\n`;
+          conditionalIconStyles.forEach(s => {
+            yaml += `        - ${s}\n`;
+          });
+        }
+        if (conditionalNameStyles.length > 0) {
+          yaml += `      name:\n`;
+          conditionalNameStyles.forEach(s => {
+            yaml += `        - ${s}\n`;
+          });
+        }
+        if (conditionalLabelStyles.length > 0) {
+          yaml += `      label:\n`;
+          conditionalLabelStyles.forEach(s => {
+            yaml += `        - ${s}\n`;
+          });
+        }
+        
+        // Additional raw styles from textarea
+        if (stateStyle.styles) {
+          stateStyle.styles.split('\n').forEach(line => {
+            if (line.trim()) {
+              yaml += `      ${line.trim()}\n`;
+            }
+          });
+        }
+      }
+    });
+  }
 
   return yaml;
 };

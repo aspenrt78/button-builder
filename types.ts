@@ -5,8 +5,11 @@ export interface ButtonStyle {
   textTransform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
 }
 
-export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'rotate';
+export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'rotate' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat' | 'flip' | 'wobble' | 'breathe' | 'ripple';
 export type AnimationTrigger = 'always' | 'on' | 'off';
+export type ActionType = 'none' | 'toggle' | 'more-info' | 'call-service' | 'perform-action' | 'navigate' | 'url' | 'assist' | 'fire-dom-event' | 'javascript' | 'multi-actions' | 'toast';
+export type LockUnlockType = 'tap' | 'hold' | 'double_tap';
+export type StateOperator = 'equals' | 'not_equals' | 'above' | 'below' | 'regex' | 'template' | 'default';
 
 export interface CustomField {
   name: string;
@@ -15,10 +18,69 @@ export interface CustomField {
   styles?: string;
 }
 
+export interface Variable {
+  name: string;
+  value: string;
+}
+
 export interface Confirmation {
   enabled: boolean;
   text: string;
   exemptions?: string[];
+}
+
+export interface LockConfig {
+  enabled: boolean;
+  duration: number;
+  unlock: LockUnlockType;
+  lockIcon: string;
+  unlockIcon: string;
+  keepUnlockIcon: boolean;
+  exemptions: string[];
+}
+
+export interface ProtectConfig {
+  enabled: boolean;
+  type: 'pin' | 'password';
+  value: string;
+  failureMessage: string;
+  successMessage: string;
+}
+
+export interface TooltipConfig {
+  enabled: boolean;
+  content: string;
+}
+
+export interface ToastConfig {
+  message: string;
+  duration: number;
+  dismissable: boolean;
+}
+
+export interface StateStyleConfig {
+  id: string;
+  operator: StateOperator;
+  value: string;
+  name: string;
+  icon: string;
+  color: string;
+  entityPicture: string;
+  label: string;
+  stateDisplay: string;
+  spin: boolean;
+  styles: string;
+  // Conditional Colors
+  backgroundColor: string;
+  iconColor: string;
+  nameColor: string;
+  labelColor: string;
+  borderColor: string;
+  // Conditional Animations
+  cardAnimation: AnimationType;
+  cardAnimationSpeed: string;
+  iconAnimation: AnimationType;
+  iconAnimationSpeed: string;
 }
 
 export interface ButtonConfig {
@@ -28,11 +90,19 @@ export interface ButtonConfig {
   label: string;
   icon: string;
   entityPicture: string;
+  stateDisplay: string;
   
   // Templates (for dynamic values)
   nameTemplate: string;
   labelTemplate: string;
   iconTemplate: string;
+  stateDisplayTemplate: string;
+  
+  // Variables
+  variables: Variable[];
+  
+  // Units override
+  units: string;
   
   // Toggles
   showName: boolean;
@@ -42,14 +112,21 @@ export interface ButtonConfig {
   showLastChanged: boolean;
   showEntityPicture: boolean;
   showUnits: boolean;
+  showRipple: boolean;
+  showLiveStream: boolean;
+  liveStreamAspectRatio: string;
   
   // Layout & Dimensions
-  size: string; // Icon size
+  size: string;
   layout: 'vertical' | 'icon_name_state2nd' | 'icon_name_state' | 'icon_state_name2nd' | 'icon_state' | 'name_state' | 'icon_label';
-  aspectRatio: string; // e.g. "1/1", "4/3"
+  aspectRatio: string;
   height: string;
   padding: string;
   borderRadius: string;
+  cardSize: number;
+  sectionMode: boolean;
+  gridRows: number;
+  gridColumns: number;
   
   // Borders
   borderWidth: string;
@@ -59,18 +136,18 @@ export interface ButtonConfig {
   
   // Styles
   colorType: 'card' | 'icon' | 'blank-card' | 'label-card';
-  colorAuto: boolean; // Sets color: auto (uses entity color)
+  colorAuto: boolean;
   backgroundColor: string;
-  backgroundColorOpacity: number; // 0-100
-  color: string; // Default Global Text Color
+  backgroundColorOpacity: number;
+  color: string;
   
   // Glass / Depth
-  backdropBlur: string; // e.g. '0px', '10px'
+  backdropBlur: string;
   shadowSize: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner';
   shadowColor: string;
   shadowOpacity: number;
   
-  // Element Specific Colors (Overrides)
+  // Element Specific Colors
   iconColor: string;
   iconColorAuto: boolean;
   nameColor: string;
@@ -86,12 +163,14 @@ export interface ButtonConfig {
   textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   letterSpacing: string;
   lineHeight: string;
+  numericPrecision: number;
   
   // State Styles
   stateOnColor: string;
-  stateOnOpacity: number; // 0-100
+  stateOnOpacity: number;
   stateOffColor: string;
-  stateOffOpacity: number; // 0-100
+  stateOffOpacity: number;
+  stateStyles: StateStyleConfig[];
   
   // Animations
   cardAnimation: AnimationType;
@@ -100,53 +179,134 @@ export interface ButtonConfig {
   iconAnimation: AnimationType;
   iconAnimationTrigger: AnimationTrigger;
   iconAnimationSpeed: string;
+  rotate: boolean;
 
-  // Actions
-  tapAction: string;
-  holdAction: string;
-  doubleTapAction: string;
-  
-  // Action Data
-  tapActionData: string; // JSON string for service data
-  holdActionData: string;
-  doubleTapActionData: string;
-  
-  // Navigation/URL for actions
+  // Card Actions
+  tapAction: ActionType;
+  tapActionData: string;
   tapActionNavigation: string;
+  tapActionJavascript: string;
+  tapActionToast: ToastConfig;
+  
+  holdAction: ActionType;
+  holdActionData: string;
   holdActionNavigation: string;
+  holdActionJavascript: string;
+  holdActionRepeat: number;
+  holdActionRepeatLimit: number;
+  holdActionToast: ToastConfig;
+  
+  doubleTapAction: ActionType;
+  doubleTapActionData: string;
   doubleTapActionNavigation: string;
+  doubleTapActionJavascript: string;
+  doubleTapActionToast: ToastConfig;
+  
+  // Momentary Actions (press/release)
+  pressAction: ActionType;
+  pressActionData: string;
+  pressActionNavigation: string;
+  pressActionJavascript: string;
+  
+  releaseAction: ActionType;
+  releaseActionData: string;
+  releaseActionNavigation: string;
+  releaseActionJavascript: string;
+  
+  // Icon-specific Actions
+  iconTapAction: ActionType;
+  iconTapActionData: string;
+  iconTapActionNavigation: string;
+  iconTapActionJavascript: string;
+  
+  iconHoldAction: ActionType;
+  iconHoldActionData: string;
+  iconHoldActionNavigation: string;
+  iconHoldActionJavascript: string;
+  
+  iconDoubleTapAction: ActionType;
+  iconDoubleTapActionData: string;
+  iconDoubleTapActionNavigation: string;
+  iconDoubleTapActionJavascript: string;
+  
+  // Icon Momentary Actions
+  iconPressAction: ActionType;
+  iconPressActionData: string;
+  iconPressActionNavigation: string;
+  
+  iconReleaseAction: ActionType;
+  iconReleaseActionData: string;
+  iconReleaseActionNavigation: string;
+  
+  // Action sounds
+  tapActionSound: string;
+  holdActionSound: string;
+  doubleTapActionSound: string;
   
   // Confirmation
   confirmation: Confirmation;
   
   // Lock
-  lock: boolean;
-  lockCode: string;
+  lock: LockConfig;
+  
+  // Protect (per-action PIN/password)
+  protect: ProtectConfig;
   
   // Tooltip
-  tooltip: string;
+  tooltip: TooltipConfig;
   
   // Custom Fields
   customFields: CustomField[];
   
   // Advanced
-  cardOpacity: number; // Overall card opacity
-  holdTime: number; // Time in ms to trigger hold action
-  triggerAction: string; // Entity state that triggers actions
-  hapticFeedback: boolean;
+  cardOpacity: number;
+  updateTimer: number;
+  hidden: boolean;
+  hiddenTemplate: string;
+  disableKeyboard: boolean;
+  spinner: boolean;
+  groupExpand: boolean;
+  template: string;
   
   // Spin/Rotation
-  spin: boolean; // If icon should spin (for fans, etc)
+  spin: boolean;
   spinDuration: string;
   
   // Extra Styles (raw CSS)
   extraStyles: string;
-  
-  // Conditions
-  conditionalEntity: string; // Entity to check for conditional display
-  conditionalState: string; // State to match for display
-  conditionalOperator: 'equals' | 'not_equals' | 'above' | 'below' | 'contains';
+  entityPictureStyles: string;
+  gridStyles: string;
+  imgCellStyles: string;
 }
+
+export const DEFAULT_TOAST_CONFIG: ToastConfig = {
+  message: '',
+  duration: 3000,
+  dismissable: true,
+};
+
+export const DEFAULT_LOCK_CONFIG: LockConfig = {
+  enabled: false,
+  duration: 5,
+  unlock: 'tap',
+  lockIcon: 'mdi:lock-outline',
+  unlockIcon: 'mdi:lock-open-outline',
+  keepUnlockIcon: false,
+  exemptions: [],
+};
+
+export const DEFAULT_PROTECT_CONFIG: ProtectConfig = {
+  enabled: false,
+  type: 'pin',
+  value: '',
+  failureMessage: 'Invalid code',
+  successMessage: '',
+};
+
+export const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
+  enabled: false,
+  content: '',
+};
 
 export const DEFAULT_CONFIG: ButtonConfig = {
   entity: 'light.living_room',
@@ -154,10 +314,15 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   label: 'Temperature: 24°C',
   icon: 'mdi:sofa',
   entityPicture: '',
+  stateDisplay: '',
   
   nameTemplate: '',
   labelTemplate: '',
   iconTemplate: '',
+  stateDisplayTemplate: '',
+  
+  variables: [],
+  units: '',
   
   showName: true,
   showIcon: true,
@@ -166,6 +331,9 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   showLastChanged: false,
   showEntityPicture: false,
   showUnits: false,
+  showRipple: true,
+  showLiveStream: false,
+  liveStreamAspectRatio: '',
   
   size: '40%',
   layout: 'vertical',
@@ -173,6 +341,10 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   height: 'auto',
   padding: '10%',
   borderRadius: '12px',
+  cardSize: 3,
+  sectionMode: false,
+  gridRows: 2,
+  gridColumns: 6,
   
   borderWidth: '0px',
   borderStyle: 'none',
@@ -204,11 +376,13 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   textTransform: 'capitalize',
   letterSpacing: 'normal',
   lineHeight: 'normal',
+  numericPrecision: -1,
   
   stateOnColor: '#f1c40f',
   stateOnOpacity: 100,
   stateOffColor: '#4a4a4a',
   stateOffOpacity: 100,
+  stateStyles: [],
   
   cardAnimation: 'none',
   cardAnimationTrigger: 'always',
@@ -216,18 +390,67 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   iconAnimation: 'none',
   iconAnimationTrigger: 'on',
   iconAnimationSpeed: '2s',
-  
+  rotate: false,
+
+  // Card Actions
   tapAction: 'toggle',
-  holdAction: 'more-info',
-  doubleTapAction: 'none',
-  
   tapActionData: '',
-  holdActionData: '',
-  doubleTapActionData: '',
-  
   tapActionNavigation: '',
+  tapActionJavascript: '',
+  tapActionToast: { ...DEFAULT_TOAST_CONFIG },
+  
+  holdAction: 'more-info',
+  holdActionData: '',
   holdActionNavigation: '',
+  holdActionJavascript: '',
+  holdActionRepeat: 0,
+  holdActionRepeatLimit: 0,
+  holdActionToast: { ...DEFAULT_TOAST_CONFIG },
+  
+  doubleTapAction: 'none',
+  doubleTapActionData: '',
   doubleTapActionNavigation: '',
+  doubleTapActionJavascript: '',
+  doubleTapActionToast: { ...DEFAULT_TOAST_CONFIG },
+  
+  // Momentary Actions
+  pressAction: 'none',
+  pressActionData: '',
+  pressActionNavigation: '',
+  pressActionJavascript: '',
+  
+  releaseAction: 'none',
+  releaseActionData: '',
+  releaseActionNavigation: '',
+  releaseActionJavascript: '',
+  
+  // Icon Actions
+  iconTapAction: 'none',
+  iconTapActionData: '',
+  iconTapActionNavigation: '',
+  iconTapActionJavascript: '',
+  
+  iconHoldAction: 'none',
+  iconHoldActionData: '',
+  iconHoldActionNavigation: '',
+  iconHoldActionJavascript: '',
+  
+  iconDoubleTapAction: 'none',
+  iconDoubleTapActionData: '',
+  iconDoubleTapActionNavigation: '',
+  iconDoubleTapActionJavascript: '',
+  
+  iconPressAction: 'none',
+  iconPressActionData: '',
+  iconPressActionNavigation: '',
+  
+  iconReleaseAction: 'none',
+  iconReleaseActionData: '',
+  iconReleaseActionNavigation: '',
+  
+  tapActionSound: '',
+  holdActionSound: '',
+  doubleTapActionSound: '',
   
   confirmation: {
     enabled: false,
@@ -235,24 +458,26 @@ export const DEFAULT_CONFIG: ButtonConfig = {
     exemptions: [],
   },
   
-  lock: false,
-  lockCode: '',
-  
-  tooltip: '',
+  lock: { ...DEFAULT_LOCK_CONFIG },
+  protect: { ...DEFAULT_PROTECT_CONFIG },
+  tooltip: { ...DEFAULT_TOOLTIP_CONFIG },
   
   customFields: [],
   
   cardOpacity: 100,
-  holdTime: 500,
-  triggerAction: '',
-  hapticFeedback: false,
+  updateTimer: 0,
+  hidden: false,
+  hiddenTemplate: '',
+  disableKeyboard: false,
+  spinner: false,
+  groupExpand: false,
+  template: '',
   
   spin: false,
   spinDuration: '2s',
   
   extraStyles: '',
-  
-  conditionalEntity: '',
-  conditionalState: '',
-  conditionalOperator: 'equals',
+  entityPictureStyles: '',
+  gridStyles: '',
+  imgCellStyles: '',
 };

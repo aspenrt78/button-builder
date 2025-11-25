@@ -5,13 +5,13 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
-      base: '/button_card_architect/',
+      base: '/button_builder/',
       server: {
         port: 3000,
         host: '0.0.0.0',
       },
       build: {
-        outDir: 'custom_components/button_card_architect/www',
+        outDir: 'custom_components/button_builder/www',
         emptyOutDir: false, // Don't delete panel.html
         rollupOptions: {
           output: {
