@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ConfigPanel } from './components/ConfigPanel';
 import { PreviewCard } from './components/PreviewCard';
 import { YamlViewer } from './components/YamlViewer';
@@ -9,19 +9,45 @@ import { PRESETS, Preset } from './presets';
 import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown } from 'lucide-react';
 import logo from './logo.png';
 
+const STORAGE_KEY = 'button-builder-config';
+
+const loadSavedConfig = (): ButtonConfig => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge with defaults to handle any new fields added in updates
+      return { ...DEFAULT_CONFIG, ...parsed };
+    }
+  } catch (e) {
+    console.warn('Failed to load saved config:', e);
+  }
+  return DEFAULT_CONFIG;
+};
+
 const App: React.FC = () => {
-  const [config, setConfig] = useState<ButtonConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<ButtonConfig>(loadSavedConfig);
   const [isMagicOpen, setIsMagicOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
   const [importYaml, setImportYaml] = useState('');
   const [importError, setImportError] = useState('');
 
+  // Save config to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    } catch (e) {
+      console.warn('Failed to save config:', e);
+    }
+  }, [config]);
+
   const yamlOutput = useMemo(() => generateYaml(config), [config]);
 
   const handleReset = () => {
     if (confirm('Reset all settings to defaults?')) {
       setConfig(DEFAULT_CONFIG);
+      localStorage.removeItem(STORAGE_KEY);
     }
   };
 
