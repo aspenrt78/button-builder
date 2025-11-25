@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { ButtonConfig, CustomField, Variable, StateStyleConfig, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG, DEFAULT_TOAST_CONFIG } from '../types';
 import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
-import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS } from '../constants';
+import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS } from '../constants';
 import { Layers, Type, MousePointer, Palette, Zap, ChevronDown, ChevronRight, Layout, ToggleRight, BoxSelect, Droplets, Activity, Settings, Lock, AlertCircle, Code, Plus, X, Shield, MessageSquare, Variable as VariableIcon, Target, Hand, Image } from 'lucide-react';
 
 interface Props {
@@ -342,16 +342,17 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
 
         {/* 9. Typography */}
         <Section title="Typography" icon={Type}>
-           <div className="grid grid-cols-2 gap-4">
+           <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
+           <div className="grid grid-cols-2 gap-4 mt-3">
               <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} placeholder="14px" />
               <ControlInput label="Transform" type="select" value={config.textTransform} options={TRANSFORM_OPTIONS} onChange={(v) => update('textTransform', v)} />
            </div>
            <div className="grid grid-cols-2 gap-4 mt-3">
              <ControlInput label="Font Weight" type="select" value={config.fontWeight} options={WEIGHT_OPTIONS} onChange={(v) => update('fontWeight', v)} />
-             <ControlInput label="Letter Spacing" value={config.letterSpacing} onChange={(v) => update('letterSpacing', v)} placeholder="normal" />
+             <ControlInput label="Letter Spacing" type="select" value={config.letterSpacing} options={LETTER_SPACING_OPTIONS} onChange={(v) => update('letterSpacing', v)} />
            </div>
            <div className="grid grid-cols-2 gap-4 mt-3">
-             <ControlInput label="Line Height" value={config.lineHeight} onChange={(v) => update('lineHeight', v)} placeholder="normal" />
+             <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
              <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
            </div>
         </Section>

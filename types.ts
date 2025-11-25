@@ -5,7 +5,7 @@ export interface ButtonStyle {
   textTransform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
 }
 
-export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'rotate' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat' | 'flip' | 'wobble' | 'breathe' | 'ripple';
+export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat' | 'flip' | 'wobble' | 'breathe' | 'ripple';
 export type AnimationTrigger = 'always' | 'on' | 'off';
 export type ActionType = 'none' | 'toggle' | 'more-info' | 'call-service' | 'perform-action' | 'navigate' | 'url' | 'assist' | 'fire-dom-event' | 'javascript' | 'multi-actions' | 'toast';
 export type LockUnlockType = 'tap' | 'hold' | 'double_tap';
@@ -161,6 +161,7 @@ export interface ButtonConfig {
   labelColorAuto: boolean;
   
   // Typography
+  fontFamily: string;
   fontSize: string;
   fontWeight: 'normal' | 'bold' | 'lighter' | 'bolder';
   textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
@@ -400,6 +401,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   labelColor: '',
   labelColorAuto: false,
   
+  fontFamily: '',
   fontSize: '14px',
   fontWeight: 'bold',
   textTransform: 'capitalize',

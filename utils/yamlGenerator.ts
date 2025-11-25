@@ -31,7 +31,6 @@ const getAnimationCSS = (type: AnimationType, speed: string = '2s') => {
     case 'shake': return `animation: cba-shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite`;
     case 'bounce': return `animation: cba-bounce 1s infinite`;
     case 'blink': return `animation: cba-blink 1s infinite`;
-    case 'rotate':
     case 'spin': return `animation: cba-rotate ${speed} linear infinite`;
     case 'glow': return `animation: cba-glow ${speed} ease-in-out infinite`;
     case 'float': return `animation: cba-float ${speed} ease-in-out infinite`;
@@ -141,6 +140,7 @@ export const generateYaml = (config: ButtonConfig): string => {
     `border-radius: ${config.borderRadius}`,
     `padding: ${config.padding}`,
     `color: ${config.color}`,
+    config.fontFamily ? `font-family: ${config.fontFamily}` : null,
     `font-size: ${config.fontSize}`,
     `text-transform: ${config.textTransform}`,
     `font-weight: ${config.fontWeight}`,
@@ -206,6 +206,9 @@ entity: ${config.entity}
     yaml += `icon: ${config.icon}\n`;
   }
 
+  // Icon size - logically grouped with icon
+  yaml += `size: ${config.size}\n`;
+
   // Label
   if (config.labelTemplate) {
     yaml += `label: ${config.labelTemplate}\n`;
@@ -264,8 +267,7 @@ show_units: ${config.showUnits}
     }
   }
 
-  yaml += `size: ${config.size}
-layout: ${config.layout}
+  yaml += `layout: ${config.layout}
 color_type: ${config.colorType}
 `;
 

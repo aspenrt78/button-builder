@@ -82,8 +82,7 @@ export const COLOR_TYPE_OPTIONS = [
 
 export const ANIMATION_OPTIONS = [
   { value: 'none', label: 'None' },
-  { value: 'spin', label: 'Spin' },
-  { value: 'rotate', label: 'Rotate (Same as Spin)' },
+  { value: 'spin', label: 'Spin / Rotate' },
   { value: 'blink', label: 'Blink' },
   { value: 'pulse', label: 'Pulse (Scale)' },
   { value: 'flash', label: 'Flash (Opacity)' },
@@ -129,6 +128,51 @@ export const SHADOW_SIZE_OPTIONS = [
 export const PROTECT_TYPE_OPTIONS = [
   { value: 'pin', label: 'PIN Code' },
   { value: 'password', label: 'Password' },
+];
+
+export const LETTER_SPACING_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: '-0.05em', label: 'Tighter' },
+  { value: '-0.025em', label: 'Tight' },
+  { value: '0.025em', label: 'Wide' },
+  { value: '0.05em', label: 'Wider' },
+  { value: '0.1em', label: 'Widest' },
+  { value: '1px', label: '1px' },
+  { value: '2px', label: '2px' },
+  { value: '3px', label: '3px' },
+];
+
+export const LINE_HEIGHT_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: '1', label: 'None (1)' },
+  { value: '1.25', label: 'Tight (1.25)' },
+  { value: '1.375', label: 'Snug (1.375)' },
+  { value: '1.5', label: 'Relaxed (1.5)' },
+  { value: '1.75', label: 'Loose (1.75)' },
+  { value: '2', label: 'Double (2)' },
+];
+
+export const FONT_FAMILY_OPTIONS = [
+  { value: '', label: 'Default (System)' },
+  { value: 'Arial, sans-serif', label: 'Arial' },
+  { value: 'Helvetica, Arial, sans-serif', label: 'Helvetica' },
+  { value: 'Georgia, serif', label: 'Georgia' },
+  { value: 'Times New Roman, serif', label: 'Times New Roman' },
+  { value: 'Courier New, monospace', label: 'Courier New' },
+  { value: 'Verdana, sans-serif', label: 'Verdana' },
+  { value: 'Trebuchet MS, sans-serif', label: 'Trebuchet MS' },
+  { value: 'Impact, sans-serif', label: 'Impact' },
+  { value: 'Comic Sans MS, cursive', label: 'Comic Sans MS' },
+  { value: 'Roboto, sans-serif', label: 'Roboto (Google)' },
+  { value: 'Open Sans, sans-serif', label: 'Open Sans (Google)' },
+  { value: 'Lato, sans-serif', label: 'Lato (Google)' },
+  { value: 'Montserrat, sans-serif', label: 'Montserrat (Google)' },
+  { value: 'Poppins, sans-serif', label: 'Poppins (Google)' },
+  { value: 'Oswald, sans-serif', label: 'Oswald (Google)' },
+  { value: 'Raleway, sans-serif', label: 'Raleway (Google)' },
+  { value: 'Ubuntu, sans-serif', label: 'Ubuntu (Google)' },
+  { value: 'Playfair Display, serif', label: 'Playfair Display (Google)' },
+  { value: 'Merriweather, serif', label: 'Merriweather (Google)' },
 ];
 
 // Mock icons for preview mapping (since we don't load all MDIs)

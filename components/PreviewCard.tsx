@@ -205,9 +205,12 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     justifyItems: 'center',
     alignItems: 'center',
     gap: '4px',
+    fontFamily: config.fontFamily || 'inherit',
     fontSize: config.fontSize,
     fontWeight: config.fontWeight,
     textTransform: config.textTransform,
+    letterSpacing: config.letterSpacing,
+    lineHeight: config.lineHeight,
     border: borderStyle,
     position: 'relative',
     zIndex: 1,
@@ -304,19 +307,19 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
           )}
           
           {config.showName && (
-            <div style={{ gridArea: 'n', color: actualNameColor }} className="font-bold text-[0.9em] text-center truncate w-full px-1">
+            <div style={{ gridArea: 'n', color: actualNameColor }} className="text-center truncate w-full px-1">
               {config.name}
             </div>
           )}
 
           {config.showState && (
-            <div style={{ gridArea: 's', color: actualStateColor }} className="opacity-80 text-[0.8em] text-center">
+            <div style={{ gridArea: 's', color: actualStateColor, opacity: 0.8, fontSize: '0.85em' }} className="text-center">
               {simulatedState.toUpperCase()}
             </div>
           )}
 
           {config.showLabel && (
-            <div style={{ gridArea: 'l', color: actualLabelColor }} className="text-[0.75em] opacity-70 text-center px-1 truncate w-full">
+            <div style={{ gridArea: 'l', color: actualLabelColor, opacity: 0.7, fontSize: '0.8em' }} className="text-center px-1 truncate w-full">
               {config.label || 'Label Text'}
             </div>
           )}
@@ -464,7 +467,6 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
         }
 
         .cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
-        .cba-animate-rotate { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
         .cba-animate-flash { animation: cba-flash 2s ease infinite; }
         .cba-animate-pulse { animation: cba-pulse 2s infinite; will-change: transform; }
         .cba-animate-jiggle { animation: cba-jiggle 0.3s ease infinite; will-change: transform; display: inline-block; }
