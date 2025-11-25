@@ -62,9 +62,11 @@ export function getIconComponent(name: string): IconComponent | undefined {
   }
 
   const component: IconComponent = ({ style }) => {
-    // Extract size from style, default to 1em
-    const size = style?.width || style?.height || '1em';
-    return React.createElement(Icon, { path, size, style });
+    // Extract size from style - @mdi/react Icon accepts size as string or number
+    const size = style?.width ?? style?.height ?? '1em';
+    // Remove width/height from style since Icon's size prop handles dimensions
+    const { width, height, ...restStyle } = style || {};
+    return React.createElement(Icon, { path, size: String(size), style: restStyle });
   };
   cache.set(normalized, component);
   return component;
