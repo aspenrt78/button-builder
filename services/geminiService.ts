@@ -2,7 +2,24 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ButtonConfig, DEFAULT_CONFIG } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const API_KEY_STORAGE_KEY = 'button-builder-gemini-api-key';
+
+export const getApiKey = (): string | null => {
+  return localStorage.getItem(API_KEY_STORAGE_KEY);
+};
+
+export const setApiKey = (key: string): void => {
+  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+};
+
+export const clearApiKey = (): void => {
+  localStorage.removeItem(API_KEY_STORAGE_KEY);
+};
+
+export const hasApiKey = (): boolean => {
+  const key = getApiKey();
+  return !!key && key.length > 0;
+};
 
 const buttonSchema: Schema = {
   type: Type.OBJECT,
@@ -76,18 +93,64 @@ const buttonSchema: Schema = {
 };
 
 export const generateButtonConfig = async (prompt: string): Promise<Partial<ButtonConfig>> => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("API_KEY_REQUIRED");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const systemPrompt = `You are a UI designer expert specializing in Home Assistant button-card configurations. Your job is to create beautiful, modern, and functional button card designs based on user descriptions.
+
+CONTEXT:
+- You're generating configuration for the custom:button-card component in Home Assistant
+- The output will be used to control smart home devices (lights, switches, fans, sensors, etc.)
+- Users want visually appealing buttons that fit modern dashboard aesthetics
+
+DESIGN PRINCIPLES:
+1. **Modern Aesthetics**: Default to clean, contemporary designs with good contrast
+2. **Color Harmony**: Use complementary colors, avoid clashing combinations
+3. **Readability**: Ensure text is readable against backgrounds (use light text on dark, dark on light)
+4. **Subtlety**: Prefer subtle effects over garish ones unless explicitly requested
+
+STYLE GUIDELINES:
+- "Glassmorphism/Glass": Semi-transparent background (opacity 20-40), backdropBlur: "10px" or "20px", subtle border, soft shadow
+- "Neon/Cyberpunk": Vibrant colors (#00ffff, #ff00ff, #00ff00), dark background, strong shadows with color
+- "Minimal/Clean": Solid colors, no border, no shadow, simple layout
+- "Neumorphism": Soft shadows, muted colors, inner shadows for depth
+- "Gradient": Use stateOnColor and stateOffColor for gradient-like effects
+- "Animated/Dynamic": Add appropriate animations (pulse for active states, spin for fans, blink for alerts)
+
+ENTITY INFERENCE:
+- If user mentions "light" → entity: "light.{room}_light", icon: "mdi:lightbulb"
+- If user mentions "fan" → entity: "fan.{room}_fan", icon: "mdi:fan", consider spin animation when on
+- If user mentions "switch" → entity: "switch.{name}", icon: "mdi:toggle-switch"
+- If user mentions "sensor/temperature" → entity: "sensor.{name}_temperature", icon: "mdi:thermometer", showState: true
+- If user mentions "door/garage" → entity: "cover.garage_door", icon: "mdi:garage"
+- If user mentions "lock" → entity: "lock.{name}", icon: "mdi:lock"
+- If user mentions "climate/AC/thermostat" → entity: "climate.{name}", icon: "mdi:thermostat"
+
+COLOR AUTO FEATURES:
+- Set colorAuto: true when user wants the button to match a light's current color
+- Use iconColorAuto, nameColorAuto, stateColorAuto, labelColorAuto for granular control
+- This makes buttons dynamically reflect the actual state of colored lights
+
+ANIMATIONS:
+- "pulse": Gentle pulsing, good for active/important states
+- "spin": Rotating, perfect for fans or loading states
+- "blink": Flashing, for alerts or warnings
+- "shake": Attention-grabbing, for errors or important notifications
+- "bounce": Playful, for confirmations
+- "marquee": Text scrolling effect, for long labels
+
+USER REQUEST: "${prompt}"
+
+Generate a configuration that best matches this request. Be creative but practical. If details are vague, make sensible design choices.`;
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Generate a configuration for a Home Assistant custom:button-card based on: "${prompt}". 
-      
-      Assume modern, aesthetic design. 
-      For "glassmorphism", use semi-transparent bg (opacity ~20-50), blur, and a subtle white/black shadow.
-      For "minimal", use simple colors, no border.
-      For "marquee" or "lighting", use animation: marquee.
-      If the user mentions "color of the light" or "matching entity color", set colorAuto to true, or use {name}ColorAuto properties.
-      
-      Return ONLY the JSON object.`,
+      contents: systemPrompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: buttonSchema
