@@ -1,5 +1,5 @@
 // Home Assistant Entity Service
-// Polls HA for available entities when running inside HA
+// Fetches HA entities when running inside HA iframe panel
 
 export interface HAEntity {
   entity_id: string;
@@ -20,83 +20,191 @@ export interface EntityInfo {
 const IS_DEV_ENV = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.DEV;
 
 class HomeAssistantService {
-  private readonly isInsideHA: boolean;
   private readonly isDevEnv: boolean;
   private entities: EntityInfo[] = [];
+  private fetchAttempted: boolean = false;
 
   constructor() {
-    // Detect if we're running inside Home Assistant
     this.isDevEnv = Boolean(IS_DEV_ENV);
-    this.isInsideHA = this.detectHomeAssistant();
   }
 
   private detectHomeAssistant(): boolean {
-    // Check if we're in an iframe with HA parent
+    // Multiple detection methods for different HA setups
     try {
+      // Method 1: Check if we're in an iframe
       const inIframe = window.parent !== window;
+      
+      // Method 2: Check URL path patterns
       const path = window.location.pathname ?? '';
-      // Check for various possible paths
-      return inIframe && (
-        path.includes('/button_builder') || 
-        path.includes('/button-builder') ||
-        path.includes('/button_card_architect') || 
-        path.includes('/local/')
-      );
-    } catch {
+      const hostname = window.location.hostname ?? '';
+      
+      // Method 3: Check for HA-specific indicators
+      const hasHassTokens = !!localStorage.getItem('hassTokens');
+      const hasHassUrl = hostname.includes('homeassistant') || 
+                         hostname.includes('hassio') ||
+                         hostname.endsWith('.local') ||
+                         hostname.includes('.nabu.casa');
+      
+      // Method 4: Check path for panel indicators
+      const hasPanelPath = path.includes('/button_builder') || 
+                          path.includes('/button-builder') ||
+                          path.includes('/button_card_architect') || 
+                          path.includes('/local/') ||
+                          path.includes('/api/panel_custom/');
+      
+      const isHA = inIframe || hasHassTokens || hasHassUrl || hasPanelPath;
+      
+      console.log('[ButtonBuilder] HA Detection:', {
+        inIframe,
+        path,
+        hostname,
+        hasHassTokens,
+        hasHassUrl,
+        hasPanelPath,
+        result: isHA
+      });
+      
+      return isHA;
+    } catch (e) {
+      console.warn('[ButtonBuilder] HA detection error:', e);
       return false;
     }
   }
 
   async getEntities(): Promise<EntityInfo[]> {
-    if (!this.isInsideHA) {
-      if (this.isDevEnv) {
-        return this.getMockEntities();
+    // Always try to fetch if we haven't yet, regardless of detection
+    if (!this.fetchAttempted) {
+      this.fetchAttempted = true;
+      const fetched = await this.fetchEntitiesFromHA();
+      if (fetched.length > 0) {
+        return fetched;
       }
-      return [];
+    } else if (this.entities.length > 0) {
+      return this.entities;
     }
 
-    try {
-      // Try to get entities from Home Assistant
-      const token = this.getAuthToken();
-      const response = await fetch('/api/states', {
-        credentials: 'same-origin',
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : undefined,
-      });
-
-      if (response.ok) {
-        const states: HAEntity[] = await response.json();
-        this.entities = states.map(entity => ({
-          id: entity.entity_id,
-          name: entity.attributes.friendly_name || entity.entity_id,
-          state: entity.state,
-          domain: entity.entity_id.split('.')[0],
-          icon: entity.attributes.icon,
-        }));
-        return this.entities;
-      }
-    } catch (error) {
-      console.warn('Failed to fetch HA entities, using mock data:', error);
+    // Fall back to mock entities in dev mode
+    if (this.isDevEnv) {
+      console.log('[ButtonBuilder] Using mock entities (dev mode)');
+      return this.getMockEntities();
     }
 
-    return this.isDevEnv ? this.getMockEntities() : [];
+    return [];
+  }
+
+  private async fetchEntitiesFromHA(): Promise<EntityInfo[]> {
+    const methods = [
+      () => this.fetchWithToken(),
+      () => this.fetchWithCredentials(),
+      () => this.fetchDirect(),
+    ];
+
+    for (const method of methods) {
+      try {
+        const result = await method();
+        if (result.length > 0) {
+          this.entities = result;
+          console.log(`[ButtonBuilder] Fetched ${result.length} entities`);
+          return result;
+        }
+      } catch (e) {
+        // Continue to next method
+      }
+    }
+
+    console.warn('[ButtonBuilder] All fetch methods failed');
+    return [];
+  }
+
+  private async fetchWithToken(): Promise<EntityInfo[]> {
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new Error('No token available');
+    }
+
+    console.log('[ButtonBuilder] Trying fetch with Bearer token');
+    const response = await fetch('/api/states', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return this.parseStates(await response.json());
+  }
+
+  private async fetchWithCredentials(): Promise<EntityInfo[]> {
+    console.log('[ButtonBuilder] Trying fetch with credentials');
+    const response = await fetch('/api/states', {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return this.parseStates(await response.json());
+  }
+
+  private async fetchDirect(): Promise<EntityInfo[]> {
+    console.log('[ButtonBuilder] Trying direct fetch');
+    const response = await fetch('/api/states');
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return this.parseStates(await response.json());
+  }
+
+  private parseStates(states: HAEntity[]): EntityInfo[] {
+    return states.map(entity => ({
+      id: entity.entity_id,
+      name: entity.attributes.friendly_name || entity.entity_id,
+      state: entity.state,
+      domain: entity.entity_id.split('.')[0],
+      icon: entity.attributes.icon,
+    }));
   }
 
   private getAuthToken(): string {
-    // Try to get auth token from HA
-    try {
-      const tokens = localStorage.getItem('hassTokens');
-      if (!tokens) {
-        return '';
+    // Try multiple token storage locations
+    const tokenKeys = ['hassTokens', 'ha_auth', 'auth_token', 'access_token'];
+    
+    for (const key of tokenKeys) {
+      try {
+        const stored = localStorage.getItem(key);
+        if (!stored) continue;
+        
+        // Try parsing as JSON
+        try {
+          const parsed = JSON.parse(stored);
+          const token = parsed?.access_token || parsed?.token || parsed?.refresh_token;
+          if (token) {
+            console.log(`[ButtonBuilder] Found token in ${key}`);
+            return token;
+          }
+        } catch {
+          // Not JSON, might be raw token
+          if (stored.length > 20) {
+            console.log(`[ButtonBuilder] Found raw token in ${key}`);
+            return stored;
+          }
+        }
+      } catch {
+        continue;
       }
-      const parsed = JSON.parse(tokens);
-      return parsed?.access_token || parsed?.token || parsed?.refresh_token || '';
-    } catch {
-      return '';
     }
+    
+    console.log('[ButtonBuilder] No auth token found');
+    return '';
   }
 
   private getMockEntities(): EntityInfo[] {
