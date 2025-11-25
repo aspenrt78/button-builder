@@ -14,13 +14,13 @@ Write-Host "Building production assets..." -ForegroundColor Yellow
 npm run build
 
 # Check if build was successful
-if (Test-Path "custom_components\button_card_architect\www\index.js") {
+if (Test-Path "custom_components\button_builder\www\index.js") {
     Write-Host "✓ Build successful!" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Built files are in: custom_components\button_card_architect\www\" -ForegroundColor Cyan
+    Write-Host "Built files are in: custom_components\button_builder\www\" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "1. Copy custom_components\button_card_architect to your Home Assistant config folder"
+    Write-Host "1. Copy custom_components\button_builder to your Home Assistant config folder"
     Write-Host "2. Restart Home Assistant"
     Write-Host "3. Find 'Button Architect' in your sidebar"
     Write-Host ""

@@ -238,7 +238,7 @@ All new features are properly exported to button-card YAML:
 
 ```
 ✓ Build successful!
-custom_components/button_card_architect/www/index.js: 485.20 kB (gzipped: 118.86 kB)
+custom_components/button_builder/www/index.js: 485.20 kB (gzipped: 118.86 kB)
 ```
 
 Everything compiles cleanly with no errors! 🎉

@@ -7,7 +7,7 @@ ha-custom-button-architect/
 │       └── validate.yaml          # HACS validation workflow
 │
 ├── 📁 custom_components/
-│   └── button_card_architect/     # Home Assistant integration
+│   └── button_builder/     # Home Assistant integration
 │       ├── __init__.py            # Integration setup and panel registration
 │       ├── manifest.json          # Integration metadata
 │       └── 📁 www/                # Built frontend assets (generated)
@@ -55,7 +55,7 @@ ha-custom-button-architect/
 
 ## Key Directories
 
-### `/custom_components/button_card_architect/`
+### `/custom_components/button_builder/`
 This is the Home Assistant integration. When installed, this entire folder goes into your HA `custom_components` directory.
 
 - **`__init__.py`**: Registers the panel in Home Assistant's sidebar
@@ -96,7 +96,7 @@ npm run dev
 npm run build
 ```
 - Compiles React app with Vite
-- Outputs to `custom_components/button_card_architect/www/`
+- Outputs to `custom_components/button_builder/www/`
 - Bundles as `index.js` and `index.css`
 - Ready for Home Assistant integration
 
@@ -138,7 +138,7 @@ This single object drives both the preview and YAML generation.
 ## Home Assistant Integration
 
 When HA loads the integration:
-1. `__init__.py` registers a static path `/button_card_architect/`
+1. `__init__.py` registers a static path `/button_builder/`
 2. Registers an iframe panel in the sidebar
 3. Panel loads `panel.html`
 4. `panel.html` loads `index.js` (the compiled React app)
@@ -181,7 +181,7 @@ When HA loads the integration:
 
 ### Home Assistant Testing
 1. Build: `npm run build`
-2. Copy `custom_components/button_card_architect` to HA config
+2. Copy `custom_components/button_builder` to HA config
 3. Restart HA
 4. Test in HA panel
 5. Check HA logs for errors

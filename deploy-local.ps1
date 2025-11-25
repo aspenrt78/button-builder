@@ -8,7 +8,7 @@ Write-Host "Building project..." -ForegroundColor Cyan
 npm run build
 
 Write-Host "Deploying to Home Assistant..." -ForegroundColor Yellow
-$targetPath = Join-Path $HAConfigPath "custom_components\button_card_architect"
+$targetPath = Join-Path $HAConfigPath "custom_components\button_builder"
 
 # Remove old installation
 if (Test-Path $targetPath) {
@@ -17,7 +17,7 @@ if (Test-Path $targetPath) {
 }
 
 # Copy new files
-Copy-Item -Recurse "custom_components\button_card_architect" -Destination (Join-Path $HAConfigPath "custom_components\")
+Copy-Item -Recurse "custom_components\button_builder" -Destination (Join-Path $HAConfigPath "custom_components\")
 Write-Host "Files copied to $targetPath" -ForegroundColor Green
 
 Write-Host "`nNext steps:" -ForegroundColor Cyan

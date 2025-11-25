@@ -35,7 +35,13 @@ class HomeAssistantService {
     try {
       const inIframe = window.parent !== window;
       const path = window.location.pathname ?? '';
-      return inIframe && (path.includes('/button_card_architect') || path.includes('/local/button_card_architect'));
+      // Check for various possible paths
+      return inIframe && (
+        path.includes('/button_builder') || 
+        path.includes('/button-builder') ||
+        path.includes('/button_card_architect') || 
+        path.includes('/local/')
+      );
     } catch {
       return false;
     }

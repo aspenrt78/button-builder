@@ -5,14 +5,14 @@ Your app is now fully configured as a HACS integration for Home Assistant!
 ## ✅ What's Been Set Up
 
 ### 1. **HACS Integration Structure**
-- ✅ `custom_components/button_card_architect/` directory created
+- ✅ `custom_components/button_builder/` directory created
 - ✅ `manifest.json` - Integration metadata
 - ✅ `__init__.py` - Home Assistant integration code
 - ✅ `hacs.json` - HACS configuration
 - ✅ `www/` directory with built assets
 
 ### 2. **Build Configuration**
-- ✅ Vite configured to output to `custom_components/button_card_architect/www/`
+- ✅ Vite configured to output to `custom_components/button_builder/www/`
 - ✅ Production build successful
 - ✅ Assets compiled: `index.js`, `index.css`, `panel.html`
 
@@ -69,7 +69,7 @@ Your app is now fully configured as a HACS integration for Home Assistant!
    ```
 
 2. **Copy to Home Assistant**:
-   Copy the entire `custom_components/button_card_architect` folder to your Home Assistant `config/custom_components/` directory.
+   Copy the entire `custom_components/button_builder` folder to your Home Assistant `config/custom_components/` directory.
 
 3. **Restart Home Assistant**
 
@@ -109,7 +109,7 @@ Your app is now fully configured as a HACS integration for Home Assistant!
 1. **Ensure your repo meets HACS requirements**:
    - ✅ Repository is public
    - ✅ Has `hacs.json` in root
-   - ✅ Has `custom_components/button_card_architect/`
+   - ✅ Has `custom_components/button_builder/`
    - ✅ Has `manifest.json` with correct format
    - ✅ Has README.md
    - ✅ Has a release/tag
@@ -151,7 +151,7 @@ Before creating your first release:
 
 Before pushing to GitHub, update these files with your information:
 
-1. **`custom_components/button_card_architect/manifest.json`**:
+1. **`custom_components/button_builder/manifest.json`**:
    ```json
    "codeowners": ["@YOUR_GITHUB_USERNAME"],
    "documentation": "https://github.com/YOUR_USERNAME/ha-custom-button-architect",
@@ -169,7 +169,7 @@ Before pushing to GitHub, update these files with your information:
 ```
 ha-custom-button-architect/
 ├── custom_components/
-│   └── button_card_architect/     ← This goes to Home Assistant
+│   └── button_builder/     ← This goes to Home Assistant
 │       ├── __init__.py
 │       ├── manifest.json
 │       └── www/

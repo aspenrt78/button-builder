@@ -11,7 +11,7 @@ This guide will help you get Button Builder up and running in minutes.
 
 ### Option 2: Manual (5 minutes)
 1. Download the [latest release](https://github.com/aspenrt78/button-builder/releases)
-2. Extract and copy `custom_components/button_card_architect` to your HA config folder
+2. Extract and copy `custom_components/button_builder` to your HA config folder
 3. Restart Home Assistant
 
 ## 📋 Before You Start

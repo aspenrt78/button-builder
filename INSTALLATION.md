@@ -28,18 +28,18 @@
 
 1. **Download** the latest release from the [releases page](https://github.com/aspenrt78/button-builder/releases)
 
-2. **Extract** the archive and locate the `custom_components/button_card_architect` folder
+2. **Extract** the archive and locate the `custom_components/button_builder` folder
 
 3. **Copy** the folder to your Home Assistant configuration directory:
    ```
-   <config_directory>/custom_components/button_card_architect/
+   <config_directory>/custom_components/button_builder/
    ```
 
 4. Your directory structure should look like:
    ```
    config/
    └── custom_components/
-       └── button_card_architect/
+       └── button_builder/
            ├── __init__.py
            ├── manifest.json
            └── www/
@@ -63,7 +63,7 @@ The AI Magic Builder feature requires a Gemini API key. This is optional - the v
 Add to your `configuration.yaml`:
 
 ```yaml
-button_card_architect:
+button_builder:
   gemini_api_key: "your_api_key_here"
 ```
 
@@ -79,7 +79,7 @@ Enter your API key in the app when prompted to use AI features.
 
 After installation and restart:
 
-1. Check **Configuration** → **Logs** for any errors related to `button_card_architect`
+1. Check **Configuration** → **Logs** for any errors related to `button_builder`
 2. Look for **"Button Architect"** in your sidebar (left navigation menu)
 3. Click it to open the designer
 
@@ -111,12 +111,12 @@ HACS will notify you when updates are available. Click "Update" and restart Home
 ### Manual Update
 
 1. Download the new release
-2. Replace the `button_card_architect` folder in `custom_components`
+2. Replace the `button_builder` folder in `custom_components`
 3. Restart Home Assistant
 
 ## Uninstallation
 
-1. Remove the `custom_components/button_card_architect` folder
+1. Remove the `custom_components/button_builder` folder
 2. Restart Home Assistant
 3. The panel will be removed from the sidebar
 
