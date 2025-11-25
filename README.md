@@ -97,21 +97,28 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 ### AI Magic Builder
 
 1. Click the "Magic Build" button in the top right
-2. Describe your ideal button in plain English:
+2. **First time?** You'll be prompted to enter your free Gemini API key:
+   - Click the link to [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Create a free API key (takes 30 seconds)
+   - Paste it into the app — it's stored locally in your browser, never sent to our servers
+3. Describe your ideal button in plain English:
    - Example: *"A futuristic cyan button for a bedroom fan that glows when on"*
    - Example: *"Glassmorphism style button for living room lights with purple accent"*
    - Example: *"Minimal dark button for garage door with red color when open"*
-3. Click "Generate Design"
-4. The AI will create a complete button configuration matching your description
-5. Fine-tune the design using the visual editor if needed
+4. Click "Generate Design"
+5. The AI will create a complete button configuration matching your description
+6. Fine-tune the design using the visual editor if needed
+
+> **Note**: Your API key is stored in your browser's localStorage and never leaves your device. You can manage or remove it by clicking the key icon in the Magic Builder dialog.
 
 ### Prerequisites
 
 **Important**: This tool generates YAML for the [custom:button-card](https://github.com/custom-cards/button-card) integration. You must install button-card separately through HACS or manually.
 
-**For AI Features**: Set up a Gemini API key:
-1. Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Configure it in the integration settings or as an environment variable
+**For AI Features**: The Magic Builder requires a free Gemini API key:
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (free tier, no credit card required)
+2. Enter it when prompted in the Magic Builder dialog
+3. Your key is stored locally in your browser — we never see it
 
 ## 🎨 Design Features
 
@@ -158,9 +165,11 @@ Choose from 10+ animations for both the card and icon:
    npm install
    ```
 
-3. Set up your Gemini API key (optional, for AI features):
-   - Create a `.env.local` file
-   - Add: `GEMINI_API_KEY=your_api_key_here`
+3. ~~Set up your Gemini API key (optional, for AI features):~~
+   ~~- Create a `.env.local` file~~
+   ~~- Add: `GEMINI_API_KEY=your_api_key_here`~~
+   
+   *Note: API keys are now entered directly in the app UI — no environment setup needed!*
 
 4. Run the development server:
    ```bash
