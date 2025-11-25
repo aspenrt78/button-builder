@@ -9,7 +9,39 @@
 [![License](https://img.shields.io/github/license/aspenrt78/button-builder.svg)](LICENSE)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/aspenrt78)
 
-A visual designer for Home Assistant's [custom:button-card](https://github.com/custom-cards/button-card) integration. Design your buttons visually with live preview, or use AI to generate designs from natural language descriptions, then export the YAML configuration.
+---
+
+## 👋 Hey there!
+
+So here's the deal — I built **Button Builder** because I got tired of hand-writing YAML for [custom:button-card](https://github.com/custom-cards/button-card). Don't get me wrong, button-card is amazing, but staring at indentation errors at 2am isn't my idea of a good time.
+
+Button Builder gives you a **visual UI** for designing buttons. Pick your style, set up tap actions, choose icons, define states, tweak colors, add animations — all the fun stuff — and the app spits out the YAML for you. Copy it, paste it into your dashboard, and *boom*: your button looks exactly how you imagined.
+
+Oh, and there's an **AI-powered button creator** too. Just describe what you want — something like *"Give me a button that glows red when the garage is open and pulses blue when it's closed"* — and it'll try to build that YAML for you. Sometimes it nails it. Sometimes it creates a Frankenstein monster. But honestly? That's half the fun.
+
+---
+
+## ⚠️ A Few Honest Disclaimers
+
+- **This thing is nowhere near finished.** I'm sure it's carrying more bugs than a backyard garden.
+- **I've literally never coded a day in my life.** Every single line of this project was built through back-and-forth sessions with AI tools. Yes, really.
+- **It takes real time (and money) to build** — especially the AI features. If you end up liking the idea and want to support it, my [Buy Me a Coffee](https://www.buymeacoffee.com/aspenrt78) is open and very much appreciated. Totally optional, of course.
+
+---
+
+## 🙏 What I Actually Need Right Now
+
+- **Feedback** — Tell me what works and what doesn't
+- **Suggestions** — Features you'd love to see
+- **Bug reports** — Things will break, I promise
+- **Tips & tricks** — I'm learning as I go
+- **Pull requests** — Especially from actual developers who won't cry reading my AI-generated code
+
+If you're into dashboards, custom controls, or you just like experimenting with new toys in Home Assistant, give this a shot and let me know what breaks.
+
+Happy automating — and thanks in advance to anyone willing to play with this thing! 🚀
+
+---
 
 ## ✨ Features
 
@@ -31,26 +63,28 @@ A visual designer for Home Assistant's [custom:button-card](https://github.com/c
 4. Search for "Button Builder"
 5. Click "Download"
 6. Restart Home Assistant
-7. The "Button Architect" panel will appear in your sidebar
+7. Go to Settings → Devices & Services → Add Integration → Search "Button Builder"
+8. The "Button Builder" panel will appear in your sidebar
 
 ### Manual Installation
 
 1. Download the latest release from the [releases page](https://github.com/aspenrt78/button-builder/releases)
-2. Extract the `button_card_architect` folder from the archive
+2. Extract the `button_builder` folder from the archive
 3. Copy it to your Home Assistant `custom_components` directory:
    ```
    config/
    └── custom_components/
-       └── button_card_architect/
+       └── button_builder/
    ```
 4. Restart Home Assistant
-5. The "Button Architect" panel will appear in your sidebar
+5. Go to Settings → Devices & Services → Add Integration → Search "Button Builder"
+6. The "Button Builder" panel will appear in your sidebar
 
 ## 🚀 Usage
 
 ### Basic Workflow
 
-1. Click "Button Architect" in your Home Assistant sidebar
+1. Click "Button Builder" in your Home Assistant sidebar
 2. Use the left panel to configure your button:
    - Set entity ID, name, icon, and label
    - Choose layout and visibility options
@@ -141,7 +175,7 @@ Choose from 10+ animations for both the card and icon:
 npm run build
 ```
 
-The built files will be output to `custom_components/button_card_architect/www/`
+The built files will be output to `custom_components/button_builder/www/`
 
 ## 🤝 Contributing
 
