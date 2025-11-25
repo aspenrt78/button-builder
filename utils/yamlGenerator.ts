@@ -209,6 +209,13 @@ entity: ${config.entity}
   // Label
   if (config.labelTemplate) {
     yaml += `label: ${config.labelTemplate}\n`;
+  } else if (config.labelEntity) {
+    // Generate template to display another entity's value
+    if (config.labelAttribute) {
+      yaml += `label: "[[[ return states['${config.labelEntity}'].attributes.${config.labelAttribute} ]]]"\n`;
+    } else {
+      yaml += `label: "[[[ return states['${config.labelEntity}'].state ]]]"\n`;
+    }
   } else if (config.label) {
     yaml += `label: "${config.label}"\n`;
   }

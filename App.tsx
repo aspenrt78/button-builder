@@ -163,7 +163,7 @@ const App: React.FC = () => {
 
       <main className="flex-1 min-h-0 flex overflow-hidden">
         {/* Left: Configuration */}
-        <aside className="w-80 shrink-0 z-10 shadow-xl bg-gray-900 border-r border-gray-800">
+        <aside className="w-80 shrink-0 z-20 shadow-xl bg-gray-900 border-r border-gray-800">
           <ConfigPanel config={config} setConfig={setConfig} />
         </aside>
 
@@ -175,13 +175,13 @@ const App: React.FC = () => {
               {/* Background grid */}
               <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
 
-              <div className="relative z-10 px-6 py-3 flex items-center gap-2 text-gray-500 text-xs font-medium uppercase tracking-wider border-b border-gray-800/50 bg-black/30 backdrop-blur-sm">
+              <div className="relative z-0 px-6 py-3 flex items-center gap-2 text-gray-500 text-xs font-medium uppercase tracking-wider border-b border-gray-800/50 bg-black/30 backdrop-blur-sm">
                 <Eye size={14} />
                 Live Preview
               </div>
 
               {/* Content Container - fills space, lets PreviewCard handle centering */}
-              <div className="flex-1 relative overflow-hidden z-10 w-full h-full min-h-0 min-w-0">
+              <div className="flex-1 relative overflow-hidden z-0 w-full h-full min-h-0 min-w-0">
                 <PreviewCard config={config} />
               </div>
             </div>

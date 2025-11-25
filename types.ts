@@ -88,6 +88,8 @@ export interface ButtonConfig {
   entity: string;
   name: string;
   label: string;
+  labelEntity: string;
+  labelAttribute: string;
   icon: string;
   entityPicture: string;
   stateDisplay: string;
@@ -311,7 +313,9 @@ export const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
 export const DEFAULT_CONFIG: ButtonConfig = {
   entity: 'light.living_room',
   name: 'Living Room',
-  label: 'Temperature: 24°C',
+  label: '',
+  labelEntity: '',
+  labelAttribute: '',
   icon: 'mdi:sofa',
   entityPicture: '',
   stateDisplay: '',

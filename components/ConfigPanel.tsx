@@ -90,11 +90,21 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <Section title="Core Configuration" icon={Type} defaultOpen={true}>
           <EntitySelector label="Entity ID" value={config.entity} onChange={(v) => update('entity', v)} />
           <ControlInput label="Name" value={config.name} onChange={(v) => update('name', v)} />
-          <ControlInput label="Label" value={config.label} onChange={(v) => update('label', v)} />
           <ControlInput label="Icon (mdi:...)" value={config.icon} onChange={(v) => update('icon', v)} />
           <ControlInput label="State Display (Custom)" value={config.stateDisplay} onChange={(v) => update('stateDisplay', v)} placeholder="Custom state text" />
           <ControlInput label="Entity Picture URL" value={config.entityPicture} onChange={(v) => update('entityPicture', v)} placeholder="https://..." />
           <ControlInput label="Units Override" value={config.units} onChange={(v) => update('units', v)} placeholder="°C, kW, etc." />
+          
+          <div className="pt-3 border-t border-gray-800">
+            <p className="text-xs font-bold text-gray-400 uppercase mb-3">Label Configuration</p>
+            <div className="space-y-3">
+              <ControlInput label="Static Label" value={config.label} onChange={(v) => update('label', v)} placeholder="My Label Text" />
+              <p className="text-[10px] text-gray-500 -mt-1">Or display another entity's value:</p>
+              <EntitySelector label="Label Entity" value={config.labelEntity} onChange={(v) => update('labelEntity', v)} />
+              <ControlInput label="Attribute (optional)" value={config.labelAttribute} onChange={(v) => update('labelAttribute', v)} placeholder="temperature, brightness, etc." />
+              <p className="text-[10px] text-gray-500 -mt-1">Leave attribute empty to show entity state</p>
+            </div>
+          </div>
           
           <div className="pt-3 border-t border-gray-800">
             <p className="text-xs font-bold text-gray-400 uppercase mb-3">Templates (Advanced)</p>
