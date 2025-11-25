@@ -33,11 +33,20 @@ const getShadowStyle = (size: string, color: string, opacity: number) => {
   }
 };
 
-const IconMapper = ({ name, size, color, animationClass, animationDuration }: { name: string, size: string, color: string, animationClass: string, animationDuration: string }) => {
-  const style = { width: size, height: size, color };
+const IconMapper = ({ name, size, color, animationClass, animationDuration, containerSize }: { name: string, size: string, color: string, animationClass: string, animationDuration: string, containerSize?: number }) => {
+  // Handle percentage-based sizing by calculating actual pixel size
+  let computedSize = size;
+  if (size.endsWith('%') && containerSize) {
+    const percentage = parseFloat(size) / 100;
+    computedSize = `${Math.round(containerSize * percentage)}px`;
+  }
+  
+  const style = { width: computedSize, height: computedSize, color };
   const IconComponent = getIconComponent(name) ?? HelpCircle;
   const spanStyle: React.CSSProperties = {
-    display: 'inline-block',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     lineHeight: 0,
     animationDuration: animationClass ? animationDuration : undefined,
   };
@@ -287,6 +296,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                     color={actualIconColor}
                     animationClass={iconAnimationClass}
                     animationDuration={iconAnimationDuration}
+                    containerSize={100}
                   />
                 )
               )}

@@ -90,7 +90,7 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-black text-white font-sans overflow-hidden selection:bg-blue-500/30">
       {/* Header */}
-      <header className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur-md shrink-0">
+      <header className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur-md shrink-0 relative z-50">
         <div className="flex items-center gap-3">
           <img
             src={logo}
@@ -163,7 +163,7 @@ const App: React.FC = () => {
 
       <main className="flex-1 min-h-0 flex overflow-hidden">
         {/* Left: Configuration */}
-        <aside className="w-80 shrink-0 z-20 shadow-xl bg-gray-900 border-r border-gray-800">
+        <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800">
           <ConfigPanel config={config} setConfig={setConfig} />
         </aside>
 
