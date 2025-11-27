@@ -241,6 +241,70 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
              
              <div className="h-px bg-gray-700/50" />
 
+             {/* Gradient Background */}
+             <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Gradient Background</p>
+                  <ControlInput type="checkbox" label="" value={config.gradientEnabled} onChange={(v) => update('gradientEnabled', v)} />
+                </div>
+                
+                {config.gradientEnabled && (
+                  <div className="space-y-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                    {/* Gradient Preview */}
+                    <div 
+                      className="h-12 rounded-lg border border-gray-600"
+                      style={{
+                        background: config.gradientType === 'linear' 
+                          ? `linear-gradient(${config.gradientAngle}deg, ${config.gradientColor1}, ${config.gradientColor2}${config.gradientColor3Enabled ? `, ${config.gradientColor3}` : ''})`
+                          : config.gradientType === 'radial'
+                          ? `radial-gradient(circle, ${config.gradientColor1}, ${config.gradientColor2}${config.gradientColor3Enabled ? `, ${config.gradientColor3}` : ''})`
+                          : `conic-gradient(from ${config.gradientAngle}deg, ${config.gradientColor1}, ${config.gradientColor2}${config.gradientColor3Enabled ? `, ${config.gradientColor3}` : ''}, ${config.gradientColor1})`
+                      }}
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <ControlInput 
+                        type="select" 
+                        label="Type" 
+                        value={config.gradientType} 
+                        options={[
+                          { value: 'linear', label: 'Linear' },
+                          { value: 'radial', label: 'Radial' },
+                          { value: 'conic', label: 'Conic' },
+                        ]} 
+                        onChange={(v) => update('gradientType', v)} 
+                      />
+                      {(config.gradientType === 'linear' || config.gradientType === 'conic') && (
+                        <ControlInput 
+                          type="slider" 
+                          label="Angle" 
+                          value={config.gradientAngle} 
+                          min={0} 
+                          max={360} 
+                          onChange={(v) => update('gradientAngle', v)} 
+                        />
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <ControlInput label="Color 1" type="color" value={config.gradientColor1} onChange={(v) => update('gradientColor1', v)} />
+                      <ControlInput label="Color 2" type="color" value={config.gradientColor2} onChange={(v) => update('gradientColor2', v)} />
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <ControlInput type="checkbox" label="3rd Color" value={config.gradientColor3Enabled} onChange={(v) => update('gradientColor3Enabled', v)} />
+                      {config.gradientColor3Enabled && (
+                        <div className="flex-1">
+                          <ControlInput label="" type="color" value={config.gradientColor3} onChange={(v) => update('gradientColor3', v)} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+             </div>
+             
+             <div className="h-px bg-gray-700/50" />
+
              {/* Element Colors */}
              <div className="space-y-4">
                 <p className="text-xs font-bold text-gray-400 uppercase">Element Colors</p>

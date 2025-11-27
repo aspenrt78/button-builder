@@ -144,6 +144,15 @@ export interface ButtonConfig {
   backgroundColorOpacity: number;
   color: string;
   
+  // Gradient Background
+  gradientEnabled: boolean;
+  gradientType: 'linear' | 'radial' | 'conic';
+  gradientAngle: number;
+  gradientColor1: string;
+  gradientColor2: string;
+  gradientColor3: string;
+  gradientColor3Enabled: boolean;
+  
   // Glass / Depth
   backdropBlur: string;
   shadowSize: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner';
@@ -386,6 +395,15 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   backgroundColor: '#1c1c1c',
   backgroundColorOpacity: 100,
   color: '#ffffff',
+  
+  // Gradient defaults
+  gradientEnabled: false,
+  gradientType: 'linear',
+  gradientAngle: 135,
+  gradientColor1: '#667eea',
+  gradientColor2: '#764ba2',
+  gradientColor3: '#f093fb',
+  gradientColor3Enabled: false,
   
   backdropBlur: '0px',
   shadowSize: 'none',

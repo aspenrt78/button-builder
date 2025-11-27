@@ -7,7 +7,7 @@ import { ButtonConfig, DEFAULT_CONFIG } from './types';
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown, Settings, Code, Menu, X } from 'lucide-react';
 import logo from './logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
@@ -33,7 +33,8 @@ const App: React.FC = () => {
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
   const [importYaml, setImportYaml] = useState('');
   const [importError, setImportError] = useState('');
-
+  const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Save config to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -80,17 +81,19 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-black text-white font-sans overflow-hidden selection:bg-blue-500/30">
-      {/* Header */}
-      <header className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur-md shrink-0 relative z-50">
-        <div className="flex items-center gap-3">
+      {/* Header - Responsive */}
+      <header className="h-12 md:h-14 border-b border-gray-800 flex items-center justify-between px-3 md:px-6 bg-gray-900/50 backdrop-blur-md shrink-0 relative z-50">
+        <div className="flex items-center gap-2 md:gap-3">
           <img
             src={logo}
             alt="Button Builder logo"
-            className="w-9 h-9 rounded-lg object-contain border border-gray-800 bg-black/40"
+            className="w-7 h-7 md:w-9 md:h-9 rounded-lg object-contain border border-gray-800 bg-black/40"
           />
-          <h1 className="font-bold text-lg tracking-tight text-gray-200">Button Builder</h1>
+          <h1 className="font-bold text-sm md:text-lg tracking-tight text-gray-200">Button Builder</h1>
         </div>
-        <div className="flex items-center gap-2">
+        
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center gap-2">
           <div className="relative">
             <button 
               onClick={() => setIsPresetsOpen(!isPresetsOpen)}
@@ -150,9 +153,85 @@ const App: React.FC = () => {
             Magic Build
           </button>
         </div>
+
+        {/* Mobile Menu Button */}
+        <button 
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden p-2 text-gray-400 hover:text-white"
+        >
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
       </header>
 
-      <main className="flex-1 min-h-0 flex overflow-hidden">
+      {/* Mobile Menu Dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
+          <button 
+            onClick={() => { setIsPresetsOpen(true); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
+          >
+            <Palette size={18} className="text-purple-400" />
+            <span>Style Presets</span>
+          </button>
+          <button 
+            onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left"
+          >
+            <Wand2 size={18} className="text-indigo-400" />
+            <span>Magic Build</span>
+          </button>
+          <button 
+            onClick={() => { setIsImportOpen(true); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
+          >
+            <Upload size={18} className="text-blue-400" />
+            <span>Import YAML</span>
+          </button>
+          <button 
+            onClick={() => { handleReset(); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
+          >
+            <RotateCcw size={18} className="text-gray-400" />
+            <span>Reset to Defaults</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Presets Modal */}
+      {isPresetsOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/90">
+          <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+              <h3 className="text-lg font-bold">Style Presets</h3>
+              <button onClick={() => setIsPresetsOpen(false)} className="p-2 text-gray-400">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'custom'].map(category => (
+                <div key={category}>
+                  <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-800/50 sticky top-0">
+                    {category === '3d' ? '3D Effects' : category}
+                  </div>
+                  {PRESETS.filter(p => p.category === category).map(preset => (
+                    <button
+                      key={preset.name}
+                      onClick={() => handleApplyPreset(preset)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors border-b border-gray-800/50"
+                    >
+                      <div className="text-sm text-white font-medium">{preset.name}</div>
+                      <div className="text-xs text-gray-500">{preset.description}</div>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content - Desktop */}
+      <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Configuration */}
         <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800">
           <ConfigPanel config={config} setConfig={setConfig} />
@@ -179,13 +258,70 @@ const App: React.FC = () => {
 
             {/* Right: YAML Output */}
             <div className="w-96 border-l border-gray-800 bg-[#111] flex flex-col shrink-0 min-h-0">
-               {/* Simplified container to ensure full height scrolling */}
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-4">
                 <YamlViewer yaml={yamlOutput} className="flex-1" />
               </div>
             </div>
           </div>
         </section>
+      </main>
+
+      {/* Main Content - Mobile */}
+      <main className="md:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Mobile Tab Content */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {mobileTab === 'preview' && (
+            <div className="h-full bg-[#0a0a0a] relative flex flex-col">
+              <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
+              <div className="flex-1 relative overflow-hidden z-0">
+                <PreviewCard config={config} />
+              </div>
+            </div>
+          )}
+          
+          {mobileTab === 'config' && (
+            <div className="h-full overflow-y-auto bg-gray-900">
+              <ConfigPanel config={config} setConfig={setConfig} />
+            </div>
+          )}
+          
+          {mobileTab === 'yaml' && (
+            <div className="h-full overflow-hidden bg-[#111] p-3">
+              <YamlViewer yaml={yamlOutput} className="h-full" />
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Tab Bar */}
+        <nav className="shrink-0 border-t border-gray-800 bg-gray-900 flex">
+          <button 
+            onClick={() => setMobileTab('preview')}
+            className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${
+              mobileTab === 'preview' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
+            }`}
+          >
+            <Eye size={20} />
+            <span className="text-[10px] font-medium">Preview</span>
+          </button>
+          <button 
+            onClick={() => setMobileTab('config')}
+            className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${
+              mobileTab === 'config' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
+            }`}
+          >
+            <Settings size={20} />
+            <span className="text-[10px] font-medium">Configure</span>
+          </button>
+          <button 
+            onClick={() => setMobileTab('yaml')}
+            className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${
+              mobileTab === 'yaml' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
+            }`}
+          >
+            <Code size={20} />
+            <span className="text-[10px] font-medium">YAML</span>
+          </button>
+        </nav>
       </main>
 
       <MagicBuilder 

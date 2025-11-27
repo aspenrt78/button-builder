@@ -131,11 +131,31 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Resolve Shadow
   const shadowCSS = getShadowCSS(config.shadowSize, config.shadowColor, config.shadowOpacity);
 
+  // Resolve Gradient
+  const getGradientCSS = () => {
+    if (!config.gradientEnabled) return null;
+    const colors = config.gradientColor3Enabled 
+      ? `${config.gradientColor1}, ${config.gradientColor2}, ${config.gradientColor3}`
+      : `${config.gradientColor1}, ${config.gradientColor2}`;
+    
+    switch (config.gradientType) {
+      case 'linear':
+        return `background: linear-gradient(${config.gradientAngle}deg, ${colors})`;
+      case 'radial':
+        return `background: radial-gradient(circle, ${colors})`;
+      case 'conic':
+        return `background: conic-gradient(from ${config.gradientAngle}deg, ${colors}, ${config.gradientColor1})`;
+      default:
+        return null;
+    }
+  };
+  const gradientCSS = getGradientCSS();
+
   // --- Base Card Styles ---
   const cardStyles = [
     config.height !== 'auto' ? `height: ${config.height}` : null,
     config.aspectRatio ? `aspect-ratio: ${config.aspectRatio}` : null,
-    `background-color: ${bgColor}`,
+    gradientCSS ? gradientCSS : `background-color: ${bgColor}`,
     config.cardOpacity < 100 ? `opacity: ${config.cardOpacity / 100}` : null,
     `border-radius: ${config.borderRadius}`,
     `padding: ${config.padding}`,

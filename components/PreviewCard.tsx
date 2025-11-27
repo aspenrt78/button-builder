@@ -33,6 +33,37 @@ const getShadowStyle = (size: string, color: string, opacity: number) => {
   }
 };
 
+// Helper to parse extraStyles string into a React CSSProperties object
+const parseExtraStyles = (extraStyles: string): React.CSSProperties => {
+  if (!extraStyles) return {};
+  
+  const result: Record<string, string> = {};
+  
+  // Split by newlines and process each line
+  const lines = extraStyles.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
+    
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex === -1) continue;
+    
+    const property = trimmed.substring(0, colonIndex).trim();
+    let value = trimmed.substring(colonIndex + 1).trim();
+    
+    // Remove trailing semicolon if present
+    if (value.endsWith(';')) {
+      value = value.slice(0, -1).trim();
+    }
+    
+    // Convert CSS property to camelCase for React
+    const camelCase = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    result[camelCase] = value;
+  }
+  
+  return result as React.CSSProperties;
+};
+
 const IconMapper = ({ name, size, color, animationClass, animationDuration, containerSize }: { name: string, size: string, color: string, animationClass: string, animationDuration: string, containerSize?: number }) => {
   // Handle percentage-based sizing by calculating actual pixel size
   let computedSize = size;
@@ -188,12 +219,40 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   // 5. Shadow Logic
   const shadowStyle = getShadowStyle(config.shadowSize, config.shadowColor, config.shadowOpacity);
 
+  // 6. Parse extra styles
+  const extraStylesParsed = parseExtraStyles(config.extraStyles);
+
+  // 7. Gradient Background
+  const getGradientBackground = () => {
+    if (!config.gradientEnabled) return undefined;
+    
+    const colors = config.gradientColor3Enabled 
+      ? `${config.gradientColor1}, ${config.gradientColor2}, ${config.gradientColor3}`
+      : `${config.gradientColor1}, ${config.gradientColor2}`;
+    
+    switch (config.gradientType) {
+      case 'linear':
+        return `linear-gradient(${config.gradientAngle}deg, ${colors})`;
+      case 'radial':
+        return `radial-gradient(circle, ${colors})`;
+      case 'conic':
+        return `conic-gradient(from ${config.gradientAngle}deg, ${colors}, ${config.gradientColor1})`;
+      default:
+        return undefined;
+    }
+  };
+
+  const gradientBg = getGradientBackground();
+
   const containerStyle: React.CSSProperties = {
-    backgroundColor: actualBg,
+    backgroundColor: gradientBg ? undefined : actualBg,
+    background: gradientBg || undefined,
     color: config.color, 
     borderRadius: config.borderRadius,
     padding: config.padding,
     height: config.aspectRatio ? 'auto' : (config.height === 'auto' ? 'auto' : config.height),
+    width: config.aspectRatio ? '140px' : undefined,  // Fixed width when aspect ratio is set
+    minWidth: config.aspectRatio ? undefined : '140px',  // Min width when no aspect ratio
     aspectRatio: config.aspectRatio ? config.aspectRatio.replace(':', '/') : 'auto',
     display: 'grid',
     transition: 'all 0.3s ease',
@@ -218,6 +277,8 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     overflow: 'hidden', // Needed for marquee mask
     opacity: Math.min(100, Math.max(0, config.cardOpacity)) / 100,
     animationDuration: cardAnimationClass ? cardAnimationDuration : undefined,
+    // Apply extra styles LAST so they can override defaults
+    ...extraStylesParsed,
   };
 
   return (
@@ -260,7 +321,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
       </div>
 
       {/* The Card Preview - Centered */}
-      <div className="relative w-full max-w-[240px] flex justify-center z-10">
+      <div className="relative flex justify-center items-center z-10" style={{ width: config.aspectRatio ? 'auto' : '100%', maxWidth: '240px' }}>
         {/* Marquee Background Layer (Simulates rotating border) */}
         {isMarquee && (
           <div className="absolute -inset-[4px] rounded-xl overflow-hidden cba-animate-spin z-0" style={{ borderRadius: `calc(${config.borderRadius} + 4px)` }}>
@@ -274,7 +335,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
         {/* Main Card */}
         <div 
           style={containerStyle}
-          className={`hover:brightness-110 w-full ${cardAnimationClass} group`}
+          className={`hover:brightness-110 ${config.aspectRatio ? '' : 'w-full'} ${cardAnimationClass} group`}
           onClick={() => setSimulatedState(s => s === 'on' ? 'off' : 'on')}
           title={config.tooltip.enabled ? config.tooltip.content : undefined}
         >
