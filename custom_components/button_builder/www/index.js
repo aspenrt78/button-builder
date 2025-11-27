@@ -787,6 +787,27 @@ color_type: ${H.colorType}
     80% { transform: perspective(400px) rotateY(360deg); }
     100% { transform: perspective(400px) rotateY(360deg); }
   }
+  @keyframes cba-breathe {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.03); opacity: 0.9; }
+  }
+  @keyframes cba-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes cba-ripple {
+    0% { box-shadow: 0 0 0 0 currentColor; }
+    100% { box-shadow: 0 0 0 20px transparent; }
+  }
+  @keyframes cba-rubberBand {
+    0% { transform: scale(1, 1); }
+    30% { transform: scale(1.25, 0.75); }
+    40% { transform: scale(0.75, 1.25); }
+    50% { transform: scale(1.15, 0.85); }
+    65% { transform: scale(0.95, 1.05); }
+    75% { transform: scale(1.05, 0.95); }
+    100% { transform: scale(1, 1); }
+  }
 `),v&&(m+=`extra_styles: |
 ${v}`);const Z=y=>{const G=y.indexOf(":");if(G>0){const Q=y.substring(0,G).trim(),K=y.substring(G+1).trim();if(K.includes("(")||K.includes(",")||K.includes("#"))return`${Q}: '${K}'`}return y};m+=`styles:
   card:
