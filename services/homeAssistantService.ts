@@ -1,5 +1,5 @@
 // Home Assistant Entity Service
-// Fetches HA entities when running inside HA iframe panel
+// Fetches HA entities when running inside HA iframe panel (browser & mobile app)
 
 export interface HAEntity {
   entity_id: string;
@@ -19,62 +19,89 @@ export interface EntityInfo {
 
 const IS_DEV_ENV = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.DEV;
 
+// Get auth token from parent HA frame (works on mobile app)
+const getParentHassAuth = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    // Timeout after 2 seconds
+    const timeout = setTimeout(() => {
+      console.log('[ButtonBuilder] Parent auth request timed out');
+      resolve(null);
+    }, 2000);
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'auth' && event.data?.token) {
+        clearTimeout(timeout);
+        window.removeEventListener('message', handleMessage);
+        console.log('[ButtonBuilder] Received auth token from parent');
+        resolve(event.data.token);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Request auth from parent frame
+    try {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'request_auth' }, '*');
+        console.log('[ButtonBuilder] Requested auth from parent frame');
+      } else {
+        clearTimeout(timeout);
+        window.removeEventListener('message', handleMessage);
+        resolve(null);
+      }
+    } catch (e) {
+      clearTimeout(timeout);
+      window.removeEventListener('message', handleMessage);
+      console.warn('[ButtonBuilder] Cannot communicate with parent:', e);
+      resolve(null);
+    }
+  });
+};
+
+// Try to extract token from URL (some HA setups pass it)
+const getTokenFromUrl = (): string | null => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('auth_token') || params.get('token') || null;
+  } catch {
+    return null;
+  }
+};
+
 class HomeAssistantService {
   private readonly isDevEnv: boolean;
   private entities: EntityInfo[] = [];
   private fetchAttempted: boolean = false;
+  private authToken: string | null = null;
 
   constructor() {
     this.isDevEnv = Boolean(IS_DEV_ENV);
+    this.initAuth();
   }
 
-  private detectHomeAssistant(): boolean {
-    // Multiple detection methods for different HA setups
-    try {
-      // Method 1: Check if we're in an iframe
-      const inIframe = window.parent !== window;
-      
-      // Method 2: Check URL path patterns
-      const path = window.location.pathname ?? '';
-      const hostname = window.location.hostname ?? '';
-      
-      // Method 3: Check for HA-specific indicators
-      const hasHassTokens = !!localStorage.getItem('hassTokens');
-      const hasHassUrl = hostname.includes('homeassistant') || 
-                         hostname.includes('hassio') ||
-                         hostname.endsWith('.local') ||
-                         hostname.includes('.nabu.casa');
-      
-      // Method 4: Check path for panel indicators
-      const hasPanelPath = path.includes('/button_builder') || 
-                          path.includes('/button-builder') ||
-                          path.includes('/button_card_architect') || 
-                          path.includes('/local/') ||
-                          path.includes('/api/panel_custom/');
-      
-      const isHA = inIframe || hasHassTokens || hasHassUrl || hasPanelPath;
-      
-      console.log('[ButtonBuilder] HA Detection:', {
-        inIframe,
-        path,
-        hostname,
-        hasHassTokens,
-        hasHassUrl,
-        hasPanelPath,
-        result: isHA
-      });
-      
-      return isHA;
-    } catch (e) {
-      console.warn('[ButtonBuilder] HA detection error:', e);
-      return false;
+  private async initAuth(): Promise<void> {
+    // Try to get auth token early
+    this.authToken = getTokenFromUrl() || this.getLocalStorageToken();
+    
+    if (!this.authToken) {
+      const parentToken = await getParentHassAuth();
+      if (parentToken) {
+        this.authToken = parentToken;
+      }
     }
   }
 
   async getEntities(): Promise<EntityInfo[]> {
-    // Always try to fetch if we haven't yet, regardless of detection
+    // Always try to fetch if we haven't yet
     if (!this.fetchAttempted) {
       this.fetchAttempted = true;
+      
+      // Wait a bit for auth to initialize if needed
+      if (!this.authToken) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await this.initAuth();
+      }
+      
       const fetched = await this.fetchEntitiesFromHA();
       if (fetched.length > 0) {
         return fetched;
@@ -93,37 +120,43 @@ class HomeAssistantService {
   }
 
   private async fetchEntitiesFromHA(): Promise<EntityInfo[]> {
-    const methods = [
-      () => this.fetchWithToken(),
+    // Build list of fetch methods to try
+    const methods: Array<() => Promise<EntityInfo[]>> = [];
+    
+    // If we have a token, try it first
+    if (this.authToken) {
+      methods.push(() => this.fetchWithToken(this.authToken!));
+    }
+    
+    // Then try other methods
+    methods.push(
       () => this.fetchWithCredentials(),
       () => this.fetchDirect(),
-    ];
+      () => this.fetchWithSameOrigin(),
+    );
 
     for (const method of methods) {
       try {
         const result = await method();
         if (result.length > 0) {
           this.entities = result;
-          console.log(`[ButtonBuilder] Fetched ${result.length} entities`);
+          console.log(`[ButtonBuilder] ✓ Fetched ${result.length} entities`);
           return result;
         }
-      } catch (e) {
+      } catch (e: any) {
+        console.log(`[ButtonBuilder] Fetch method failed: ${e.message}`);
         // Continue to next method
       }
     }
 
-    console.warn('[ButtonBuilder] All fetch methods failed');
+    console.warn('[ButtonBuilder] ✗ All fetch methods failed');
     return [];
   }
 
-  private async fetchWithToken(): Promise<EntityInfo[]> {
-    const token = this.getAuthToken();
-    if (!token) {
-      throw new Error('No token available');
-    }
-
+  private async fetchWithToken(token: string): Promise<EntityInfo[]> {
     console.log('[ButtonBuilder] Trying fetch with Bearer token');
     const response = await fetch('/api/states', {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -138,12 +171,27 @@ class HomeAssistantService {
   }
 
   private async fetchWithCredentials(): Promise<EntityInfo[]> {
-    console.log('[ButtonBuilder] Trying fetch with credentials');
+    console.log('[ButtonBuilder] Trying fetch with credentials: include');
     const response = await fetch('/api/states', {
+      method: 'GET',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return this.parseStates(await response.json());
+  }
+
+  private async fetchWithSameOrigin(): Promise<EntityInfo[]> {
+    console.log('[ButtonBuilder] Trying fetch with credentials: same-origin');
+    const response = await fetch('/api/states', {
+      method: 'GET',
+      credentials: 'same-origin',
     });
 
     if (!response.ok) {
@@ -165,18 +213,22 @@ class HomeAssistantService {
   }
 
   private parseStates(states: HAEntity[]): EntityInfo[] {
+    if (!Array.isArray(states)) {
+      console.warn('[ButtonBuilder] Invalid states response:', typeof states);
+      return [];
+    }
     return states.map(entity => ({
       id: entity.entity_id,
-      name: entity.attributes.friendly_name || entity.entity_id,
+      name: entity.attributes?.friendly_name || entity.entity_id,
       state: entity.state,
       domain: entity.entity_id.split('.')[0],
-      icon: entity.attributes.icon,
+      icon: entity.attributes?.icon,
     }));
   }
 
-  private getAuthToken(): string {
+  private getLocalStorageToken(): string | null {
     // Try multiple token storage locations
-    const tokenKeys = ['hassTokens', 'ha_auth', 'auth_token', 'access_token'];
+    const tokenKeys = ['hassTokens', 'ha_auth', 'auth_token', 'access_token', 'hass_tokens'];
     
     for (const key of tokenKeys) {
       try {
@@ -186,15 +238,15 @@ class HomeAssistantService {
         // Try parsing as JSON
         try {
           const parsed = JSON.parse(stored);
-          const token = parsed?.access_token || parsed?.token || parsed?.refresh_token;
-          if (token) {
-            console.log(`[ButtonBuilder] Found token in ${key}`);
+          const token = parsed?.access_token || parsed?.token || parsed?.refresh_token || parsed?.hassUrl;
+          if (token && typeof token === 'string' && token.length > 20) {
+            console.log(`[ButtonBuilder] Found token in localStorage.${key}`);
             return token;
           }
         } catch {
           // Not JSON, might be raw token
-          if (stored.length > 20) {
-            console.log(`[ButtonBuilder] Found raw token in ${key}`);
+          if (stored.length > 20 && !stored.startsWith('{')) {
+            console.log(`[ButtonBuilder] Found raw token in localStorage.${key}`);
             return stored;
           }
         }
@@ -203,8 +255,8 @@ class HomeAssistantService {
       }
     }
     
-    console.log('[ButtonBuilder] No auth token found');
-    return '';
+    console.log('[ButtonBuilder] No auth token found in localStorage');
+    return null;
   }
 
   private getMockEntities(): EntityInfo[] {

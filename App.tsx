@@ -5,6 +5,7 @@ import { YamlViewer } from './components/YamlViewer';
 import { MagicBuilder } from './components/MagicBuilder';
 import { ButtonConfig, DEFAULT_CONFIG } from './types';
 import { generateYaml } from './utils/yamlGenerator';
+import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset } from './presets';
 import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown } from 'lucide-react';
 import logo from './logo.png';
@@ -59,57 +60,21 @@ const App: React.FC = () => {
   const handleImportYaml = () => {
     setImportError('');
     try {
-      // Basic YAML parser for button-card config
-      const lines = importYaml.split('\n');
-      const imported: Partial<ButtonConfig> = {};
+      // Use proper YAML parser
+      const imported = parseButtonCardYaml(importYaml);
+      const validated = validateImportedConfig(imported);
       
-      for (const line of lines) {
-        const match = line.match(/^(\s*)([a-zA-Z_][a-zA-Z0-9_-]*):\s*(.*)$/);
-        if (match) {
-          const [, , key, value] = match;
-          const cleanValue = value.trim().replace(/^["']|["']$/g, '');
-          
-          // Map YAML keys to config keys
-          const keyMap: Record<string, keyof ButtonConfig> = {
-            'entity': 'entity',
-            'name': 'name',
-            'icon': 'icon',
-            'label': 'label',
-            'show_name': 'showName',
-            'show_icon': 'showIcon',
-            'show_state': 'showState',
-            'show_label': 'showLabel',
-            'show_entity_picture': 'showEntityPicture',
-            'show_last_changed': 'showLastChanged',
-            'size': 'size',
-            'layout': 'layout',
-            'color_type': 'colorType',
-            'aspect_ratio': 'aspectRatio',
-          };
-          
-          const configKey = keyMap[key];
-          if (configKey) {
-            // Handle booleans
-            if (cleanValue === 'true') (imported as any)[configKey] = true;
-            else if (cleanValue === 'false') (imported as any)[configKey] = false;
-            // Handle numbers
-            else if (!isNaN(Number(cleanValue)) && cleanValue !== '') (imported as any)[configKey] = Number(cleanValue);
-            // Handle strings
-            else (imported as any)[configKey] = cleanValue;
-          }
-        }
-      }
-      
-      if (Object.keys(imported).length === 0) {
+      if (Object.keys(validated).length === 0) {
         setImportError('No valid configuration found. Make sure it\'s valid button-card YAML.');
         return;
       }
       
-      setConfig(prev => ({ ...prev, ...imported }));
+      setConfig(prev => ({ ...prev, ...validated }));
       setIsImportOpen(false);
       setImportYaml('');
-    } catch (e) {
-      setImportError('Failed to parse YAML. Please check the format.');
+    } catch (e: any) {
+      console.error('YAML import error:', e);
+      setImportError(`Failed to parse YAML: ${e.message || 'Please check the format.'}`);
     }
   };
 

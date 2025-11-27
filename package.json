@@ -9,12 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.30.0",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
-    "@google/genai": "^1.30.0",
-    "react-dom": "^19.2.0",
+    "lucide-react": "^0.554.0",
     "react": "^19.2.0",
-    "lucide-react": "^0.554.0"
+    "react-dom": "^19.2.0",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
