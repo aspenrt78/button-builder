@@ -324,7 +324,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
       <div className="relative flex justify-center items-center z-10" style={{ width: config.aspectRatio ? 'auto' : '100%', maxWidth: '240px' }}>
         {/* Marquee Background Layer (Simulates rotating border) */}
         {isMarquee && (
-          <div className="absolute -inset-[4px] rounded-xl overflow-hidden cba-animate-spin z-0" style={{ borderRadius: `calc(${config.borderRadius} + 4px)` }}>
+          <div className="absolute -inset-[4px] overflow-hidden cba-animate-spin z-0" style={{ borderRadius: config.borderRadius === '50%' ? '50%' : `calc(${config.borderRadius} + 4px)` }}>
              <div className="w-full h-full" style={{
                background: `conic-gradient(transparent 20%, ${actualBorderColor || SIMULATED_ENTITY_COLOR})`,
                filter: 'blur(4px)'
@@ -353,7 +353,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
 
            {/* Marquee Inner Cover to create border effect (Only if marquee is on) */}
            {isMarquee && (
-             <div className="absolute inset-[2px] bg-black z-[-1]" style={{ 
+             <div className="absolute inset-[2px] z-[-1]" style={{ 
                borderRadius: config.borderRadius,
                backgroundColor: actualBg
              }}></div>

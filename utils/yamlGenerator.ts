@@ -668,18 +668,41 @@ color_type: ${config.colorType}
     yaml += `extra_styles: |\n${extraStyles}`;
   }
 
+  // Helper to format CSS style for YAML (quote values with special chars)
+  const formatStyleForYaml = (style: string): string => {
+    const colonIndex = style.indexOf(':');
+    if (colonIndex > 0) {
+      const prop = style.substring(0, colonIndex).trim();
+      const value = style.substring(colonIndex + 1).trim();
+      // Quote values containing parentheses, commas, or other special chars
+      if (value.includes('(') || value.includes(',') || value.includes('#')) {
+        return `${prop}: '${value}'`;
+      }
+    }
+    return style;
+  };
+
   // --- Styles Section (Always) ---
   yaml += `styles:
   card:
-${cardStyles.map(s => `    - ${s}`).join('\n')}
+${cardStyles.map(s => `    - ${formatStyleForYaml(s)}`).join('\n')}
 `;
 
-  // Extra styles from textarea
+  // Extra styles from textarea (need to quote values containing special chars)
   if (config.extraStyles) {
     yaml += `    # Custom Extra Styles\n`;
     config.extraStyles.split('\n').forEach(line => {
       if (line.trim()) {
-        yaml += `    - ${line.trim()}\n`;
+        // Check if line contains a colon (CSS property: value format)
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          const prop = line.substring(0, colonIndex).trim();
+          const value = line.substring(colonIndex + 1).trim();
+          // Quote the value to prevent YAML parsing issues
+          yaml += `    - ${prop}: '${value}'\n`;
+        } else {
+          yaml += `    - ${line.trim()}\n`;
+        }
       }
     });
   }
