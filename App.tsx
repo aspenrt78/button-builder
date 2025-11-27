@@ -104,11 +104,11 @@ const App: React.FC = () => {
             {isPresetsOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsPresetsOpen(false)} />
-                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-96 overflow-y-auto custom-scrollbar">
-                  {['minimal', 'glass', 'neon', 'animated', 'custom'].map(category => (
+                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                  {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'custom'].map(category => (
                     <div key={category}>
                       <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-800/50 sticky top-0">
-                        {category}
+                        {category === '3d' ? '3D Effects' : category}
                       </div>
                       {PRESETS.filter(p => p.category === category).map(preset => (
                         <button
