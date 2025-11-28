@@ -178,12 +178,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
             <ControlInput label="Aspect Ratio (e.g 1/1)" value={config.aspectRatio} onChange={(v) => update('aspectRatio', v)} placeholder="1/1" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <ControlInput label="Card Height" value={config.height} onChange={(v) => update('height', v)} />
-            <ControlInput label="Icon Size" value={config.size} onChange={(v) => update('size', v)} />
+            <ControlInput label="Card Height" value={config.height} onChange={(v) => update('height', v)} suffix="px" />
+            <ControlInput label="Icon Size" value={config.size} onChange={(v) => update('size', v)} suffix="%" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-             <ControlInput label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} />
-             <ControlInput label="Padding" value={config.padding} onChange={(v) => update('padding', v)} />
+             <ControlInput label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} suffix="px" />
+             <ControlInput label="Padding" value={config.padding} onChange={(v) => update('padding', v)} suffix="px" />
           </div>
           <div className="grid grid-cols-2 gap-4">
              <ControlInput label="Card Size (1-6)" value={config.cardSize.toString()} onChange={(v) => update('cardSize', Number(v) || 3)} placeholder="3" />
@@ -362,7 +362,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <Section title="Borders" icon={BoxSelect}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} placeholder="1px" />
+               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
                <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
             </div>
 
@@ -386,7 +386,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
                   <ControlInput label="Type" type="select" value={config.cardAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('cardAnimation', v)} />
                   <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} />
                 </div>
-                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} placeholder="2s" />
+                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} suffix="s" />
              </div>
 
              <div className="h-px bg-gray-700/50" />
@@ -398,7 +398,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
                   <ControlInput label="Type" type="select" value={config.iconAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('iconAnimation', v)} />
                   <ControlInput label="Condition" type="select" value={config.iconAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('iconAnimationTrigger', v)} />
                 </div>
-                <ControlInput label="Speed/Duration" value={config.iconAnimationSpeed} onChange={(v) => update('iconAnimationSpeed', v)} placeholder="2s" />
+                <ControlInput label="Speed/Duration" value={config.iconAnimationSpeed} onChange={(v) => update('iconAnimationSpeed', v)} suffix="s" />
                 <ControlInput type="checkbox" label="Rotate Icon" value={config.rotate} onChange={(v) => update('rotate', v)} />
              </div>
           </div>
@@ -408,7 +408,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <Section title="Typography" icon={Type}>
            <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
            <div className="grid grid-cols-2 gap-4 mt-3">
-              <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} placeholder="14px" />
+              <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} suffix="px" />
               <ControlInput label="Transform" type="select" value={config.textTransform} options={TRANSFORM_OPTIONS} onChange={(v) => update('textTransform', v)} />
            </div>
            <div className="grid grid-cols-2 gap-4 mt-3">
@@ -583,7 +583,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
                               const updated = [...config.stateStyles];
                               updated[idx] = { ...style, cardAnimationSpeed: v };
                               update('stateStyles', updated);
-                            }} placeholder="2s" />
+                            }} suffix="s" />
                           </div>
                           <div className="grid grid-cols-2 gap-2 mt-2">
                             <ControlInput label="Icon Animation" type="select" value={style.iconAnimation || 'none'} options={ANIMATION_OPTIONS} onChange={(v) => {
@@ -595,7 +595,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
                               const updated = [...config.stateStyles];
                               updated[idx] = { ...style, iconAnimationSpeed: v };
                               update('stateStyles', updated);
-                            }} placeholder="2s" />
+                            }} suffix="s" />
                           </div>
                           <div className="mt-2">
                             <ControlInput type="checkbox" label="Spin Icon (Legacy)" value={style.spin} onChange={(v) => {
@@ -943,7 +943,10 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
               <ControlInput label="Update Timer (s)" value={config.updateTimer.toString()} onChange={(v) => update('updateTimer', Number(v) || 0)} placeholder="0 = disabled" />
             </div>
             
-            <ControlInput label="Template" value={config.template} onChange={(v) => update('template', v)} placeholder="template_name" />
+            <div className="grid grid-cols-2 gap-4">
+              <ControlInput label="Hold Time (ms)" value={config.holdTime.toString()} onChange={(v) => update('holdTime', Number(v) || 500)} placeholder="500" />
+              <ControlInput label="Template" value={config.template} onChange={(v) => update('template', v)} placeholder="template_name" />
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <ControlInput type="checkbox" label="Icon Spin (rotate)" value={config.spin} onChange={(v) => update('spin', v)} />
@@ -951,13 +954,36 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
             </div>
             
             <div className="grid grid-cols-2 gap-4">
+              <ControlInput type="checkbox" label="Haptic Feedback" value={config.hapticFeedback} onChange={(v) => update('hapticFeedback', v)} />
               <ControlInput type="checkbox" label="Disable Keyboard" value={config.disableKeyboard} onChange={(v) => update('disableKeyboard', v)} />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
               <ControlInput type="checkbox" label="Group Expand" value={config.groupExpand} onChange={(v) => update('groupExpand', v)} />
+              <ControlInput type="checkbox" label="Hidden" value={config.hidden} onChange={(v) => update('hidden', v)} />
             </div>
             
             {config.spin && (
-              <ControlInput label="Spin Duration" value={config.spinDuration} onChange={(v) => update('spinDuration', v)} placeholder="2s" />
+              <ControlInput label="Spin Duration" value={config.spinDuration} onChange={(v) => update('spinDuration', v)} suffix="s" />
             )}
+            
+            {config.hidden && (
+              <ControlInput label="Hidden Template" value={config.hiddenTemplate} onChange={(v) => update('hiddenTemplate', v)} placeholder="[[[ return ... ]]]" />
+            )}
+            
+            <div className="h-px bg-gray-700/50" />
+            
+            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Trigger Options</p>
+            <ControlInput label="Trigger Entity" value={config.triggerEntity} onChange={(v) => update('triggerEntity', v)} placeholder="sensor.time" />
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Triggers Update (one entity per line)</label>
+              <textarea
+                value={config.triggersUpdate.join('\n')}
+                onChange={(e) => update('triggersUpdate', e.target.value.split('\n').filter(s => s.trim()))}
+                placeholder="sensor.temperature&#10;sensor.humidity"
+                className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
+              />
+            </div>
             
             <div className="h-px bg-gray-700/50" />
             
@@ -988,6 +1014,26 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
                 value={config.gridStyles}
                 onChange={(e) => update('gridStyles', e.target.value)}
                 placeholder="- grid-template-areas: ..."
+                className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
+              />
+            </div>
+            
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Lock Styles</label>
+              <textarea
+                value={config.lockStyles}
+                onChange={(e) => update('lockStyles', e.target.value)}
+                placeholder="- color: red"
+                className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
+              />
+            </div>
+            
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Tooltip Styles</label>
+              <textarea
+                value={config.tooltipStyles}
+                onChange={(e) => update('tooltipStyles', e.target.value)}
+                placeholder="- background: rgba(0,0,0,0.9)"
                 className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
               />
             </div>

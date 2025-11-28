@@ -11,6 +11,7 @@ interface Props {
   min?: number;
   max?: number;
   step?: number;
+  suffix?: string; // Auto-append suffix like 'px', '%', 's', etc.
 }
 
 export const ControlInput: React.FC<Props> = ({ 
@@ -23,8 +24,41 @@ export const ControlInput: React.FC<Props> = ({
   placeholder = '',
   min = 0,
   max = 100,
-  step = 1
+  step = 1,
+  suffix
 }) => {
+  
+  // Handle auto-suffix on blur
+  const handleBlurWithSuffix = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (!suffix) return;
+    
+    const val = e.target.value.trim();
+    if (!val) return;
+    
+    // Check if value is a number or ends with the suffix already
+    if (val.endsWith(suffix)) return;
+    
+    // Extract numeric part - check if it's just a number
+    const numericMatch = val.match(/^-?[\d.]+$/);
+    if (numericMatch) {
+      onChange(val + suffix);
+    }
+  };
+
+  // Handle key press - auto-add suffix on Enter
+  const handleKeyDownWithSuffix = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suffix || e.key !== 'Enter') return;
+    
+    const val = (e.target as HTMLInputElement).value.trim();
+    if (!val) return;
+    
+    if (val.endsWith(suffix)) return;
+    
+    const numericMatch = val.match(/^-?[\d.]+$/);
+    if (numericMatch) {
+      onChange(val + suffix);
+    }
+  };
   
   if (type === 'checkbox') {
     return (
@@ -92,8 +126,10 @@ export const ControlInput: React.FC<Props> = ({
           <input
             type={type === 'color' ? 'text' : type}
             value={value}
-            placeholder={placeholder}
+            placeholder={placeholder || (suffix ? `e.g. 10${suffix}` : '')}
             onChange={(e) => onChange(e.target.value)}
+            onBlur={handleBlurWithSuffix}
+            onKeyDown={handleKeyDownWithSuffix}
             className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder-gray-600"
           />
         )}

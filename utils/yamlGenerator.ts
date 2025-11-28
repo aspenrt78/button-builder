@@ -821,6 +821,16 @@ ${stateColorLine}
     });
   }
 
+  // Img Cell Styles (for entity pictures in grid)
+  if (config.imgCellStyles) {
+    yaml += `  img_cell:\n`;
+    config.imgCellStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        yaml += `    - ${line.trim()}\n`;
+      }
+    });
+  }
+
   // --- Resolve onColor/offColor for state logic ---
   const onColorResolved = hexToRgba(config.stateOnColor, config.stateOnOpacity);
   const offColorResolved = hexToRgba(config.stateOffColor, config.stateOffOpacity);
