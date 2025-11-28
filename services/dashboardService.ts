@@ -54,61 +54,51 @@ export const isInHomeAssistant = (): boolean => {
 };
 
 /**
- * Get the Home Assistant connection from parent window
+ * Get the Home Assistant hass object from parent window
  */
-const getHassConnection = async (): Promise<any> => {
+const getHass = (): any | null => {
   try {
-    // Try to get connection from parent window (iframe scenario)
     const parent = window.parent as any;
     
-    // Method 1: Direct hass object
+    // Direct hass object on parent
     if (parent?.hass) {
       return parent.hass;
     }
     
-    // Method 2: hassConnection promise
-    if (parent?.hassConnection) {
-      const { conn } = await parent.hassConnection;
-      return conn;
+    // Sometimes it's on document
+    if ((parent?.document as any)?.querySelector?.('home-assistant')?.hass) {
+      return (parent.document as any).querySelector('home-assistant').hass;
     }
     
-    // Method 3: Custom event for HA panels
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timeout waiting for HA connection')), 5000);
-      
-      window.addEventListener('message', (event) => {
-        if (event.data?.type === 'hass-connection') {
-          clearTimeout(timeout);
-          resolve(event.data.connection);
-        }
-      }, { once: true });
-      
-      // Request connection from parent
-      window.parent.postMessage({ type: 'request-hass-connection' }, '*');
-    });
+    return null;
   } catch (error) {
-    console.error('Failed to get HA connection:', error);
-    throw error;
+    console.error('Failed to get hass object:', error);
+    return null;
   }
 };
 
 /**
- * Send a WebSocket message to Home Assistant
+ * Call a Home Assistant WebSocket API
  */
-const sendHassMessage = async (hass: any, message: any): Promise<any> => {
-  return new Promise((resolve, reject) => {
+const callHassWS = async (message: any): Promise<any> => {
+  const hass = getHass();
+  
+  if (!hass) {
+    throw new Error('Home Assistant connection not available');
+  }
+  
+  // The hass object has a connection property with sendMessagePromise
+  // or we can use hass.callWS directly if available
+  if (hass.callWS) {
+    return await hass.callWS(message);
+  }
+  
+  if (hass.connection?.sendMessagePromise) {
     const id = Date.now();
-    
-    if (hass.callWS) {
-      // Using hass object with callWS method
-      hass.callWS(message).then(resolve).catch(reject);
-    } else if (hass.sendMessagePromise) {
-      // Using connection object
-      hass.sendMessagePromise({ ...message, id }).then(resolve).catch(reject);
-    } else {
-      reject(new Error('No valid method to send message'));
-    }
-  });
+    return await hass.connection.sendMessagePromise({ ...message, id });
+  }
+  
+  throw new Error('No valid method to call WebSocket API');
 };
 
 /**
@@ -116,13 +106,17 @@ const sendHassMessage = async (hass: any, message: any): Promise<any> => {
  */
 export const fetchDashboards = async (): Promise<DashboardInfo[]> => {
   try {
-    const hass = await getHassConnection();
-    
-    const dashboards = await sendHassMessage(hass, {
+    const dashboards = await callHassWS({
       type: 'lovelace/dashboards'
     });
     
-    return dashboards || [];
+    // Ensure we always return an array
+    if (!dashboards || !Array.isArray(dashboards)) {
+      console.warn('Dashboards response is not an array:', dashboards);
+      return [];
+    }
+    
+    return dashboards;
   } catch (error) {
     console.error('Failed to fetch dashboards:', error);
     return [];
@@ -134,9 +128,7 @@ export const fetchDashboards = async (): Promise<DashboardInfo[]> => {
  */
 export const fetchDashboardConfig = async (urlPath: string | null): Promise<any> => {
   try {
-    const hass = await getHassConnection();
-    
-    const config = await sendHassMessage(hass, {
+    const config = await callHassWS({
       type: 'lovelace/config',
       url_path: urlPath, // null = default dashboard
     });
@@ -276,8 +268,9 @@ export const fetchAllDashboardBackgrounds = fetchAllDashboardConfigs;
  * - "var(--primary-background-color)"
  * - Simple color values
  */
-export const parseBackgroundToCss = (background: string): React.CSSProperties => {
-  if (!background) return {};
+export const parseBackgroundToCss = (background: string | null | undefined): React.CSSProperties => {
+  // Guard against non-string values
+  if (!background || typeof background !== 'string') return {};
   
   // If it starts with url( or contains url(, treat as background shorthand
   if (background.includes('url(')) {
