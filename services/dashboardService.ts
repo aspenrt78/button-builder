@@ -65,9 +65,10 @@ const getHass = (): any | null => {
       return parent.hass;
     }
     
-    // Sometimes it's on document
-    if ((parent?.document as any)?.querySelector?.('home-assistant')?.hass) {
-      return (parent.document as any).querySelector('home-assistant').hass;
+    // Try to get from home-assistant element
+    const haElement = parent?.document?.querySelector?.('home-assistant');
+    if (haElement?.hass) {
+      return haElement.hass;
     }
     
     return null;
@@ -78,24 +79,48 @@ const getHass = (): any | null => {
 };
 
 /**
- * Call a Home Assistant WebSocket API
+ * Call a Home Assistant WebSocket API using the connection
  */
-const callHassWS = async (message: any): Promise<any> => {
+const callHassWS = async (type: string, data?: any): Promise<any> => {
   const hass = getHass();
   
   if (!hass) {
     throw new Error('Home Assistant connection not available');
   }
   
-  // The hass object has a connection property with sendMessagePromise
-  // or we can use hass.callWS directly if available
-  if (hass.callWS) {
-    return await hass.callWS(message);
+  // Method 1: Use hass.callWS (available in modern HA)
+  if (typeof hass.callWS === 'function') {
+    try {
+      return await hass.callWS({ type, ...data });
+    } catch (e) {
+      console.warn('hass.callWS failed:', e);
+    }
   }
   
-  if (hass.connection?.sendMessagePromise) {
-    const id = Date.now();
-    return await hass.connection.sendMessagePromise({ ...message, id });
+  // Method 2: Use the connection directly
+  if (hass.connection) {
+    return new Promise((resolve, reject) => {
+      const msgId = Date.now();
+      
+      const unsub = hass.connection.subscribeMessage(
+        (msg: any) => {
+          unsub();
+          if (msg.success === false) {
+            reject(new Error(msg.error?.message || 'Unknown error'));
+          } else {
+            resolve(msg.result);
+          }
+        },
+        { type, id: msgId, ...data },
+        { resubscribe: false }
+      );
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        unsub();
+        reject(new Error('Timeout waiting for response'));
+      }, 10000);
+    });
   }
   
   throw new Error('No valid method to call WebSocket API');
@@ -106,9 +131,7 @@ const callHassWS = async (message: any): Promise<any> => {
  */
 export const fetchDashboards = async (): Promise<DashboardInfo[]> => {
   try {
-    const dashboards = await callHassWS({
-      type: 'lovelace/dashboards'
-    });
+    const dashboards = await callHassWS('lovelace/dashboards');
     
     // Ensure we always return an array
     if (!dashboards || !Array.isArray(dashboards)) {
@@ -128,10 +151,7 @@ export const fetchDashboards = async (): Promise<DashboardInfo[]> => {
  */
 export const fetchDashboardConfig = async (urlPath: string | null): Promise<any> => {
   try {
-    const config = await callHassWS({
-      type: 'lovelace/config',
-      url_path: urlPath, // null = default dashboard
-    });
+    const config = await callHassWS('lovelace/config', { url_path: urlPath });
     
     return config;
   } catch (error) {
@@ -224,6 +244,7 @@ export const fetchAllDashboardConfigs = async (): Promise<DashboardConfig[]> => 
   try {
     // Always try to fetch the default dashboard first
     const defaultConfig = await fetchDashboardConfig(null);
+    console.log('Default dashboard config:', defaultConfig);
     if (defaultConfig) {
       configs.push({
         dashboardId: 'lovelace',
@@ -236,24 +257,32 @@ export const fetchAllDashboardConfigs = async (): Promise<DashboardConfig[]> => 
     
     // Fetch list of other dashboards
     const dashboards = await fetchDashboards();
+    console.log('Other dashboards:', dashboards);
     
     for (const dashboard of dashboards) {
-      if (dashboard.mode === 'storage') {
+      // Fetch both storage and yaml mode dashboards
+      try {
         const config = await fetchDashboardConfig(dashboard.url_path);
+        console.log(`Dashboard ${dashboard.url_path} config:`, config);
         
-        configs.push({
-          dashboardId: dashboard.url_path || dashboard.id,
-          title: dashboard.title || dashboard.id,
-          background: extractBackground(config),
-          icon: dashboard.icon,
-          grid: extractGridConfig(config),
-        });
+        if (config) {
+          configs.push({
+            dashboardId: dashboard.url_path || dashboard.id,
+            title: dashboard.title || dashboard.id,
+            background: extractBackground(config),
+            icon: dashboard.icon,
+            grid: extractGridConfig(config),
+          });
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch config for dashboard ${dashboard.url_path}:`, err);
       }
     }
   } catch (error) {
     console.error('Failed to fetch dashboard configs:', error);
   }
   
+  console.log('Final dashboard configs:', configs);
   return configs;
 };
 
