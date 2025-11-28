@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3 } from 'lucide-react';
+import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDashboard, RefreshCw } from 'lucide-react';
 import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
 import { getIconComponent } from '../services/iconMapper';
+import { isInHomeAssistant, fetchAllDashboardConfigs, DashboardConfig, DashboardGridConfig, parseBackgroundToCss } from '../services/dashboardService';
 
 interface Props {
   config: ButtonConfig;
@@ -154,8 +155,16 @@ const getGridCols = (layout: string) => {
 export const PreviewCard: React.FC<Props> = ({ config }) => {
   const [simulatedState, setSimulatedState] = useState<'on' | 'off'>('on');
   const [canvasColor, setCanvasColor] = useState('#0a0a0a');
+  const [canvasBackground, setCanvasBackground] = useState<string | null>(null);
   const [showCanvasPicker, setShowCanvasPicker] = useState(false);
   const [showLayoutSettings, setShowLayoutSettings] = useState(false);
+  
+  // Dashboard backgrounds from HA
+  const [dashboardConfigs, setDashboardConfigs] = useState<DashboardConfig[]>([]);
+  const [loadingDashboards, setLoadingDashboards] = useState(false);
+  const [dashboardsLoaded, setDashboardsLoaded] = useState(false);
+  const [isHA, setIsHA] = useState(false);
+  const [selectedDashboard, setSelectedDashboard] = useState<string | null>(null);
   
   // Dashboard layout settings
   const [selectedPreset, setSelectedPreset] = useState(0);
@@ -163,6 +172,85 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const [cardHeight, setCardHeight] = useState(100);
   const [gridGap, setGridGap] = useState(8);
   const [showGrid, setShowGrid] = useState(false);
+
+  // Check if we're in HA on mount
+  useEffect(() => {
+    setIsHA(isInHomeAssistant());
+  }, []);
+
+  // Load dashboard backgrounds when picker is opened
+  const loadDashboardConfigs = async () => {
+    if (loadingDashboards || dashboardsLoaded) return;
+    
+    setLoadingDashboards(true);
+    try {
+      const configs = await fetchAllDashboardConfigs();
+      setDashboardConfigs(configs);
+      setDashboardsLoaded(true);
+    } catch (error) {
+      console.error('Failed to load dashboard configs:', error);
+    } finally {
+      setLoadingDashboards(false);
+    }
+  };
+
+  // Apply dashboard config (background + grid)
+  const applyDashboardConfig = (db: DashboardConfig) => {
+    setSelectedDashboard(db.dashboardId);
+    
+    // Apply background if available
+    if (db.background) {
+      setCanvasBackground(db.background);
+    }
+    
+    // Apply grid settings
+    if (db.grid) {
+      // Calculate card size based on grid type and columns
+      const columns = db.grid.columns || 4;
+      const gridType = db.grid.type;
+      
+      // Base canvas size approximation (typical HA sidebar view)
+      // We'll use reasonable defaults that match HA's default layouts
+      let newCardWidth: number;
+      let newCardHeight: number;
+      
+      if (gridType === 'sections') {
+        // Sections view uses card_size for height calculation
+        const cardSize = db.grid.cardSize || 75;
+        newCardWidth = Math.round(300 / columns * 1.5);
+        newCardHeight = cardSize;
+      } else if (gridType === 'panel') {
+        // Panel view - full width card
+        newCardWidth = 200;
+        newCardHeight = 150;
+      } else {
+        // Masonry (default) - calculate based on column count
+        // Typical masonry card widths in HA are ~300px at 4 columns
+        newCardWidth = Math.round(280 / (columns / 4));
+        newCardHeight = Math.round(newCardWidth * 0.85); // Slightly shorter than square
+      }
+      
+      // Clamp values to reasonable ranges
+      setCardWidth(Math.max(60, Math.min(200, newCardWidth)));
+      setCardHeight(Math.max(60, Math.min(200, newCardHeight)));
+      
+      // Set gap based on dense mode
+      setGridGap(db.grid.dense ? 4 : 8);
+    }
+  };
+
+  // Clear dashboard selection
+  const clearDashboardSelection = () => {
+    setSelectedDashboard(null);
+    setCanvasBackground(null);
+  };
+
+  // Refresh dashboards
+  const refreshDashboards = async () => {
+    setDashboardsLoaded(false);
+    setDashboardConfigs([]);
+    await loadDashboardConfigs();
+  };
 
   // Load custom font when customFontUrl changes
   useEffect(() => {
@@ -345,10 +433,15 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     ...extraStylesParsed,
   };
 
+  // Calculate canvas style - support both color and background image
+  const canvasStyle: React.CSSProperties = canvasBackground 
+    ? { ...parseBackgroundToCss(canvasBackground), backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { backgroundColor: canvasColor };
+
   return (
     <div 
-      className="absolute inset-0 flex items-center justify-center transition-colors duration-500"
-      style={{ backgroundColor: canvasColor }}
+      className="absolute inset-0 flex items-center justify-center transition-all duration-500"
+      style={canvasStyle}
     >
       {/* Grid Overlay (when enabled) */}
       {showGrid && (
@@ -385,7 +478,8 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                 <select
                   value={selectedPreset}
                   onChange={(e) => applyPreset(Number(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white"
+                  disabled={!!selectedDashboard}
+                  className={`w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white ${selectedDashboard ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {DASHBOARD_PRESETS.map((preset, i) => (
                     <option key={preset.name} value={i}>{preset.name}</option>
@@ -394,7 +488,12 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
               </div>
 
               {/* Custom Size Controls */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${selectedDashboard ? 'opacity-50' : ''}`}>
+                {selectedDashboard && (
+                  <p className="text-[9px] text-amber-500/80 mb-1">
+                    Locked by dashboard preset
+                  </p>
+                )}
                 <div className="flex items-center gap-2">
                   <label className="text-[10px] text-gray-400 w-16">Width</label>
                   <input
@@ -402,8 +501,9 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                     min="60"
                     max="250"
                     value={cardWidth}
+                    disabled={!!selectedDashboard}
                     onChange={(e) => { setCardWidth(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
-                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   />
                   <span className="text-[10px] text-gray-300 w-10 text-right">{cardWidth}px</span>
                 </div>
@@ -414,8 +514,9 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                     min="60"
                     max="250"
                     value={cardHeight}
+                    disabled={!!selectedDashboard}
                     onChange={(e) => { setCardHeight(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
-                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   />
                   <span className="text-[10px] text-gray-300 w-10 text-right">{cardHeight}px</span>
                 </div>
@@ -426,8 +527,9 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                     min="0"
                     max="24"
                     value={gridGap}
+                    disabled={!!selectedDashboard}
                     onChange={(e) => { setGridGap(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
-                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   />
                   <span className="text-[10px] text-gray-300 w-10 text-right">{gridGap}px</span>
                 </div>
@@ -450,31 +552,127 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
         {/* Canvas Color Picker */}
         <div className="relative">
            <button 
-             onClick={() => { setShowCanvasPicker(!showCanvasPicker); setShowLayoutSettings(false); }}
+             onClick={() => { 
+               setShowCanvasPicker(!showCanvasPicker); 
+               setShowLayoutSettings(false);
+               // Load dashboards when opening picker
+               if (!showCanvasPicker && isHA) {
+                 loadDashboardConfigs();
+               }
+             }}
              className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors ${showCanvasPicker ? 'bg-gray-700 text-white' : ''}`}
-             title="Change Canvas Backdrop Color"
+             title="Change Canvas Backdrop"
            >
              <Palette size={16} />
            </button>
            {showCanvasPicker && (
-             <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-48 animate-in slide-in-from-top-2">
+             <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-64 animate-in slide-in-from-top-2 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Preview Backdrop</p>
+                
+                {/* Solid Colors */}
                 <div className="grid grid-cols-4 gap-2 mb-3">
                    {['#0a0a0a', '#1a1a2e', '#ffffff', '#1e3a5f'].map(c => (
                      <button 
                        key={c} 
-                       className={`w-6 h-6 rounded-full border shadow-sm ${canvasColor === c ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-600'}`}
+                       className={`w-8 h-8 rounded-full border shadow-sm transition-all ${canvasColor === c && !canvasBackground ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-600 hover:border-gray-500'}`}
                        style={{ backgroundColor: c }}
-                       onClick={() => setCanvasColor(c)}
+                       onClick={() => { setCanvasColor(c); setCanvasBackground(null); }}
+                       title={c}
                      />
                    ))}
                 </div>
                 <input 
                    type="color" 
                    value={canvasColor}
-                   onChange={(e) => setCanvasColor(e.target.value)}
-                   className="w-full h-8 rounded cursor-pointer"
+                   onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); }}
+                   className="w-full h-8 rounded cursor-pointer mb-3"
                 />
+
+                {/* Dashboard Backgrounds Section */}
+                {isHA && (
+                  <div className="border-t border-gray-800 pt-3 mt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1">
+                        <LayoutDashboard size={12} />
+                        Dashboard Presets
+                      </p>
+                      <button
+                        onClick={refreshDashboards}
+                        disabled={loadingDashboards}
+                        className="p-1 text-gray-500 hover:text-gray-300 disabled:opacity-50"
+                        title="Refresh dashboards"
+                      >
+                        <RefreshCw size={12} className={loadingDashboards ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
+                    
+                    <p className="text-[9px] text-gray-500 mb-2">
+                      Apply dashboard background & grid sizing
+                    </p>
+                    
+                    {loadingDashboards && (
+                      <div className="flex items-center justify-center py-4 text-gray-500">
+                        <Loader2 size={16} className="animate-spin mr-2" />
+                        <span className="text-xs">Loading dashboards...</span>
+                      </div>
+                    )}
+                    
+                    {!loadingDashboards && dashboardConfigs.length === 0 && dashboardsLoaded && (
+                      <p className="text-[10px] text-gray-500 text-center py-2">
+                        No dashboards found
+                      </p>
+                    )}
+                    
+                    {!loadingDashboards && dashboardConfigs.length > 0 && (
+                      <div className="space-y-1">
+                        {dashboardConfigs.map((db) => (
+                          <button
+                            key={db.dashboardId}
+                            onClick={() => applyDashboardConfig(db)}
+                            className={`w-full flex items-center gap-2 px-2 py-2 rounded text-left transition-colors ${
+                              selectedDashboard === db.dashboardId 
+                                ? 'bg-blue-600/20 border border-blue-500/50' 
+                                : 'hover:bg-gray-800 border border-transparent'
+                            }`}
+                          >
+                            {/* Background Preview */}
+                            <div 
+                              className="w-8 h-8 rounded border border-gray-600 shrink-0"
+                              style={db.background ? parseBackgroundToCss(db.background) : { backgroundColor: '#333' }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-white truncate">{db.title}</p>
+                              <p className="text-[9px] text-gray-500 truncate">
+                                {db.grid.type}{db.grid.columns ? ` · ${db.grid.columns} cols` : ''}
+                                {db.background ? ' · bg' : ''}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Clear dashboard selection */}
+                    {selectedDashboard && (
+                      <button
+                        onClick={clearDashboardSelection}
+                        className="w-full mt-2 px-2 py-1.5 text-[10px] text-gray-400 hover:text-white border border-gray-700 rounded hover:bg-gray-800 transition-colors"
+                      >
+                        Clear dashboard preset
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Not in HA message */}
+                {!isHA && (
+                  <div className="border-t border-gray-800 pt-3 mt-3">
+                    <p className="text-[10px] text-gray-500 text-center">
+                      <LayoutDashboard size={12} className="inline mr-1" />
+                      Dashboard presets available when running in Home Assistant
+                    </p>
+                  </div>
+                )}
              </div>
            )}
         </div>

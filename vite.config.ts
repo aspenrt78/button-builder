@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
       build: {
         outDir: 'custom_components/button_builder/www',
         emptyOutDir: false, // Don't delete panel.html
+        chunkSizeWarningLimit: 4000, // Suppress warning for large bundles (expected for this app)
         rollupOptions: {
           output: {
             entryFileNames: 'index.js',

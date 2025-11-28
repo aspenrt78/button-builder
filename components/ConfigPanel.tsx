@@ -5,7 +5,8 @@ import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS } from '../constants';
-import { Layers, Type, MousePointer, Palette, Zap, ChevronDown, ChevronRight, Layout, ToggleRight, BoxSelect, Droplets, Activity, Settings, Lock, AlertCircle, Code, Plus, X, Shield, MessageSquare, Variable as VariableIcon, Target, Hand, Image } from 'lucide-react';
+import { Plus, X, Variable as VariableIcon } from 'lucide-react';
+import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
 
 // Domain to icon mappings for auto-fill
 const DOMAIN_ICONS: Record<string, string> = {
@@ -168,24 +169,7 @@ const PresetIndicator = ({ field, activePreset, modifiedFromPreset }: {
   );
 };
 
-const Section = ({ title, icon: Icon, children, defaultOpen = false }: any) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  return (
-    <div className="border-b border-gray-800">
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-800/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Icon size={16} className="text-blue-400" />
-          {title}
-        </div>
-        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      </button>
-      {isOpen && <div className="p-4 space-y-4 bg-gray-900/50 animate-in slide-in-from-top-2">{children}</div>}
-    </div>
-  );
-};
+// Section component removed - now using drill-down navigation via ConfigPanelNav
 
 const ColorPairInput = ({ label, colorValue, setColor, autoValue, setAuto }: any) => (
   <div className="flex flex-col gap-1.5">
@@ -237,54 +221,95 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
   const isPresetField = (field: string) => activePreset && field in activePreset.config;
   const isModifiedField = (field: string) => modifiedFromPreset?.has(field);
 
-  // Wrapper for ControlInput that automatically adds preset indicators
-  const PresetControl = ({ field, ...props }: { field: keyof ButtonConfig } & Omit<React.ComponentProps<typeof ControlInput>, 'isPresetField' | 'isModified'>) => (
-    <ControlInput 
-      {...props} 
-      isPresetField={!!isPresetField(field)} 
-      isModified={!!isModifiedField(field)} 
-    />
-  );
+  // Helper to check if extraStyles contains certain CSS properties that override other controls
+  const extraStylesContains = (property: string): boolean => {
+    const styles = activePreset?.config?.extraStyles || '';
+    return styles.toLowerCase().includes(property.toLowerCase());
+  };
+
+  // Check if CARD animation controls should be locked due to extraStyles containing animation CSS
+  // Note: extraStyles animations only affect the card, NOT the icon - icon animations still work
+  const isCardAnimationLockedByExtraStyles = extraStylesContains('animation:') || extraStylesContains('animation-name:');
+  
+  // Check if background controls should be locked due to extraStyles containing background/gradient CSS
+  const isBackgroundLockedByExtraStyles = extraStylesContains('background:') || extraStylesContains('background-image:') || extraStylesContains('linear-gradient') || extraStylesContains('radial-gradient');
+  
+  // Check if shadow controls should be locked due to extraStyles containing box-shadow CSS
+  const isShadowLockedByExtraStyles = extraStylesContains('box-shadow:');
+  
+  // Check if specific fields should be locked by preset (not just indicated)
+  const isFieldLockedByPreset = (field: string): { locked: boolean; reason?: string } => {
+    if (!activePreset) return { locked: false };
+    
+    // If extraStyles contains animation CSS, lock CARD animation fields only (not icon)
+    if (isCardAnimationLockedByExtraStyles && ['cardAnimation', 'cardAnimationTrigger', 'cardAnimationSpeed'].includes(field)) {
+      return { locked: true, reason: 'Controlled by Custom CSS in preset' };
+    }
+    
+    // If extraStyles contains background CSS, lock background-related fields
+    if (isBackgroundLockedByExtraStyles && ['backgroundColor', 'backgroundColorOpacity'].includes(field)) {
+      return { locked: true, reason: 'Controlled by Custom CSS gradient/background' };
+    }
+    
+    // If extraStyles contains box-shadow CSS, lock shadow-related fields  
+    if (isShadowLockedByExtraStyles && ['shadowSize', 'shadowColor', 'shadowOpacity'].includes(field)) {
+      return { locked: true, reason: 'Controlled by Custom CSS box-shadow' };
+    }
+    
+    return { locked: false };
+  };
+
+  // Wrapper for ControlInput that automatically adds preset indicators and locking
+  const PresetControl = ({ field, ...props }: { field: keyof ButtonConfig } & Omit<React.ComponentProps<typeof ControlInput>, 'isPresetField' | 'isModified' | 'disabled' | 'disabledReason'>) => {
+    const lockInfo = isFieldLockedByPreset(field);
+    return (
+      <ControlInput 
+        {...props} 
+        isPresetField={!!isPresetField(field)} 
+        isModified={!!isModifiedField(field)}
+        disabled={lockInfo.locked}
+        disabledReason={lockInfo.reason}
+      />
+    );
+  };
+
+  // Drill-down navigation
+  const { nav, goBack, selectCategory, selectSection } = useNavigation();
+  const showSection = (sectionId: SectionId) => nav.level === 'content' && nav.sectionId === sectionId;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
-      <div className="p-4 border-b border-gray-800 shrink-0 bg-gray-900 z-10">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Layers size={18} className="text-blue-500" />
-          Editor
-          {activePreset && (
-            <span className="text-xs font-normal text-purple-400 ml-auto">
-              {activePreset.name}
-              {modifiedFromPreset && modifiedFromPreset.size > 0 && (
-                <span className="text-yellow-400 ml-1">({modifiedFromPreset.size} changed)</span>
-              )}
-            </span>
-          )}
-        </h2>
-      </div>
+      <NavHeader nav={nav} goBack={goBack} activePreset={activePreset} modifiedFromPreset={modifiedFromPreset} />
 
-      <div className="flex-1">
-        {/* 1. Core Information */}
-        <Section title="Core Configuration" icon={Type} defaultOpen={true}>
-          <EntitySelector 
-            label="Entity ID" 
-            value={config.entity} 
-            onChange={(v) => update('entity', v)} 
-            onEntitySelect={(entity) => {
-              // Auto-fill name when entity is selected from dropdown
-              if (entity.name && (!config.name || config.name === 'Living Room')) {
-                update('name', entity.name);
-              }
-              // Auto-fill icon based on entity domain and id
-              if (!config.icon || config.icon === 'mdi:sofa') {
-                const suggestedIcon = getIconForEntity(entity.id, entity.domain);
-                update('icon', suggestedIcon);
-              }
-            }}
-          />
-          <ControlInput label="Name" value={config.name} onChange={(v) => update('name', v)} />
-          <IconPicker label="Icon" value={config.icon} onChange={(v) => update('icon', v)} />
-          <ControlInput label="State Display (Custom)" value={config.stateDisplay} onChange={(v) => update('stateDisplay', v)} placeholder="Custom state text" />
+      {/* Category List */}
+      {nav.level === 'categories' && <CategoryList onSelect={selectCategory} />}
+
+      {/* Section List */}
+      {nav.level === 'sections' && <SectionList categoryId={nav.categoryId} onSelect={selectSection} />}
+
+      {/* Content Sections */}
+      {nav.level === 'content' && (
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          {/* ===== ENTITY > CORE ===== */}
+          {showSection('core') && (
+            <>
+              <EntitySelector 
+                label="Entity ID" 
+                value={config.entity} 
+                onChange={(v) => update('entity', v)} 
+                onEntitySelect={(entity) => {
+                  if (entity.name && (!config.name || config.name === 'Living Room')) {
+                    update('name', entity.name);
+                  }
+                  if (!config.icon || config.icon === 'mdi:sofa') {
+                    const suggestedIcon = getIconForEntity(entity.id, entity.domain);
+                    update('icon', suggestedIcon);
+                  }
+                }}
+              />
+              <ControlInput label="Name" value={config.name} onChange={(v) => update('name', v)} />
+              <IconPicker label="Icon" value={config.icon} onChange={(v) => update('icon', v)} />
+              <ControlInput label="State Display (Custom)" value={config.stateDisplay} onChange={(v) => update('stateDisplay', v)} placeholder="Custom state text" />
           <ControlInput label="Entity Picture URL" value={config.entityPicture} onChange={(v) => update('entityPicture', v)} placeholder="https://..." />
           <ControlInput label="Units Override" value={config.units} onChange={(v) => update('units', v)} placeholder="°C, kW, etc." />
           
@@ -329,11 +354,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               <ControlInput label="State Display Template" value={config.stateDisplayTemplate} onChange={(v) => update('stateDisplayTemplate', v)} placeholder="[[[ return entity.state.toUpperCase() ]]]" />
             </div>
           </div>
-        </Section>
+            </>
+          )}
 
-        {/* 2. Variables */}
-        <Section title="Variables" icon={VariableIcon}>
-          <div className="space-y-4">
+          {/* ===== ENTITY > VARIABLES ===== */}
+          {showSection('variables') && (
+            <>
             <p className="text-xs text-gray-400">Define variables for use in templates</p>
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-gray-400 uppercase">Variable List</p>
@@ -376,11 +402,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
                 ))}
               </div>
             )}
-          </div>
-        </Section>
+            </>
+          )}
 
-        {/* 3. Layout & Dimensions */}
-        <Section title="Layout & Dimensions" icon={Layout}>
+          {/* ===== LAYOUT > DIMENSIONS ===== */}
+          {showSection('dimensions') && (
+            <>
           <div className="grid grid-cols-2 gap-4">
             <PresetControl 
               field="layout"
@@ -410,10 +437,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
                <ControlInput label="Grid Columns" value={config.gridColumns.toString()} onChange={(v) => update('gridColumns', Number(v) || 6)} />
             </div>
           )}
-        </Section>
+            </>
+          )}
 
-        {/* 4. Visibility Toggles */}
-        <Section title="Visibility" icon={ToggleRight}>
+          {/* ===== LAYOUT > VISIBILITY ===== */}
+          {showSection('visibility') && (
+            <>
           <div className="grid grid-cols-2 gap-3">
             <PresetControl field="showName" type="checkbox" label="Show Name" value={config.showName} onChange={(v) => update('showName', v)} />
             <PresetControl field="showIcon" type="checkbox" label="Show Icon" value={config.showIcon} onChange={(v) => update('showIcon', v)} />
@@ -432,10 +461,20 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
           {config.hidden && (
             <ControlInput label="Hidden Template" value={config.hiddenTemplate} onChange={(v) => update('hiddenTemplate', v)} placeholder="[[[ return entity.state === 'off' ]]]" />
           )}
-        </Section>
+            </>
+          )}
 
-        {/* 5. Colors & Theming */}
-        <Section title="Colors & Theming" icon={Palette}>
+          {/* ===== APPEARANCE > COLORS ===== */}
+          {showSection('colors') && (
+            <>
+           {isBackgroundLockedByExtraStyles && (
+             <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg mb-4">
+               <p className="text-xs text-amber-400 flex items-center gap-2">
+                 <span>🔒</span>
+                 <span>Background controls are locked because the preset uses Custom CSS gradient.</span>
+               </p>
+             </div>
+           )}
            <div className="space-y-6">
              {/* Global Settings */}
              <div className="space-y-4">
@@ -557,10 +596,20 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
                 />
              </div>
            </div>
-        </Section>
+            </>
+          )}
         
-        {/* 6. Glass & Depth */}
-        <Section title="Glass & Depth" icon={Droplets}>
+          {/* ===== APPEARANCE > GLASS ===== */}
+          {showSection('glass') && (
+            <>
+           {isShadowLockedByExtraStyles && (
+             <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg mb-4">
+               <p className="text-xs text-amber-400 flex items-center gap-2">
+                 <span>🔒</span>
+                 <span>Shadow controls are locked because the preset uses Custom CSS box-shadow.</span>
+               </p>
+             </div>
+           )}
            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                  <PresetControl field="backdropBlur" label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
@@ -571,10 +620,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
                   <PresetControl field="shadowOpacity" label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
               </div>
            </div>
-        </Section>
+            </>
+          )}
 
-        {/* 7. Borders */}
-        <Section title="Borders" icon={BoxSelect}>
+          {/* ===== APPEARANCE > BORDERS ===== */}
+          {showSection('borders') && (
+            <>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                <PresetControl field="borderWidth" label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
@@ -589,24 +640,34 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
                setAuto={(v: boolean) => update('borderColorAuto', v)}
             />
           </div>
-        </Section>
+            </>
+          )}
 
-        {/* 8. Animations */}
-        <Section title="Animations" icon={Activity}>
+          {/* ===== APPEARANCE > ANIMATIONS ===== */}
+          {showSection('animations') && (
+            <>
+          {isCardAnimationLockedByExtraStyles && (
+            <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg mb-4">
+              <p className="text-xs text-amber-400 flex items-center gap-2">
+                <span>🔒</span>
+                <span>Card animation is controlled by Custom CSS. Icon animation still works!</span>
+              </p>
+            </div>
+          )}
           <div className="space-y-6">
              {/* Card Animation */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Type" type="select" value={config.cardAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('cardAnimation', v)} />
-                  <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} />
+                  <ControlInput label="Type" type="select" value={config.cardAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('cardAnimation', v)} disabled={isCardAnimationLockedByExtraStyles} disabledReason="Controlled by Custom CSS" />
+                  <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} disabled={isCardAnimationLockedByExtraStyles} disabledReason="Controlled by Custom CSS" />
                 </div>
-                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} suffix="s" />
+                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} suffix="s" disabled={isCardAnimationLockedByExtraStyles} disabledReason="Controlled by Custom CSS" />
              </div>
 
              <div className="h-px bg-gray-700/50" />
 
-             {/* Icon Animation */}
+             {/* Icon Animation - NOT locked by extraStyles since it only affects card */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
                 <div className="grid grid-cols-2 gap-4">
@@ -617,10 +678,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
                 <ControlInput type="checkbox" label="Rotate Icon" value={config.rotate} onChange={(v) => update('rotate', v)} />
              </div>
           </div>
-        </Section>
+            </>
+          )}
 
-        {/* 9. Typography */}
-        <Section title="Typography" icon={Type}>
+          {/* ===== APPEARANCE > TYPOGRAPHY ===== */}
+          {showSection('typography') && (
+            <>
            <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
            
            {/* Custom Font */}
@@ -663,10 +726,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
              <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
              <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
            </div>
-        </Section>
+            </>
+          )}
 
-        {/* 10. State Logic */}
-        <Section title="State Colors & Styles" icon={Zap}>
+          {/* ===== EFFECTS > STATE STYLES ===== */}
+          {showSection('stateStyles') && (
+            <>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -865,10 +930,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               )}
             </div>
           </div>
-        </Section>
+            </>
+          )}
 
-        {/* 11. Card Actions */}
-        <Section title="Card Actions" icon={MousePointer}>
+          {/* ===== ACTIONS > CARD ACTIONS ===== */}
+          {showSection('cardActions') && (
+            <>
           <div className="space-y-4">
             <div>
               <ControlInput label="Tap Action" type="select" value={config.tapAction} options={ACTION_OPTIONS} onChange={(v) => update('tapAction', v)} />
@@ -946,10 +1013,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               <ControlInput label="Dbl Tap Sound" value={config.doubleTapActionSound} onChange={(v) => update('doubleTapActionSound', v)} placeholder="/local/..." />
             </div>
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 12. Momentary Actions */}
-        <Section title="Momentary Actions" icon={Hand}>
+          {/* ===== ACTIONS > MOMENTARY ACTIONS ===== */}
+          {showSection('momentaryActions') && (
+            <>
           <p className="text-xs text-gray-400 mb-4">Press/release actions for momentary switches (e.g., garage doors)</p>
           <div className="space-y-4">
             <div>
@@ -980,10 +1049,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               )}
             </div>
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 13. Icon Actions */}
-        <Section title="Icon Actions" icon={Target}>
+          {/* ===== ACTIONS > ICON ACTIONS ===== */}
+          {showSection('iconActions') && (
+            <>
           <p className="text-xs text-gray-400 mb-4">Separate actions when clicking on the icon specifically</p>
           <div className="space-y-4">
             <div>
@@ -1066,20 +1137,24 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               </div>
             </div>
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 14. Confirmation & Security */}
-        <Section title="Confirmation" icon={AlertCircle}>
+          {/* ===== ADVANCED > CONFIRMATION ===== */}
+          {showSection('confirmation') && (
+            <>
           <div className="space-y-4">
             <ControlInput type="checkbox" label="Require Confirmation" value={config.confirmation.enabled} onChange={(v) => update('confirmation', { ...config.confirmation, enabled: v })} />
             {config.confirmation.enabled && (
               <ControlInput label="Confirmation Text" value={config.confirmation.text} onChange={(v) => update('confirmation', { ...config.confirmation, text: v })} placeholder="Are you sure?" />
             )}
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 15. Lock */}
-        <Section title="Lock" icon={Lock}>
+          {/* ===== ADVANCED > LOCK ===== */}
+          {showSection('lock') && (
+            <>
           <div className="space-y-4">
             <ControlInput type="checkbox" label="Enable Lock" value={config.lock.enabled} onChange={(v) => update('lock', { ...config.lock, enabled: v })} />
             {config.lock.enabled && (
@@ -1096,10 +1171,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               </>
             )}
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 16. Protect (PIN/Password) */}
-        <Section title="Protect (PIN/Password)" icon={Shield}>
+          {/* ===== ADVANCED > PROTECT ===== */}
+          {showSection('protect') && (
+            <>
           <div className="space-y-4">
             <ControlInput type="checkbox" label="Enable Protection" value={config.protect.enabled} onChange={(v) => update('protect', { ...config.protect, enabled: v })} />
             {config.protect.enabled && (
@@ -1113,20 +1190,24 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               </>
             )}
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 17. Tooltip */}
-        <Section title="Tooltip" icon={MessageSquare}>
+          {/* ===== ADVANCED > TOOLTIP ===== */}
+          {showSection('tooltip') && (
+            <>
           <div className="space-y-4">
             <ControlInput type="checkbox" label="Enable Tooltip" value={config.tooltip.enabled} onChange={(v) => update('tooltip', { ...config.tooltip, enabled: v })} />
             {config.tooltip.enabled && (
               <ControlInput label="Content" value={config.tooltip.content} onChange={(v) => update('tooltip', { ...config.tooltip, content: v })} placeholder="Hover text or template..." />
             )}
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 18. Custom Fields */}
-        <Section title="Custom Fields" icon={Code}>
+          {/* ===== ADVANCED > CUSTOM FIELDS ===== */}
+          {showSection('customFields') && (
+            <>
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -1177,10 +1258,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               )}
             </div>
           </div>
-        </Section>
+            </>
+          )}
         
-        {/* 19. Advanced Settings */}
-        <Section title="Advanced Settings" icon={Settings}>
+          {/* ===== ADVANCED > ADVANCED SETTINGS ===== */}
+          {showSection('advancedSettings') && (
+            <>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
@@ -1282,10 +1365,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
               />
             </div>
           </div>
-        </Section>
-        
-        <div className="h-10"></div>
-      </div>
+            </>
+          )}
+          
+          <div className="h-10"></div>
+        </div>
+      )}
     </div>
   );
 };

@@ -14,6 +14,8 @@ interface Props {
   suffix?: string; // Auto-append suffix like 'px', '%', 's', etc.
   isPresetField?: boolean;
   isModified?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export const ControlInput: React.FC<Props> = ({ 
@@ -29,7 +31,9 @@ export const ControlInput: React.FC<Props> = ({
   step = 1,
   suffix,
   isPresetField = false,
-  isModified = false
+  isModified = false,
+  disabled = false,
+  disabledReason
 }) => {
   
   // Handle auto-suffix on blur
@@ -66,10 +70,16 @@ export const ControlInput: React.FC<Props> = ({
   
   if (type === 'checkbox') {
     return (
-      <label className={`flex items-center justify-between p-2 bg-gray-800/50 rounded border border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors ${isPresetField && !isModified ? 'ring-1 ring-purple-500/30' : ''} ${isModified ? 'ring-1 ring-yellow-500/30' : ''} ${className}`}>
+      <label 
+        className={`flex items-center justify-between p-2 bg-gray-800/50 rounded border border-gray-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-800'} ${isPresetField && !isModified ? 'ring-1 ring-purple-500/30' : ''} ${isModified ? 'ring-1 ring-yellow-500/30' : ''} ${className}`}
+        title={disabled ? disabledReason : undefined}
+      >
         <span className="text-sm text-gray-300 flex items-center gap-1">
           {label}
-          {isPresetField && (
+          {disabled && (
+            <span className="text-[8px] px-1 rounded bg-gray-600/50 text-gray-400" title={disabledReason}>🔒</span>
+          )}
+          {!disabled && isPresetField && (
             <span 
               className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
               title={isModified ? 'Modified from preset' : 'From preset'}
@@ -81,8 +91,9 @@ export const ControlInput: React.FC<Props> = ({
         <input 
           type="checkbox" 
           checked={value === true} 
-          onChange={(e) => onChange(e.target.checked)}
-          className="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-0 w-4 h-4" 
+          onChange={(e) => !disabled && onChange(e.target.checked)}
+          disabled={disabled}
+          className="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-0 w-4 h-4 disabled:opacity-50" 
         />
       </label>
     );
@@ -90,11 +101,14 @@ export const ControlInput: React.FC<Props> = ({
 
   if (type === 'slider') {
     return (
-      <div className={`flex flex-col gap-2 ${className}`}>
+      <div className={`flex flex-col gap-2 ${disabled ? 'opacity-50' : ''} ${className}`} title={disabled ? disabledReason : undefined}>
         <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider">
           <span className="flex items-center gap-1">
             {label}
-            {isPresetField && (
+            {disabled && (
+              <span className="text-[8px] px-1 rounded bg-gray-600/50 text-gray-400" title={disabledReason}>🔒</span>
+            )}
+            {!disabled && isPresetField && (
               <span 
                 className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
                 title={isModified ? 'Modified from preset' : 'From preset'}
@@ -111,18 +125,22 @@ export const ControlInput: React.FC<Props> = ({
           max={max}
           step={step}
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full accent-blue-500"
+          onChange={(e) => !disabled && onChange(Number(e.target.value))}
+          disabled={disabled}
+          className={`w-full accent-blue-500 ${disabled ? 'cursor-not-allowed' : ''}`}
         />
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <div className={`flex flex-col gap-1.5 ${disabled ? 'opacity-50' : ''} ${className}`} title={disabled ? disabledReason : undefined}>
       <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
         {label}
-        {isPresetField && (
+        {disabled && (
+          <span className="text-[8px] px-1 rounded bg-gray-600/50 text-gray-400" title={disabledReason}>🔒</span>
+        )}
+        {!disabled && isPresetField && (
           <span 
             className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
             title={isModified ? 'Modified from preset' : 'From preset'}
@@ -134,14 +152,15 @@ export const ControlInput: React.FC<Props> = ({
       <div className="flex items-center gap-2">
         {type === 'color' && (
           <div 
-            className="w-8 h-9 rounded border border-gray-600 overflow-hidden shrink-0 relative"
+            className={`w-8 h-9 rounded border border-gray-600 overflow-hidden shrink-0 relative ${disabled ? 'cursor-not-allowed' : ''}`}
             style={{ backgroundColor: value as string }}
           >
             <input 
               type="color" 
               value={value} 
-              onChange={(e) => onChange(e.target.value)}
-              className="opacity-0 w-full h-full cursor-pointer absolute inset-0"
+              onChange={(e) => !disabled && onChange(e.target.value)}
+              disabled={disabled}
+              className={`opacity-0 w-full h-full absolute inset-0 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             />
           </div>
         )}
@@ -149,8 +168,9 @@ export const ControlInput: React.FC<Props> = ({
         {type === 'select' ? (
           <select
             value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+            onChange={(e) => !disabled && onChange(e.target.value)}
+            disabled={disabled}
+            className={`bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors ${disabled ? 'cursor-not-allowed' : ''}`}
           >
             {options.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -161,10 +181,11 @@ export const ControlInput: React.FC<Props> = ({
             type={type === 'color' ? 'text' : type}
             value={value}
             placeholder={placeholder || (suffix ? `e.g. 10${suffix}` : '')}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => !disabled && onChange(e.target.value)}
             onBlur={handleBlurWithSuffix}
             onKeyDown={handleKeyDownWithSuffix}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder-gray-600"
+            disabled={disabled}
+            className={`bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder-gray-600 ${disabled ? 'cursor-not-allowed' : ''}`}
           />
         )}
       </div>

@@ -3,11 +3,20 @@ import { ConfigPanel } from './components/ConfigPanel';
 import { PreviewCard } from './components/PreviewCard';
 import { YamlViewer } from './components/YamlViewer';
 import { MagicBuilder } from './components/MagicBuilder';
-import { ButtonConfig, DEFAULT_CONFIG } from './types';
+import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig } from './types';
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown, Settings, Code, Menu, X } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown, Settings, Code, Menu, X, ToggleLeft, ToggleRight, Layers } from 'lucide-react';
+
+export type PresetCondition = 'always' | 'on' | 'off';
+
+export interface PresetState {
+  preset: Preset | null;
+  condition: PresetCondition;
+  offStatePreset: Preset | null; // Used when condition is 'on' - what preset to use for off state
+  onStatePreset: Preset | null;  // Used when condition is 'off' - what preset to use for on state
+}
 import logo from './logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
@@ -36,6 +45,10 @@ const App: React.FC = () => {
   const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activePreset, setActivePreset] = useState<Preset | null>(null);
+  const [presetCondition, setPresetCondition] = useState<PresetCondition>('always');
+  const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
+  const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
+  const [isPresetSettingsOpen, setIsPresetSettingsOpen] = useState(false);
   // Save config to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -45,19 +58,103 @@ const App: React.FC = () => {
     }
   }, [config]);
 
-  const yamlOutput = useMemo(() => generateYaml(config), [config]);
+  // Build config with conditional preset state styles
+  const configWithPresetConditions = useMemo(() => {
+    if (presetCondition === 'always' || !activePreset) {
+      return config;
+    }
+    
+    // When preset has a condition, we need to generate state_styles
+    const newConfig = { ...config };
+    const newStateStyles = [...(config.stateStyles || [])];
+    
+    // Create a state style for the "other" state if a secondary preset is set
+    if (presetCondition === 'on' && offStatePreset) {
+      // Main preset applies when ON, offStatePreset applies when OFF
+      const offStyle: StateStyleConfig = {
+        id: `preset-off-${Date.now()}`,
+        operator: 'equals',
+        value: 'off',
+        name: '',
+        icon: offStatePreset.config.icon || '',
+        color: offStatePreset.config.color || '',
+        entityPicture: '',
+        label: '',
+        stateDisplay: '',
+        spin: false,
+        styles: offStatePreset.config.extraStyles || '',
+        backgroundColor: offStatePreset.config.backgroundColor || '',
+        iconColor: offStatePreset.config.iconColor || '',
+        nameColor: offStatePreset.config.nameColor || '',
+        labelColor: offStatePreset.config.labelColor || '',
+        borderColor: offStatePreset.config.borderColor || '',
+        cardAnimation: offStatePreset.config.cardAnimation || 'none',
+        cardAnimationSpeed: offStatePreset.config.cardAnimationSpeed || '2s',
+        iconAnimation: offStatePreset.config.iconAnimation || 'none',
+        iconAnimationSpeed: offStatePreset.config.iconAnimationSpeed || '2s',
+      };
+      newStateStyles.push(offStyle);
+    } else if (presetCondition === 'off' && onStatePreset) {
+      // Main preset applies when OFF, onStatePreset applies when ON
+      const onStyle: StateStyleConfig = {
+        id: `preset-on-${Date.now()}`,
+        operator: 'equals',
+        value: 'on',
+        name: '',
+        icon: onStatePreset.config.icon || '',
+        color: onStatePreset.config.color || '',
+        entityPicture: '',
+        label: '',
+        stateDisplay: '',
+        spin: false,
+        styles: onStatePreset.config.extraStyles || '',
+        backgroundColor: onStatePreset.config.backgroundColor || '',
+        iconColor: onStatePreset.config.iconColor || '',
+        nameColor: onStatePreset.config.nameColor || '',
+        labelColor: onStatePreset.config.labelColor || '',
+        borderColor: onStatePreset.config.borderColor || '',
+        cardAnimation: onStatePreset.config.cardAnimation || 'none',
+        cardAnimationSpeed: onStatePreset.config.cardAnimationSpeed || '2s',
+        iconAnimation: onStatePreset.config.iconAnimation || 'none',
+        iconAnimationSpeed: onStatePreset.config.iconAnimationSpeed || '2s',
+      };
+      newStateStyles.push(onStyle);
+    }
+    
+    newConfig.stateStyles = newStateStyles;
+    return newConfig;
+  }, [config, presetCondition, activePreset, offStatePreset, onStatePreset]);
+
+  const yamlOutput = useMemo(() => generateYaml(configWithPresetConditions), [configWithPresetConditions]);
 
   const handleReset = () => {
     if (confirm('Reset all settings to defaults?')) {
       setConfig(DEFAULT_CONFIG);
       setActivePreset(null);
+      setPresetCondition('always');
+      setOffStatePreset(null);
+      setOnStatePreset(null);
       localStorage.removeItem(STORAGE_KEY);
     }
   };
 
-  const handleApplyPreset = (preset: Preset) => {
-    setConfig(prev => ({ ...prev, ...preset.config }));
-    setActivePreset(preset);
+  const handleApplyPreset = (preset: Preset, forState?: 'on' | 'off') => {
+    if (forState === 'off') {
+      // Setting the off-state preset (when main preset is 'on' condition)
+      setOffStatePreset(preset);
+    } else if (forState === 'on') {
+      // Setting the on-state preset (when main preset is 'off' condition)
+      setOnStatePreset(preset);
+    } else {
+      // Setting the main preset
+      setConfig(prev => ({ ...prev, ...preset.config }));
+      setActivePreset(preset);
+      // Reset condition-based presets when changing main preset
+      if (presetCondition === 'always') {
+        setOffStatePreset(null);
+        setOnStatePreset(null);
+      }
+    }
     setIsPresetsOpen(false);
   };
 
@@ -120,6 +217,11 @@ const App: React.FC = () => {
               <div className="flex items-center gap-1 mr-2">
                 <span className="text-xs text-gray-500">Preset:</span>
                 <span className="text-xs text-purple-400 font-medium">{activePreset.name}</span>
+                {presetCondition !== 'always' && (
+                  <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 rounded">
+                    {presetCondition === 'on' ? 'ON only' : 'OFF only'}
+                  </span>
+                )}
                 {modifiedFromPreset.size > 0 && (
                   <span className="text-[10px] text-yellow-500" title={`${modifiedFromPreset.size} field(s) modified`}>*</span>
                 )}
@@ -132,6 +234,14 @@ const App: React.FC = () => {
                     reset
                   </button>
                 )}
+                {/* Preset Settings Button */}
+                <button
+                  onClick={() => setIsPresetSettingsOpen(!isPresetSettingsOpen)}
+                  className="ml-1 p-1 text-gray-500 hover:text-purple-400 rounded transition-colors"
+                  title="Preset Conditions"
+                >
+                  <Layers size={12} />
+                </button>
               </div>
             )}
             <button 
@@ -147,6 +257,126 @@ const App: React.FC = () => {
               Presets
               <ChevronDown size={12} />
             </button>
+            
+            {/* Preset Settings Panel */}
+            {isPresetSettingsOpen && activePreset && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsPresetSettingsOpen(false)} />
+                <div className="absolute top-full right-0 mt-2 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Layers size={14} className="text-purple-400" />
+                      Preset Conditions
+                    </h3>
+                    <button onClick={() => setIsPresetSettingsOpen(false)} className="text-gray-500 hover:text-white">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  
+                  <p className="text-xs text-gray-400 mb-4">
+                    Choose when "{activePreset.name}" applies and optionally set a different preset for the other state.
+                  </p>
+                  
+                  {/* Condition Selection */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Apply Preset When</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['always', 'on', 'off'] as PresetCondition[]).map(cond => (
+                        <button
+                          key={cond}
+                          onClick={() => {
+                            setPresetCondition(cond);
+                            if (cond === 'always') {
+                              setOffStatePreset(null);
+                              setOnStatePreset(null);
+                            }
+                          }}
+                          className={`px-3 py-2 rounded text-xs font-medium transition-all ${
+                            presetCondition === cond
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                          }`}
+                        >
+                          {cond === 'always' ? 'Always' : cond === 'on' ? 'When ON' : 'When OFF'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Secondary Preset Selection */}
+                  {presetCondition === 'on' && (
+                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
+                        <ToggleLeft size={12} />
+                        When OFF, use:
+                      </label>
+                      {offStatePreset ? (
+                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
+                          <span className="text-sm text-cyan-400">{offStatePreset.name}</span>
+                          <button 
+                            onClick={() => setOffStatePreset(null)}
+                            className="text-gray-500 hover:text-red-400 text-xs"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          onChange={(e) => {
+                            const preset = PRESETS.find(p => p.name === e.target.value);
+                            if (preset) setOffStatePreset(preset);
+                          }}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Select preset for OFF state...</option>
+                          {PRESETS.map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when OFF</p>
+                    </div>
+                  )}
+                  
+                  {presetCondition === 'off' && (
+                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
+                        <ToggleRight size={12} />
+                        When ON, use:
+                      </label>
+                      {onStatePreset ? (
+                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
+                          <span className="text-sm text-green-400">{onStatePreset.name}</span>
+                          <button 
+                            onClick={() => setOnStatePreset(null)}
+                            className="text-gray-500 hover:text-red-400 text-xs"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          onChange={(e) => {
+                            const preset = PRESETS.find(p => p.name === e.target.value);
+                            if (preset) setOnStatePreset(preset);
+                          }}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Select preset for ON state...</option>
+                          {PRESETS.map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when ON</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            
             {isPresetsOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsPresetsOpen(false)} />
