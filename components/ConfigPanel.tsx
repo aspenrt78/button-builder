@@ -3,13 +3,170 @@ import React, { useState } from 'react';
 import { ButtonConfig, CustomField, Variable, StateStyleConfig, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG, DEFAULT_TOAST_CONFIG } from '../types';
 import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
+import { IconPicker } from './IconPicker';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS } from '../constants';
 import { Layers, Type, MousePointer, Palette, Zap, ChevronDown, ChevronRight, Layout, ToggleRight, BoxSelect, Droplets, Activity, Settings, Lock, AlertCircle, Code, Plus, X, Shield, MessageSquare, Variable as VariableIcon, Target, Hand, Image } from 'lucide-react';
+
+// Domain to icon mappings for auto-fill
+const DOMAIN_ICONS: Record<string, string> = {
+  // Lighting
+  light: 'mdi:lightbulb',
+  // Switches & Power
+  switch: 'mdi:toggle-switch',
+  input_boolean: 'mdi:toggle-switch-outline',
+  // Climate & Comfort
+  fan: 'mdi:fan',
+  climate: 'mdi:thermostat',
+  humidifier: 'mdi:air-humidifier',
+  water_heater: 'mdi:water-boiler',
+  // Covers & Shades
+  cover: 'mdi:window-shutter',
+  // Security
+  lock: 'mdi:lock',
+  alarm_control_panel: 'mdi:shield-home',
+  // Media & Entertainment
+  media_player: 'mdi:speaker',
+  remote: 'mdi:remote',
+  // Sensors (various types)
+  binary_sensor: 'mdi:checkbox-blank-circle-outline',
+  sensor: 'mdi:eye',
+  // Location & Presence
+  person: 'mdi:account',
+  device_tracker: 'mdi:crosshairs-gps',
+  zone: 'mdi:map-marker-radius',
+  // Cameras & Doorbells
+  camera: 'mdi:video',
+  // Automation & Scripts
+  automation: 'mdi:robot',
+  script: 'mdi:script-text',
+  scene: 'mdi:palette',
+  // Input Helpers
+  input_number: 'mdi:ray-vertex',
+  input_select: 'mdi:form-dropdown',
+  input_text: 'mdi:form-textbox',
+  input_datetime: 'mdi:calendar-clock',
+  input_button: 'mdi:gesture-tap-button',
+  // Weather & Sun
+  weather: 'mdi:weather-partly-cloudy',
+  sun: 'mdi:weather-sunny',
+  // Vacuum & Lawn
+  vacuum: 'mdi:robot-vacuum',
+  lawn_mower: 'mdi:robot-mower',
+  // Notifications & Communication
+  notify: 'mdi:bell',
+  tts: 'mdi:text-to-speech',
+  // Home Assistant Core
+  update: 'mdi:package-up',
+  button: 'mdi:gesture-tap-button',
+  group: 'mdi:google-circles-communities',
+  timer: 'mdi:timer',
+  counter: 'mdi:counter',
+  schedule: 'mdi:calendar-clock',
+  // Miscellaneous
+  plant: 'mdi:flower',
+  image: 'mdi:image',
+  calendar: 'mdi:calendar',
+  todo: 'mdi:clipboard-check',
+  stt: 'mdi:microphone',
+  conversation: 'mdi:message-text',
+};
+
+// Specific entity ID patterns for more precise icon matching
+const ENTITY_PATTERNS: Array<{ pattern: RegExp; icon: string }> = [
+  // Sensors by type
+  { pattern: /sensor\..*temperature/i, icon: 'mdi:thermometer' },
+  { pattern: /sensor\..*humidity/i, icon: 'mdi:water-percent' },
+  { pattern: /sensor\..*battery/i, icon: 'mdi:battery' },
+  { pattern: /sensor\..*power|sensor\..*watt/i, icon: 'mdi:flash' },
+  { pattern: /sensor\..*energy|sensor\..*kwh/i, icon: 'mdi:lightning-bolt' },
+  { pattern: /sensor\..*motion/i, icon: 'mdi:motion-sensor' },
+  { pattern: /sensor\..*door|sensor\..*window/i, icon: 'mdi:door' },
+  { pattern: /sensor\..*illuminance|sensor\..*lux/i, icon: 'mdi:brightness-6' },
+  { pattern: /sensor\..*pressure/i, icon: 'mdi:gauge' },
+  { pattern: /sensor\..*co2|sensor\..*carbon/i, icon: 'mdi:molecule-co2' },
+  { pattern: /sensor\..*pm25|sensor\..*pm10|sensor\..*air_quality/i, icon: 'mdi:air-filter' },
+  // Binary sensors
+  { pattern: /binary_sensor\..*motion/i, icon: 'mdi:motion-sensor' },
+  { pattern: /binary_sensor\..*door/i, icon: 'mdi:door' },
+  { pattern: /binary_sensor\..*window/i, icon: 'mdi:window-closed-variant' },
+  { pattern: /binary_sensor\..*smoke/i, icon: 'mdi:smoke-detector' },
+  { pattern: /binary_sensor\..*water|binary_sensor\..*leak/i, icon: 'mdi:water-alert' },
+  { pattern: /binary_sensor\..*garage/i, icon: 'mdi:garage' },
+  { pattern: /binary_sensor\..*vibration/i, icon: 'mdi:vibrate' },
+  { pattern: /binary_sensor\..*occupancy/i, icon: 'mdi:home-account' },
+  // Covers by type
+  { pattern: /cover\..*garage/i, icon: 'mdi:garage' },
+  { pattern: /cover\..*blind/i, icon: 'mdi:blinds' },
+  { pattern: /cover\..*curtain/i, icon: 'mdi:curtains' },
+  { pattern: /cover\..*shade/i, icon: 'mdi:roller-shade' },
+  { pattern: /cover\..*door/i, icon: 'mdi:door' },
+  { pattern: /cover\..*gate/i, icon: 'mdi:gate' },
+  { pattern: /cover\..*window/i, icon: 'mdi:window-closed' },
+  // Lights by type
+  { pattern: /light\..*strip|light\..*led/i, icon: 'mdi:led-strip-variant' },
+  { pattern: /light\..*ceiling|light\..*overhead/i, icon: 'mdi:ceiling-light' },
+  { pattern: /light\..*floor|light\..*lamp/i, icon: 'mdi:floor-lamp' },
+  { pattern: /light\..*desk|light\..*table/i, icon: 'mdi:desk-lamp' },
+  { pattern: /light\..*outdoor|light\..*porch|light\..*patio/i, icon: 'mdi:outdoor-lamp' },
+  { pattern: /light\..*chandelier/i, icon: 'mdi:chandelier' },
+  // Media players
+  { pattern: /media_player\..*tv|media_player\..*television/i, icon: 'mdi:television' },
+  { pattern: /media_player\..*receiver|media_player\..*avr/i, icon: 'mdi:audio-video' },
+  { pattern: /media_player\..*sonos|media_player\..*speaker/i, icon: 'mdi:speaker' },
+  { pattern: /media_player\..*echo|media_player\..*alexa/i, icon: 'mdi:amazon-alexa' },
+  { pattern: /media_player\..*google|media_player\..*nest/i, icon: 'mdi:google-home' },
+  { pattern: /media_player\..*chromecast/i, icon: 'mdi:cast' },
+  // Switches by type
+  { pattern: /switch\..*outlet|switch\..*plug/i, icon: 'mdi:power-socket-us' },
+  { pattern: /switch\..*pump/i, icon: 'mdi:water-pump' },
+  { pattern: /switch\..*heater/i, icon: 'mdi:radiator' },
+  // Climate
+  { pattern: /climate\..*heat|climate\..*furnace/i, icon: 'mdi:fire' },
+  { pattern: /climate\..*cool|climate\..*ac/i, icon: 'mdi:air-conditioner' },
+];
+
+function getIconForEntity(entityId: string, domain: string): string {
+  // First check specific patterns for more precise matching
+  for (const { pattern, icon } of ENTITY_PATTERNS) {
+    if (pattern.test(entityId)) {
+      return icon;
+    }
+  }
+  
+  // Fall back to domain-based icon
+  return DOMAIN_ICONS[domain] || 'mdi:help-circle';
+}
 
 interface Props {
   config: ButtonConfig;
   setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>>;
+  activePreset?: { name: string; config: Partial<ButtonConfig> } | null;
+  modifiedFromPreset?: Set<string>;
 }
+
+// Helper component to show preset indicator on fields
+const PresetIndicator = ({ field, activePreset, modifiedFromPreset }: { 
+  field: string; 
+  activePreset?: { config: Partial<ButtonConfig> } | null;
+  modifiedFromPreset?: Set<string>;
+}) => {
+  if (!activePreset || !(field in activePreset.config)) return null;
+  
+  const isModified = modifiedFromPreset?.has(field);
+  
+  return (
+    <span 
+      className={`ml-1 text-[8px] px-1 rounded ${
+        isModified 
+          ? 'bg-yellow-500/20 text-yellow-400' 
+          : 'bg-purple-500/20 text-purple-400'
+      }`}
+      title={isModified ? 'Modified from preset' : 'From preset'}
+    >
+      {isModified ? '✎' : '◆'}
+    </span>
+  );
+};
 
 const Section = ({ title, icon: Icon, children, defaultOpen = false }: any) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -70,11 +227,24 @@ const ColorPairInput = ({ label, colorValue, setColor, autoValue, setAuto }: any
   </div>
 );
 
-export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
+export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, modifiedFromPreset }) => {
   
   const update = (key: keyof ButtonConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
+
+  // Helper to check if a field is from the active preset
+  const isPresetField = (field: string) => activePreset && field in activePreset.config;
+  const isModifiedField = (field: string) => modifiedFromPreset?.has(field);
+
+  // Wrapper for ControlInput that automatically adds preset indicators
+  const PresetControl = ({ field, ...props }: { field: keyof ButtonConfig } & Omit<React.ComponentProps<typeof ControlInput>, 'isPresetField' | 'isModified'>) => (
+    <ControlInput 
+      {...props} 
+      isPresetField={!!isPresetField(field)} 
+      isModified={!!isModifiedField(field)} 
+    />
+  );
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
@@ -82,27 +252,71 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <Layers size={18} className="text-blue-500" />
           Editor
+          {activePreset && (
+            <span className="text-xs font-normal text-purple-400 ml-auto">
+              {activePreset.name}
+              {modifiedFromPreset && modifiedFromPreset.size > 0 && (
+                <span className="text-yellow-400 ml-1">({modifiedFromPreset.size} changed)</span>
+              )}
+            </span>
+          )}
         </h2>
       </div>
 
       <div className="flex-1">
         {/* 1. Core Information */}
         <Section title="Core Configuration" icon={Type} defaultOpen={true}>
-          <EntitySelector label="Entity ID" value={config.entity} onChange={(v) => update('entity', v)} />
+          <EntitySelector 
+            label="Entity ID" 
+            value={config.entity} 
+            onChange={(v) => update('entity', v)} 
+            onEntitySelect={(entity) => {
+              // Auto-fill name when entity is selected from dropdown
+              if (entity.name && (!config.name || config.name === 'Living Room')) {
+                update('name', entity.name);
+              }
+              // Auto-fill icon based on entity domain and id
+              if (!config.icon || config.icon === 'mdi:sofa') {
+                const suggestedIcon = getIconForEntity(entity.id, entity.domain);
+                update('icon', suggestedIcon);
+              }
+            }}
+          />
           <ControlInput label="Name" value={config.name} onChange={(v) => update('name', v)} />
-          <ControlInput label="Icon (mdi:...)" value={config.icon} onChange={(v) => update('icon', v)} />
+          <IconPicker label="Icon" value={config.icon} onChange={(v) => update('icon', v)} />
           <ControlInput label="State Display (Custom)" value={config.stateDisplay} onChange={(v) => update('stateDisplay', v)} placeholder="Custom state text" />
           <ControlInput label="Entity Picture URL" value={config.entityPicture} onChange={(v) => update('entityPicture', v)} placeholder="https://..." />
           <ControlInput label="Units Override" value={config.units} onChange={(v) => update('units', v)} placeholder="°C, kW, etc." />
           
           <div className="pt-3 border-t border-gray-800">
-            <p className="text-xs font-bold text-gray-400 uppercase mb-3">Label Configuration</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-400 uppercase">Label Configuration</p>
+              {!config.showLabel && (config.label || config.labelEntity) && (
+                <button
+                  onClick={() => update('showLabel', true)}
+                  className="text-[10px] px-2 py-1 bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 rounded hover:bg-yellow-600/30 transition-colors"
+                >
+                  Enable Label ⚠️
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               <ControlInput label="Static Label" value={config.label} onChange={(v) => update('label', v)} placeholder="My Label Text" />
-              <p className="text-[10px] text-gray-500 -mt-1">Or display another entity's value:</p>
-              <EntitySelector label="Label Entity" value={config.labelEntity} onChange={(v) => update('labelEntity', v)} />
+              <p className="text-[10px] text-gray-500 -mt-1">Or display another entity's value as label:</p>
+              <EntitySelector 
+                label="Label Entity" 
+                value={config.labelEntity} 
+                onChange={(v) => {
+                  update('labelEntity', v);
+                  // Auto-enable Show Label when an entity is selected
+                  if (v && !config.showLabel) {
+                    update('showLabel', true);
+                  }
+                }}
+                allowAll={true}
+              />
               <ControlInput label="Attribute (optional)" value={config.labelAttribute} onChange={(v) => update('labelAttribute', v)} placeholder="temperature, brightness, etc." />
-              <p className="text-[10px] text-gray-500 -mt-1">Leave attribute empty to show entity state</p>
+              <p className="text-[10px] text-gray-500 -mt-1">Leave attribute empty to show entity state. Examples: temperature, brightness, battery</p>
             </div>
           </div>
           
@@ -168,7 +382,8 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         {/* 3. Layout & Dimensions */}
         <Section title="Layout & Dimensions" icon={Layout}>
           <div className="grid grid-cols-2 gap-4">
-            <ControlInput 
+            <PresetControl 
+              field="layout"
               label="Layout" 
               type="select" 
               value={config.layout} 
@@ -179,10 +394,10 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <ControlInput label="Card Height" value={config.height} onChange={(v) => update('height', v)} suffix="px" />
-            <ControlInput label="Icon Size" value={config.size} onChange={(v) => update('size', v)} suffix="%" />
+            <PresetControl field="size" label="Icon Size" value={config.size} onChange={(v) => update('size', v)} suffix="%" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-             <ControlInput label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} suffix="px" />
+             <PresetControl field="borderRadius" label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} suffix="px" />
              <ControlInput label="Padding" value={config.padding} onChange={(v) => update('padding', v)} suffix="px" />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -200,10 +415,10 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         {/* 4. Visibility Toggles */}
         <Section title="Visibility" icon={ToggleRight}>
           <div className="grid grid-cols-2 gap-3">
-            <ControlInput type="checkbox" label="Show Name" value={config.showName} onChange={(v) => update('showName', v)} />
-            <ControlInput type="checkbox" label="Show Icon" value={config.showIcon} onChange={(v) => update('showIcon', v)} />
-            <ControlInput type="checkbox" label="Show State" value={config.showState} onChange={(v) => update('showState', v)} />
-            <ControlInput type="checkbox" label="Show Label" value={config.showLabel} onChange={(v) => update('showLabel', v)} />
+            <PresetControl field="showName" type="checkbox" label="Show Name" value={config.showName} onChange={(v) => update('showName', v)} />
+            <PresetControl field="showIcon" type="checkbox" label="Show Icon" value={config.showIcon} onChange={(v) => update('showIcon', v)} />
+            <PresetControl field="showState" type="checkbox" label="Show State" value={config.showState} onChange={(v) => update('showState', v)} />
+            <PresetControl field="showLabel" type="checkbox" label="Show Label" value={config.showLabel} onChange={(v) => update('showLabel', v)} />
             <ControlInput type="checkbox" label="Show Last Chg." value={config.showLastChanged} onChange={(v) => update('showLastChanged', v)} />
             <ControlInput type="checkbox" label="Entity Picture" value={config.showEntityPicture} onChange={(v) => update('showEntityPicture', v)} />
             <ControlInput type="checkbox" label="Show Units" value={config.showUnits} onChange={(v) => update('showUnits', v)} />
@@ -224,18 +439,18 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
            <div className="space-y-6">
              {/* Global Settings */}
              <div className="space-y-4">
-                <ControlInput type="select" label="Color Type" value={config.colorType} options={COLOR_TYPE_OPTIONS} onChange={(v) => update('colorType', v)} />
+                <PresetControl field="colorType" type="select" label="Color Type" value={config.colorType} options={COLOR_TYPE_OPTIONS} onChange={(v) => update('colorType', v)} />
                 
                 <div className="grid grid-cols-2 gap-4">
-                   <ControlInput type="checkbox" label="Auto Color (Light)" value={config.colorAuto} onChange={(v) => update('colorAuto', v)} />
+                   <PresetControl field="colorAuto" type="checkbox" label="Auto Color (Light)" value={config.colorAuto} onChange={(v) => update('colorAuto', v)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
-                        <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
-                          <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
+                        <PresetControl field="backgroundColor" label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
+                          <PresetControl field="backgroundColorOpacity" label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
                    </div>
-                   <ControlInput label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
+                   <PresetControl field="color" label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
                 </div>
              </div>
              
@@ -348,12 +563,12 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <Section title="Glass & Depth" icon={Droplets}>
            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                 <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
-                 <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
+                 <PresetControl field="backdropBlur" label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
+                 <PresetControl field="shadowSize" label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
+                  <PresetControl field="shadowColor" label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
+                  <PresetControl field="shadowOpacity" label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
               </div>
            </div>
         </Section>
@@ -362,8 +577,8 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         <Section title="Borders" icon={BoxSelect}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
-               <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
+               <PresetControl field="borderWidth" label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
+               <PresetControl field="borderStyle" label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
             </div>
 
             <ColorPairInput 
@@ -407,6 +622,35 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig }) => {
         {/* 9. Typography */}
         <Section title="Typography" icon={Type}>
            <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
+           
+           {/* Custom Font */}
+           <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+             <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Custom Font (Optional)</p>
+             <div className="space-y-2">
+               <ControlInput 
+                 label="Font Name" 
+                 value={config.customFontName} 
+                 onChange={(v) => update('customFontName', v)} 
+                 placeholder="My Custom Font" 
+               />
+               <ControlInput 
+                 label="Google Fonts URL or @import" 
+                 value={config.customFontUrl} 
+                 onChange={(v) => update('customFontUrl', v)} 
+                 placeholder="https://fonts.googleapis.com/css2?family=..." 
+               />
+               <p className="text-[9px] text-gray-500">
+                 Get fonts from <a href="https://fonts.google.com" target="_blank" rel="noopener" className="text-blue-400 hover:underline">fonts.google.com</a> → 
+                 Select font → Copy the embed URL. The font name must match exactly.
+               </p>
+               {config.customFontName && config.customFontUrl && (
+                 <div className="mt-2 p-2 bg-green-900/20 border border-green-800/50 rounded text-[10px] text-green-400">
+                   ✓ Using custom font: {config.customFontName}
+                 </div>
+               )}
+             </div>
+           </div>
+           
            <div className="grid grid-cols-2 gap-4 mt-3">
               <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} suffix="px" />
               <ControlInput label="Transform" type="select" value={config.textTransform} options={TRANSFORM_OPTIONS} onChange={(v) => update('textTransform', v)} />

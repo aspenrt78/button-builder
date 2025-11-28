@@ -12,6 +12,8 @@ interface Props {
   max?: number;
   step?: number;
   suffix?: string; // Auto-append suffix like 'px', '%', 's', etc.
+  isPresetField?: boolean;
+  isModified?: boolean;
 }
 
 export const ControlInput: React.FC<Props> = ({ 
@@ -25,7 +27,9 @@ export const ControlInput: React.FC<Props> = ({
   min = 0,
   max = 100,
   step = 1,
-  suffix
+  suffix,
+  isPresetField = false,
+  isModified = false
 }) => {
   
   // Handle auto-suffix on blur
@@ -62,8 +66,18 @@ export const ControlInput: React.FC<Props> = ({
   
   if (type === 'checkbox') {
     return (
-      <label className={`flex items-center justify-between p-2 bg-gray-800/50 rounded border border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors ${className}`}>
-        <span className="text-sm text-gray-300">{label}</span>
+      <label className={`flex items-center justify-between p-2 bg-gray-800/50 rounded border border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors ${isPresetField && !isModified ? 'ring-1 ring-purple-500/30' : ''} ${isModified ? 'ring-1 ring-yellow-500/30' : ''} ${className}`}>
+        <span className="text-sm text-gray-300 flex items-center gap-1">
+          {label}
+          {isPresetField && (
+            <span 
+              className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
+              title={isModified ? 'Modified from preset' : 'From preset'}
+            >
+              {isModified ? '✎' : '◆'}
+            </span>
+          )}
+        </span>
         <input 
           type="checkbox" 
           checked={value === true} 
@@ -78,7 +92,17 @@ export const ControlInput: React.FC<Props> = ({
     return (
       <div className={`flex flex-col gap-2 ${className}`}>
         <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-          <span>{label}</span>
+          <span className="flex items-center gap-1">
+            {label}
+            {isPresetField && (
+              <span 
+                className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
+                title={isModified ? 'Modified from preset' : 'From preset'}
+              >
+                {isModified ? '✎' : '◆'}
+              </span>
+            )}
+          </span>
           <span className="text-gray-400 font-mono text-[11px]">{value}</span>
         </div>
         <input
@@ -96,7 +120,17 @@ export const ControlInput: React.FC<Props> = ({
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+        {label}
+        {isPresetField && (
+          <span 
+            className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
+            title={isModified ? 'Modified from preset' : 'From preset'}
+          >
+            {isModified ? '✎' : '◆'}
+          </span>
+        )}
+      </label>
       <div className="flex items-center gap-2">
         {type === 'color' && (
           <div 

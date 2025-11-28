@@ -160,7 +160,10 @@ export const generateYaml = (config: ButtonConfig): string => {
     `border-radius: ${config.borderRadius}`,
     `padding: ${config.padding}`,
     `color: ${config.color}`,
-    config.fontFamily ? `font-family: ${config.fontFamily}` : null,
+    // Use custom font if specified, otherwise use fontFamily dropdown
+    (config.customFontName && config.customFontUrl) 
+      ? `font-family: '${config.customFontName}', sans-serif`
+      : (config.fontFamily ? `font-family: ${config.fontFamily}` : null),
     `font-size: ${config.fontSize}`,
     `text-transform: ${config.textTransform}`,
     `font-weight: ${config.fontWeight}`,
@@ -557,8 +560,20 @@ color_type: ${config.colorType}
     }
   }
   
-  // --- Extra Styles (Keyframes) ---
+  // --- Extra Styles (Keyframes and Custom Fonts) ---
   let extraStyles = '';
+  
+  // Custom Font @import (must be at the top of extra_styles)
+  if (config.customFontName && config.customFontUrl) {
+    // Handle both full @import statements and just URLs
+    const fontUrl = config.customFontUrl.trim();
+    if (fontUrl.startsWith('@import')) {
+      extraStyles += `  ${fontUrl}\n`;
+    } else if (fontUrl.startsWith('http')) {
+      extraStyles += `  @import url('${fontUrl}');\n`;
+    }
+  }
+  
   // Marquee special keyframes
   if (config.cardAnimation === 'marquee') {
     extraStyles += `  @keyframes cba-marquee-spin {

@@ -35,6 +35,7 @@ const App: React.FC = () => {
   const [importError, setImportError] = useState('');
   const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activePreset, setActivePreset] = useState<Preset | null>(null);
   // Save config to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -49,14 +50,34 @@ const App: React.FC = () => {
   const handleReset = () => {
     if (confirm('Reset all settings to defaults?')) {
       setConfig(DEFAULT_CONFIG);
+      setActivePreset(null);
       localStorage.removeItem(STORAGE_KEY);
     }
   };
 
   const handleApplyPreset = (preset: Preset) => {
     setConfig(prev => ({ ...prev, ...preset.config }));
+    setActivePreset(preset);
     setIsPresetsOpen(false);
   };
+
+  const handleResetToPreset = () => {
+    if (activePreset) {
+      setConfig(prev => ({ ...prev, ...activePreset.config }));
+    }
+  };
+
+  // Calculate which fields have been modified from the active preset
+  const modifiedFromPreset = useMemo(() => {
+    if (!activePreset) return new Set<string>();
+    const modified = new Set<string>();
+    for (const [key, presetValue] of Object.entries(activePreset.config)) {
+      if (JSON.stringify(config[key as keyof ButtonConfig]) !== JSON.stringify(presetValue)) {
+        modified.add(key);
+      }
+    }
+    return modified;
+  }, [config, activePreset]);
 
   const handleImportYaml = () => {
     setImportError('');
@@ -95,9 +116,31 @@ const App: React.FC = () => {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-2">
           <div className="relative">
+            {activePreset && (
+              <div className="flex items-center gap-1 mr-2">
+                <span className="text-xs text-gray-500">Preset:</span>
+                <span className="text-xs text-purple-400 font-medium">{activePreset.name}</span>
+                {modifiedFromPreset.size > 0 && (
+                  <span className="text-[10px] text-yellow-500" title={`${modifiedFromPreset.size} field(s) modified`}>*</span>
+                )}
+                {modifiedFromPreset.size > 0 && (
+                  <button
+                    onClick={handleResetToPreset}
+                    className="ml-1 text-[10px] text-gray-500 hover:text-purple-400 underline"
+                    title="Reset to preset defaults"
+                  >
+                    reset
+                  </button>
+                )}
+              </div>
+            )}
             <button 
               onClick={() => setIsPresetsOpen(!isPresetsOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"
+              className={`flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm font-medium transition-all ${
+                activePreset 
+                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20' 
+                  : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'
+              }`}
               title="Style Presets"
             >
               <Palette size={14} />
@@ -108,10 +151,10 @@ const App: React.FC = () => {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsPresetsOpen(false)} />
                 <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'custom'].map(category => (
+                  {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => (
                     <div key={category}>
                       <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-800/50 sticky top-0">
-                        {category === '3d' ? '3D Effects' : category}
+                        {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category}
                       </div>
                       {PRESETS.filter(p => p.category === category).map(preset => (
                         <button
@@ -208,10 +251,10 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'custom'].map(category => (
+              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => (
                 <div key={category}>
                   <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-800/50 sticky top-0">
-                    {category === '3d' ? '3D Effects' : category}
+                    {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category}
                   </div>
                   {PRESETS.filter(p => p.category === category).map(preset => (
                     <button
@@ -234,7 +277,12 @@ const App: React.FC = () => {
       <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Configuration */}
         <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800">
-          <ConfigPanel config={config} setConfig={setConfig} />
+          <ConfigPanel 
+            config={config} 
+            setConfig={setConfig} 
+            activePreset={activePreset}
+            modifiedFromPreset={modifiedFromPreset}
+          />
         </aside>
 
         {/* Center: Workspace */}
@@ -281,7 +329,12 @@ const App: React.FC = () => {
           
           {mobileTab === 'config' && (
             <div className="h-full overflow-y-auto bg-gray-900">
-              <ConfigPanel config={config} setConfig={setConfig} />
+              <ConfigPanel 
+                config={config} 
+                setConfig={setConfig}
+                activePreset={activePreset}
+                modifiedFromPreset={modifiedFromPreset}
+              />
             </div>
           )}
           

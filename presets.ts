@@ -3,7 +3,7 @@ import { ButtonConfig, DEFAULT_CONFIG } from './types';
 export interface Preset {
   name: string;
   description: string;
-  category: 'minimal' | 'glass' | 'neon' | 'animated' | 'custom' | '3d' | 'retro' | 'gradient' | 'cyberpunk' | 'nature';
+  category: 'minimal' | 'glass' | 'neon' | 'animated' | 'custom' | '3d' | 'retro' | 'gradient' | 'cyberpunk' | 'nature' | 'icon-styles';
   config: Partial<ButtonConfig>;
 }
 
@@ -1222,6 +1222,595 @@ export const PRESETS: Preset[] = [
       size: '60%',
       borderRadius: '16px',
       showState: true,
+    }
+  },
+
+  // ============================================
+  // ICON STYLES
+  // ============================================
+  {
+    name: 'Circle Icon',
+    description: 'Icon in a circular background',
+    category: 'icon-styles',
+    config: {
+      size: '50%',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.1)
+border-radius: 50%
+padding: 12px
+aspect-ratio: 1`,
+    }
+  },
+  {
+    name: 'Square Badge',
+    description: 'Icon in a rounded square badge',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.15)
+border-radius: 12px
+padding: 10px
+aspect-ratio: 1`,
+    }
+  },
+  {
+    name: 'Soft Glow Icon',
+    description: 'Icon with soft glow effect',
+    category: 'icon-styles',
+    config: {
+      size: '50%',
+      iconColorAuto: true,
+      imgCellStyles: `filter: drop-shadow(0 0 8px currentColor)
+padding: 8px`,
+    }
+  },
+  {
+    name: 'Neon Ring Icon',
+    description: 'Icon with neon ring border',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      iconColor: '#00ffff',
+      imgCellStyles: `border: 2px solid currentColor
+border-radius: 50%
+padding: 12px
+box-shadow: 0 0 10px currentColor, inset 0 0 10px rgba(0, 255, 255, 0.2)`,
+    }
+  },
+  {
+    name: 'Gradient Circle',
+    description: 'Icon in gradient circle background',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      iconColor: '#ffffff',
+      imgCellStyles: `background: linear-gradient(135deg, #667eea, #764ba2)
+border-radius: 50%
+padding: 14px
+aspect-ratio: 1`,
+    }
+  },
+  {
+    name: 'Floating Icon',
+    description: 'Icon with floating shadow effect',
+    category: 'icon-styles',
+    config: {
+      size: '50%',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.1)
+border-radius: 16px
+padding: 10px
+box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4)
+transform: translateY(-4px)`,
+    }
+  },
+  {
+    name: 'Icon Only Large',
+    description: 'Large centered icon, no text',
+    category: 'icon-styles',
+    config: {
+      size: '70%',
+      showName: false,
+      showState: false,
+      showLabel: false,
+      padding: '15%',
+    }
+  },
+  {
+    name: 'Mini Icon Badge',
+    description: 'Small icon in top corner badge style',
+    category: 'icon-styles',
+    config: {
+      size: '30%',
+      layout: 'icon_name_state',
+      imgCellStyles: `background: rgba(59, 130, 246, 0.8)
+border-radius: 8px
+padding: 6px`,
+    }
+  },
+  {
+    name: 'Outlined Icon',
+    description: 'Icon with outline ring',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      imgCellStyles: `border: 2px solid rgba(255, 255, 255, 0.3)
+border-radius: 50%
+padding: 10px`,
+    }
+  },
+  {
+    name: 'Hexagon Icon',
+    description: 'Icon in hexagon shape',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.1)
+clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)
+padding: 16px
+aspect-ratio: 1`,
+    }
+  },
+  {
+    name: 'Diamond Icon',
+    description: 'Icon in rotated square (diamond)',
+    category: 'icon-styles',
+    config: {
+      size: '35%',
+      imgCellStyles: `background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))
+transform: rotate(45deg)
+padding: 12px
+border-radius: 4px`,
+      extraStyles: `--mdc-icon-size: 24px`,
+    }
+  },
+  {
+    name: 'Pill Icon',
+    description: 'Icon in horizontal pill shape',
+    category: 'icon-styles',
+    config: {
+      size: '35%',
+      layout: 'icon_name_state',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.15)
+border-radius: 50px
+padding: 8px 16px`,
+    }
+  },
+  {
+    name: 'Neumorphic Icon',
+    description: 'Soft 3D neumorphic icon style',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      backgroundColor: '#2a2a2a',
+      imgCellStyles: `background: #2a2a2a
+border-radius: 50%
+padding: 14px
+box-shadow: 8px 8px 16px #1a1a1a, -8px -8px 16px #3a3a3a`,
+    }
+  },
+  {
+    name: 'Glassmorphic Icon',
+    description: 'Frosted glass icon background',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.1)
+backdrop-filter: blur(10px)
+border: 1px solid rgba(255, 255, 255, 0.2)
+border-radius: 16px
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Pulse Ring Icon',
+    description: 'Icon with animated pulse ring',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      iconAnimation: 'pulse',
+      iconAnimationTrigger: 'on',
+      imgCellStyles: `border: 2px solid currentColor
+border-radius: 50%
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Sunrise Icon',
+    description: 'Warm gradient icon backdrop',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      iconColor: '#ffffff',
+      imgCellStyles: `background: linear-gradient(180deg, #f093fb 0%, #f5576c 50%, #ffd89b 100%)
+border-radius: 50%
+padding: 14px`,
+    }
+  },
+  {
+    name: 'Ocean Icon',
+    description: 'Cool ocean gradient icon',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      iconColor: '#ffffff',
+      imgCellStyles: `background: linear-gradient(135deg, #667eea 0%, #00d4ff 100%)
+border-radius: 50%
+padding: 14px`,
+    }
+  },
+  {
+    name: 'Fire Icon',
+    description: 'Hot fire gradient icon',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      iconColor: '#ffffff',
+      imgCellStyles: `background: linear-gradient(135deg, #ff512f 0%, #f09819 100%)
+border-radius: 50%
+padding: 14px`,
+    }
+  },
+  {
+    name: 'Shadow Icon',
+    description: 'Icon with dramatic drop shadow',
+    category: 'icon-styles',
+    config: {
+      size: '55%',
+      imgCellStyles: `filter: drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.5))`,
+    }
+  },
+  {
+    name: 'Inset Icon',
+    description: 'Icon pressed into surface',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      imgCellStyles: `background: rgba(0, 0, 0, 0.2)
+border-radius: 50%
+padding: 12px
+box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.4), inset -2px -2px 6px rgba(255, 255, 255, 0.1)`,
+    }
+  },
+  {
+    name: 'Minimal Line Icon',
+    description: 'Thin icon with underline accent',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      imgCellStyles: `border-bottom: 2px solid currentColor
+padding-bottom: 8px`,
+    }
+  },
+  {
+    name: 'Top Accent Icon',
+    description: 'Icon with colored top accent bar',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      imgCellStyles: `border-top: 3px solid #3b82f6
+background: rgba(59, 130, 246, 0.1)
+border-radius: 0 0 12px 12px
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Corner Notch Icon',
+    description: 'Icon with corner cut style',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.1)
+clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))
+padding: 14px`,
+    }
+  },
+  {
+    name: 'Bottom-Left Icon',
+    description: 'Large icon anchored to bottom-left corner',
+    category: 'icon-styles',
+    config: {
+      size: '55%',
+      layout: 'vertical',
+      showName: true,
+      showState: false,
+      iconColor: 'rgba(255, 255, 255, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 8px
+left: 8px
+opacity: 0.85`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Bottom-Right Icon',
+    description: 'Large icon anchored to bottom-right corner',
+    category: 'icon-styles',
+    config: {
+      size: '55%',
+      layout: 'vertical',
+      showName: true,
+      showState: false,
+      iconColor: 'rgba(255, 255, 255, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 8px
+right: 8px
+opacity: 0.85`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-end
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Top-Left Icon',
+    description: 'Icon positioned in top-left corner',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      layout: 'vertical',
+      imgCellStyles: `position: absolute
+top: 8px
+left: 8px`,
+      extraStyles: `justify-content: flex-end
+align-items: flex-start
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Top-Right Icon',
+    description: 'Icon positioned in top-right corner',
+    category: 'icon-styles',
+    config: {
+      size: '40%',
+      layout: 'vertical',
+      imgCellStyles: `position: absolute
+top: 8px
+right: 8px`,
+      extraStyles: `justify-content: flex-end
+align-items: flex-end
+padding: 12px`,
+    }
+  },
+  {
+    name: 'Area Card - Amber',
+    description: 'Room area card style with amber tint',
+    category: 'icon-styles',
+    config: {
+      backgroundColor: '#3d3520',
+      backgroundColorOpacity: 100,
+      color: '#ffffff',
+      borderRadius: '16px',
+      size: '60%',
+      layout: 'vertical',
+      showName: true,
+      showState: true,
+      showLabel: false,
+      nameColor: '#ffffff',
+      stateColor: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '13px',
+      iconColor: 'rgba(255, 200, 100, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 6px
+left: 6px
+opacity: 0.9
+filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3))`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
+padding: 10px
+min-height: 80px`,
+    }
+  },
+  {
+    name: 'Area Card - Teal',
+    description: 'Room area card style with teal tint',
+    category: 'icon-styles',
+    config: {
+      backgroundColor: '#1a3a3a',
+      backgroundColorOpacity: 100,
+      color: '#ffffff',
+      borderRadius: '16px',
+      size: '60%',
+      layout: 'vertical',
+      showName: true,
+      showState: true,
+      showLabel: false,
+      nameColor: '#ffffff',
+      stateColor: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '13px',
+      iconColor: 'rgba(100, 220, 220, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 6px
+left: 6px
+opacity: 0.9
+filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3))`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
+padding: 10px
+min-height: 80px`,
+    }
+  },
+  {
+    name: 'Area Card - Purple',
+    description: 'Room area card style with purple tint',
+    category: 'icon-styles',
+    config: {
+      backgroundColor: '#2a2040',
+      backgroundColorOpacity: 100,
+      color: '#ffffff',
+      borderRadius: '16px',
+      size: '60%',
+      layout: 'vertical',
+      showName: true,
+      showState: true,
+      showLabel: false,
+      nameColor: '#ffffff',
+      stateColor: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '13px',
+      iconColor: 'rgba(180, 140, 255, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 6px
+left: 6px
+opacity: 0.9
+filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3))`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
+padding: 10px
+min-height: 80px`,
+    }
+  },
+  {
+    name: 'Area Card - Blue',
+    description: 'Room area card style with blue tint',
+    category: 'icon-styles',
+    config: {
+      backgroundColor: '#1a2a40',
+      backgroundColorOpacity: 100,
+      color: '#ffffff',
+      borderRadius: '16px',
+      size: '60%',
+      layout: 'vertical',
+      showName: true,
+      showState: true,
+      showLabel: false,
+      nameColor: '#ffffff',
+      stateColor: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '13px',
+      iconColor: 'rgba(100, 180, 255, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 6px
+left: 6px
+opacity: 0.9
+filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3))`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
+padding: 10px
+min-height: 80px`,
+    }
+  },
+  {
+    name: 'Area Card - Green',
+    description: 'Room area card style with green tint',
+    category: 'icon-styles',
+    config: {
+      backgroundColor: '#1a3020',
+      backgroundColorOpacity: 100,
+      color: '#ffffff',
+      borderRadius: '16px',
+      size: '60%',
+      layout: 'vertical',
+      showName: true,
+      showState: true,
+      showLabel: false,
+      nameColor: '#ffffff',
+      stateColor: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '13px',
+      iconColor: 'rgba(100, 220, 140, 0.9)',
+      imgCellStyles: `position: absolute
+bottom: 6px
+left: 6px
+opacity: 0.9
+filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3))`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
+padding: 10px
+min-height: 80px`,
+    }
+  },
+  {
+    name: 'Badge Icon - Top Right',
+    description: 'Small status badge icon in top-right',
+    category: 'icon-styles',
+    config: {
+      size: '24px',
+      padding: '4px',
+      borderRadius: '50%',
+      backgroundColor: '#3b82f6',
+      backgroundColorOpacity: 100,
+      showName: false,
+      showState: false,
+      iconColor: '#ffffff',
+      extraStyles: `width: 32px
+height: 32px
+min-width: unset
+position: absolute
+top: -4px
+right: -4px`,
+    }
+  },
+  {
+    name: 'Badge Icon - Notification',
+    description: 'Red notification badge style',
+    category: 'icon-styles',
+    config: {
+      size: '18px',
+      padding: '2px',
+      borderRadius: '50%',
+      backgroundColor: '#ef4444',
+      backgroundColorOpacity: 100,
+      showName: false,
+      showState: false,
+      iconColor: '#ffffff',
+      extraStyles: `width: 24px
+height: 24px
+min-width: unset`,
+    }
+  },
+  {
+    name: 'Overlay Info Icon',
+    description: 'Icon with semi-transparent info overlay',
+    category: 'icon-styles',
+    config: {
+      size: '50%',
+      layout: 'vertical',
+      showName: true,
+      showState: true,
+      backgroundColor: '#1a1a1a',
+      backgroundColorOpacity: 90,
+      borderRadius: '12px',
+      iconColor: 'rgba(255, 255, 255, 0.8)',
+      imgCellStyles: `position: absolute
+bottom: 10px
+left: 10px
+opacity: 0.7`,
+      extraStyles: `position: relative
+overflow: hidden`,
+      gridStyles: `position: absolute
+top: 8px
+left: 8px
+right: 8px`,
+    }
+  },
+  {
+    name: 'Watermark Icon',
+    description: 'Large faded icon as background watermark',
+    category: 'icon-styles',
+    config: {
+      size: '80%',
+      showName: true,
+      showState: true,
+      iconColor: 'rgba(255, 255, 255, 0.1)',
+      imgCellStyles: `position: absolute
+bottom: -10%
+right: -10%
+opacity: 0.5
+transform: rotate(-15deg)`,
+      extraStyles: `overflow: hidden`,
+    }
+  },
+  {
+    name: 'Split Card Icon',
+    description: 'Icon on left side with info on right',
+    category: 'icon-styles',
+    config: {
+      size: '45%',
+      layout: 'icon_name_state',
+      showName: true,
+      showState: true,
+      borderRadius: '12px',
+      imgCellStyles: `background: rgba(255, 255, 255, 0.1)
+border-radius: 10px
+padding: 12px
+margin-right: 8px`,
     }
   },
 ];

@@ -171,6 +171,8 @@ export interface ButtonConfig {
   
   // Typography
   fontFamily: string;
+  customFontName: string;
+  customFontUrl: string;
   fontSize: string;
   fontWeight: 'normal' | 'bold' | 'lighter' | 'bolder';
   textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
@@ -420,6 +422,8 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   labelColorAuto: false,
   
   fontFamily: '',
+  customFontName: '',
+  customFontUrl: '',
   fontSize: '14px',
   fontWeight: 'bold',
   textTransform: 'capitalize',

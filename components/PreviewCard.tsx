@@ -1,12 +1,23 @@
 
-import React, { useState } from 'react';
-import { Palette, User, HelpCircle, Lock, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3 } from 'lucide-react';
 import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
 import { getIconComponent } from '../services/iconMapper';
 
 interface Props {
   config: ButtonConfig;
 }
+
+// Dashboard layout presets matching common HA configurations
+const DASHBOARD_PRESETS = [
+  { name: 'Masonry (Default)', columns: 4, cardWidth: 100, cardHeight: 100, gap: 8 },
+  { name: 'Masonry Wide', columns: 6, cardWidth: 85, cardHeight: 85, gap: 8 },
+  { name: 'Sections', columns: 4, cardWidth: 95, cardHeight: 75, gap: 4 },
+  { name: 'Panel', columns: 1, cardWidth: 200, cardHeight: 120, gap: 16 },
+  { name: 'Sidebar', columns: 2, cardWidth: 110, cardHeight: 90, gap: 8 },
+  { name: 'Mobile', columns: 2, cardWidth: 85, cardHeight: 85, gap: 6 },
+  { name: 'Custom', columns: 4, cardWidth: 100, cardHeight: 100, gap: 8 },
+];
 
 // Simulate the "Light Color" provided by HA when state is ON
 const SIMULATED_ENTITY_COLOR = '#FFC107'; // Warm Amber/Gold
@@ -144,6 +155,60 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const [simulatedState, setSimulatedState] = useState<'on' | 'off'>('on');
   const [canvasColor, setCanvasColor] = useState('#0a0a0a');
   const [showCanvasPicker, setShowCanvasPicker] = useState(false);
+  const [showLayoutSettings, setShowLayoutSettings] = useState(false);
+  
+  // Dashboard layout settings
+  const [selectedPreset, setSelectedPreset] = useState(0);
+  const [cardWidth, setCardWidth] = useState(100);
+  const [cardHeight, setCardHeight] = useState(100);
+  const [gridGap, setGridGap] = useState(8);
+  const [showGrid, setShowGrid] = useState(false);
+
+  // Load custom font when customFontUrl changes
+  useEffect(() => {
+    if (config.customFontName && config.customFontUrl) {
+      const fontUrl = config.customFontUrl.trim();
+      const linkId = 'custom-font-link';
+      
+      // Remove existing link
+      const existing = document.getElementById(linkId);
+      if (existing) existing.remove();
+      
+      // Create new link element
+      const link = document.createElement('link');
+      link.id = linkId;
+      link.rel = 'stylesheet';
+      
+      // Handle both full URLs and @import statements
+      if (fontUrl.startsWith('@import')) {
+        // Convert @import to link
+        const urlMatch = fontUrl.match(/url\(['"]?([^'"]+)['"]?\)/);
+        if (urlMatch) {
+          link.href = urlMatch[1];
+        }
+      } else {
+        link.href = fontUrl;
+      }
+      
+      document.head.appendChild(link);
+      
+      return () => {
+        const el = document.getElementById(linkId);
+        if (el) el.remove();
+      };
+    }
+  }, [config.customFontName, config.customFontUrl]);
+
+  // Apply preset
+  const applyPreset = (index: number) => {
+    setSelectedPreset(index);
+    if (index < DASHBOARD_PRESETS.length - 1) { // Not "Custom"
+      const preset = DASHBOARD_PRESETS[index];
+      setCardWidth(preset.cardWidth);
+      setCardHeight(preset.cardHeight);
+      setGridGap(preset.gap);
+    }
+  };
 
   const isOff = simulatedState === 'off';
   const isOn = simulatedState === 'on';
@@ -173,19 +238,17 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
 
   const actualBg = hexToRgba(actualBgHex, actualBgOpacity);
 
-  // 2. Resolve Colors
-  const effectiveEntityColorActive = (config.colorAuto || config.nameColorAuto || config.iconColorAuto || config.stateColorAuto || config.labelColorAuto || config.borderColorAuto) && isOn;
-
+  // 2. Resolve Colors - Auto flag should use simulated entity color when ON
   const actualIconColor = resolveColor(
     config.iconColor, 
     config.iconColorAuto, 
-    config.color, 
-    isOn && config.colorAuto && config.colorType !== 'card' // Fallback logic for auto-icon color if global auto is on
+    config.color || '#ffffff', 
+    isOn // Use simulated color when iconColorAuto is true AND state is ON
   );
   
-  const actualNameColor = resolveColor(config.nameColor, config.nameColorAuto, config.color, isOn);
-  const actualStateColor = resolveColor(config.stateColor, config.stateColorAuto, config.color, isOn);
-  const actualLabelColor = resolveColor(config.labelColor, config.labelColorAuto, config.color, isOn);
+  const actualNameColor = resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn);
+  const actualStateColor = resolveColor(config.stateColor, config.stateColorAuto, config.color || '#ffffff', isOn);
+  const actualLabelColor = resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn);
   const actualBorderColor = resolveColor(config.borderColor, config.borderColorAuto, 'transparent', isOn);
 
   // 3. Border Logic
@@ -247,12 +310,11 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const containerStyle: React.CSSProperties = {
     backgroundColor: gradientBg ? undefined : actualBg,
     background: gradientBg || undefined,
-    color: config.color, 
+    color: config.color || '#ffffff',  // Default text color, overridden by individual element colors
     borderRadius: config.borderRadius,
     padding: config.padding,
     height: config.aspectRatio ? 'auto' : (config.height === 'auto' ? 'auto' : config.height),
-    width: config.aspectRatio ? '140px' : undefined,  // Fixed width when aspect ratio is set
-    minWidth: config.aspectRatio ? undefined : '140px',  // Min width when no aspect ratio
+    width: '100%',  // Fill the container (controlled by wrapper)
     aspectRatio: config.aspectRatio ? config.aspectRatio.replace(':', '/') : 'auto',
     display: 'grid',
     transition: 'all 0.3s ease',
@@ -265,7 +327,9 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     justifyItems: 'center',
     alignItems: 'center',
     gap: '4px',
-    fontFamily: config.fontFamily || 'inherit',
+    fontFamily: (config.customFontName && config.customFontUrl) 
+      ? `'${config.customFontName}', sans-serif` 
+      : (config.fontFamily || 'inherit'),
     fontSize: config.fontSize,
     fontWeight: config.fontWeight,
     textTransform: config.textTransform,
@@ -286,12 +350,108 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
       className="absolute inset-0 flex items-center justify-center transition-colors duration-500"
       style={{ backgroundColor: canvasColor }}
     >
-      {/* Canvas Color Control */}
-      <div className="absolute top-3 right-3 z-50">
+      {/* Grid Overlay (when enabled) */}
+      {showGrid && (
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-20"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, #666 1px, transparent 1px),
+              linear-gradient(to bottom, #666 1px, transparent 1px)
+            `,
+            backgroundSize: `${cardWidth + gridGap}px ${cardHeight + gridGap}px`,
+            backgroundPosition: 'center center',
+          }}
+        />
+      )}
+
+      {/* Canvas Controls */}
+      <div className="absolute top-3 right-3 z-50 flex gap-2">
+        {/* Dashboard Layout Settings */}
+        <div className="relative">
+          <button 
+            onClick={() => { setShowLayoutSettings(!showLayoutSettings); setShowCanvasPicker(false); }}
+            className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors ${showLayoutSettings ? 'bg-gray-700 text-white' : ''}`}
+            title="Dashboard Layout Settings"
+          >
+            <Grid3X3 size={16} />
+          </button>
+          {showLayoutSettings && (
+            <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-64 animate-in slide-in-from-top-2">
+              <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Dashboard Layout</p>
+              
+              {/* Preset Selector */}
+              <div className="mb-3">
+                <select
+                  value={selectedPreset}
+                  onChange={(e) => applyPreset(Number(e.target.value))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white"
+                >
+                  {DASHBOARD_PRESETS.map((preset, i) => (
+                    <option key={preset.name} value={i}>{preset.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Custom Size Controls */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-gray-400 w-16">Width</label>
+                  <input
+                    type="range"
+                    min="60"
+                    max="250"
+                    value={cardWidth}
+                    onChange={(e) => { setCardWidth(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
+                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-[10px] text-gray-300 w-10 text-right">{cardWidth}px</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-gray-400 w-16">Height</label>
+                  <input
+                    type="range"
+                    min="60"
+                    max="250"
+                    value={cardHeight}
+                    onChange={(e) => { setCardHeight(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
+                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-[10px] text-gray-300 w-10 text-right">{cardHeight}px</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-gray-400 w-16">Gap</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="24"
+                    value={gridGap}
+                    onChange={(e) => { setGridGap(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
+                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-[10px] text-gray-300 w-10 text-right">{gridGap}px</span>
+                </div>
+              </div>
+
+              {/* Show Grid Toggle */}
+              <label className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showGrid}
+                  onChange={(e) => setShowGrid(e.target.checked)}
+                  className="w-3 h-3 rounded bg-gray-700 border-gray-600"
+                />
+                <span className="text-[10px] text-gray-400">Show grid overlay</span>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* Canvas Color Picker */}
         <div className="relative">
            <button 
-             onClick={() => setShowCanvasPicker(!showCanvasPicker)}
-             className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors"
+             onClick={() => { setShowCanvasPicker(!showCanvasPicker); setShowLayoutSettings(false); }}
+             className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors ${showCanvasPicker ? 'bg-gray-700 text-white' : ''}`}
              title="Change Canvas Backdrop Color"
            >
              <Palette size={16} />
@@ -300,10 +460,10 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
              <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-48 animate-in slide-in-from-top-2">
                 <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Preview Backdrop</p>
                 <div className="grid grid-cols-4 gap-2 mb-3">
-                   {['#0a0a0a', '#ffffff', '#3b82f6', '#ef4444'].map(c => (
+                   {['#0a0a0a', '#1a1a2e', '#ffffff', '#1e3a5f'].map(c => (
                      <button 
                        key={c} 
-                       className="w-6 h-6 rounded-full border border-gray-600 shadow-sm"
+                       className={`w-6 h-6 rounded-full border shadow-sm ${canvasColor === c ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-600'}`}
                        style={{ backgroundColor: c }}
                        onClick={() => setCanvasColor(c)}
                      />
@@ -321,7 +481,10 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
       </div>
 
       {/* The Card Preview - Centered */}
-      <div className="relative flex justify-center items-center z-10" style={{ width: config.aspectRatio ? 'auto' : '100%', maxWidth: '240px' }}>
+      <div 
+        className="relative flex justify-center items-center z-10 transition-all duration-300" 
+        style={{ width: `${cardWidth}px`, height: config.aspectRatio ? 'auto' : `${cardHeight}px` }}
+      >
         {/* Marquee Background Layer (Simulates rotating border) */}
         {isMarquee && (
           <div className="absolute -inset-[4px] overflow-hidden cba-animate-spin z-0" style={{ borderRadius: config.borderRadius === '50%' ? '50%' : `calc(${config.borderRadius} + 4px)` }}>
@@ -361,7 +524,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
 
           {/* Icon / Entity Picture */}
           {(config.showIcon || config.showEntityPicture) && (
-            <div style={{ gridArea: 'i' }} className="flex justify-center items-center w-full h-full relative">
+            <div style={{ gridArea: 'i', ...parseExtraStyles(config.imgCellStyles) }} className="flex justify-center items-center w-full h-full relative">
               {config.showEntityPicture ? (
                 <div className="rounded-full bg-gray-300 overflow-hidden w-full h-full max-w-[80%] aspect-square flex items-center justify-center border-2 border-white/20">
                   <User className="text-gray-500 w-2/3 h-2/3" />
@@ -374,7 +537,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                     color={actualIconColor}
                     animationClass={iconAnimationClass}
                     animationDuration={iconAnimationDuration}
-                    containerSize={100}
+                    containerSize={cardWidth}
                   />
                 )
               )}
@@ -447,14 +610,6 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
 
       {/* Controls Overlay - Positioned at bottom */}
       <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-3 pointer-events-none">
-        
-        {/* Legend */}
-        {effectiveEntityColorActive && (
-          <div className="text-[10px] text-gray-400 bg-gray-900/80 backdrop-blur px-3 py-1 rounded-full border border-gray-800 shadow-lg animate-in slide-in-from-bottom-2">
-             <span className="w-2 h-2 bg-[#FFC107] inline-block rounded-full mr-2"></span>
-             Using Simulated Entity Color
-          </div>
-        )}
 
         {/* Simulator Toggle */}
         <div className="bg-gray-800/90 backdrop-blur p-1 rounded-full inline-flex border border-gray-700 shadow-xl pointer-events-auto">
