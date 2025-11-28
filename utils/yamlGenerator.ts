@@ -682,6 +682,16 @@ color_type: ${config.colorType}
     75% { transform: scale(1.05, 0.95); }
     100% { transform: scale(1, 1); }
   }
+  @keyframes lava-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes holo-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 `;
   }
 
@@ -730,7 +740,7 @@ ${cardStyles.map(s => `    - ${formatStyleForYaml(s)}`).join('\n')}
 
   if (iconStyles.length > 0) {
      yaml += `  icon:
-${iconStyles.map(s => `    - ${s}`).join('\n')}
+${iconStyles.map(s => `    - ${formatStyleForYaml(s)}`).join('\n')}
 `;
   }
 
@@ -849,10 +859,10 @@ ${stateColorLine}
      return `  - value: '${stateVal}'
     styles:
       card:
-${stateCardStyles.map(s => `        - ${s}`).join('\n')}
+${stateCardStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}
 ${marqueePseudo}
 ${stateIconStyles.length > 0 ? `      icon:
-${stateIconStyles.map(s => `        - ${s}`).join('\n')}` : ''}`;
+${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : ''}`;
   };
 
   yaml += `state:
@@ -957,25 +967,25 @@ ${getStateLogic('off', offColorResolved)}
         if (conditionalCardStyles.length > 0) {
           yaml += `      card:\n`;
           conditionalCardStyles.forEach(s => {
-            yaml += `        - ${s}\n`;
+            yaml += `        - ${formatStyleForYaml(s)}\n`;
           });
         }
         if (conditionalIconStyles.length > 0) {
           yaml += `      icon:\n`;
           conditionalIconStyles.forEach(s => {
-            yaml += `        - ${s}\n`;
+            yaml += `        - ${formatStyleForYaml(s)}\n`;
           });
         }
         if (conditionalNameStyles.length > 0) {
           yaml += `      name:\n`;
           conditionalNameStyles.forEach(s => {
-            yaml += `        - ${s}\n`;
+            yaml += `        - ${formatStyleForYaml(s)}\n`;
           });
         }
         if (conditionalLabelStyles.length > 0) {
           yaml += `      label:\n`;
           conditionalLabelStyles.forEach(s => {
-            yaml += `        - ${s}\n`;
+            yaml += `        - ${formatStyleForYaml(s)}\n`;
           });
         }
         

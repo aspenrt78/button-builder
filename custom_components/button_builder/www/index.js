@@ -359,13 +359,22 @@ Error generating stack: `+r.message+`
           50% { transform: translateY(-10px); }
         }
         @keyframes cba-breathe {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(0.98); }
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.03); opacity: 0.9; }
         }
         @keyframes cba-ripple {
           0% { box-shadow: 0 0 0 0 currentColor; }
-          70% { box-shadow: 0 0 0 10px transparent; }
-          100% { box-shadow: 0 0 0 0 transparent; }
+          100% { box-shadow: 0 0 0 20px transparent; }
+        }
+        @keyframes lava-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes holo-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
 
         .cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
@@ -808,6 +817,16 @@ color_type: ${H.colorType}
     75% { transform: scale(1.05, 0.95); }
     100% { transform: scale(1, 1); }
   }
+  @keyframes lava-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes holo-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 `),v&&(m+=`extra_styles: |
 ${v}`);const Z=y=>{const G=y.indexOf(":");if(G>0){const Q=y.substring(0,G).trim(),K=y.substring(G+1).trim();if(K.includes("(")||K.includes(",")||K.includes("#"))return`${Q}: '${K}'`}return y};m+=`styles:
   card:
@@ -818,7 +837,7 @@ ${A.map(y=>`    - ${Z(y)}`).join(`
 `).forEach(y=>{if(y.trim()){const G=y.indexOf(":");if(G>0){const Q=y.substring(0,G).trim(),K=y.substring(G+1).trim();m+=`    - ${Q}: '${K}'
 `}else m+=`    - ${y.trim()}
 `}})),u.length>0&&(m+=`  icon:
-${u.map(y=>`    - ${y}`).join(`
+${u.map(y=>`    - ${Z(y)}`).join(`
 `)}
 `);const b=C(H.nameColor,H.nameColorAuto);m+=`  name:
     - font-weight: bold
@@ -854,11 +873,11 @@ ${O}
             - animation: cba-marquee-spin ${H.cardAnimationSpeed||"4s"} linear infinite`),`  - value: '${y}'
     styles:
       card:
-${Q.map(V1=>`        - ${V1}`).join(`
+${Q.map(V1=>`        - ${Z(V1)}`).join(`
 `)}
 ${W}
 ${K.length>0?`      icon:
-${K.map(V1=>`        - ${V1}`).join(`
+${K.map(V1=>`        - ${Z(V1)}`).join(`
 `)}`:""}`};return m+=`state:
 ${R("on",w)}
 ${R("off",F)}
@@ -882,13 +901,13 @@ ${R("off",F)}
 `),y.spin&&(m+=`    spin: true
 `);const G=[],Q=[],K=[],W=[];if(y.backgroundColor&&G.push(`background-color: ${y.backgroundColor}`),y.borderColor&&G.push(`border-color: ${y.borderColor}`),y.iconColor&&Q.push(`color: ${y.iconColor}`),y.nameColor&&K.push(`color: ${y.nameColor}`),y.labelColor&&W.push(`color: ${y.labelColor}`),y.cardAnimation&&y.cardAnimation!=="none"){const L1=y3(y.cardAnimation,y.cardAnimationSpeed||"2s");L1&&G.push(L1)}if(y.iconAnimation&&y.iconAnimation!=="none"){const L1=y3(y.iconAnimation,y.iconAnimationSpeed||"2s");L1&&Q.push(L1)}(G.length>0||Q.length>0||K.length>0||W.length>0||y.styles)&&(m+=`    styles:
 `,G.length>0&&(m+=`      card:
-`,G.forEach(L1=>{m+=`        - ${L1}
+`,G.forEach(L1=>{m+=`        - ${Z(L1)}
 `})),Q.length>0&&(m+=`      icon:
-`,Q.forEach(L1=>{m+=`        - ${L1}
+`,Q.forEach(L1=>{m+=`        - ${Z(L1)}
 `})),K.length>0&&(m+=`      name:
-`,K.forEach(L1=>{m+=`        - ${L1}
+`,K.forEach(L1=>{m+=`        - ${Z(L1)}
 `})),W.length>0&&(m+=`      label:
-`,W.forEach(L1=>{m+=`        - ${L1}
+`,W.forEach(L1=>{m+=`        - ${Z(L1)}
 `})),y.styles&&y.styles.split(`
 `).forEach(L1=>{L1.trim()&&(m+=`      ${L1.trim()}
 `)}))}),m},hH=Symbol.for("yaml.alias"),LH=Symbol.for("yaml.document"),r0=Symbol.for("yaml.map"),On=Symbol.for("yaml.pair"),o5=Symbol.for("yaml.scalar"),q3=Symbol.for("yaml.seq"),Q2=Symbol.for("yaml.node.type"),l0=H=>!!H&&typeof H=="object"&&H[Q2]===hH,D0=H=>!!H&&typeof H=="object"&&H[Q2]===LH,K3=H=>!!H&&typeof H=="object"&&H[Q2]===r0,z1=H=>!!H&&typeof H=="object"&&H[Q2]===On,D1=H=>!!H&&typeof H=="object"&&H[Q2]===o5,$3=H=>!!H&&typeof H=="object"&&H[Q2]===q3;function q1(H){if(H&&typeof H=="object")switch(H[Q2]){case r0:case q3:return!0}return!1}function K1(H){if(H&&typeof H=="object")switch(H[Q2]){case hH:case r0:case o5:case q3:return!0}return!1}const xn=H=>(D1(H)||q1(H))&&!!H.anchor,Z2=Symbol("break visit"),En=Symbol("skip children"),M5=Symbol("remove node");function P0(H,C){const e=kn(C);D0(H)?E3(null,H.contents,e,Object.freeze([H]))===M5&&(H.contents=null):E3(null,H,e,Object.freeze([]))}P0.BREAK=Z2;P0.SKIP=En;P0.REMOVE=M5;function E3(H,C,e,L){const a=wn(H,C,e,L);if(K1(a)||z1(a))return _n(H,L,a),E3(H,a,e,L);if(typeof a!="symbol"){if(q1(C)){L=Object.freeze(L.concat(C));for(let n=0;n<C.items.length;++n){const M=E3(n,C.items[n],e,L);if(typeof M=="number")n=M-1;else{if(M===Z2)return Z2;M===M5&&(C.items.splice(n,1),n-=1)}}}else if(z1(C)){L=Object.freeze(L.concat(C));const n=E3("key",C.key,e,L);if(n===Z2)return Z2;n===M5&&(C.key=null);const M=E3("value",C.value,e,L);if(M===Z2)return Z2;M===M5&&(C.value=null)}}return a}async function Y9(H,C){const e=kn(C);D0(H)?await k3(null,H.contents,e,Object.freeze([H]))===M5&&(H.contents=null):await k3(null,H,e,Object.freeze([]))}Y9.BREAK=Z2;Y9.SKIP=En;Y9.REMOVE=M5;async function k3(H,C,e,L){const a=await wn(H,C,e,L);if(K1(a)||z1(a))return _n(H,L,a),k3(H,a,e,L);if(typeof a!="symbol"){if(q1(C)){L=Object.freeze(L.concat(C));for(let n=0;n<C.items.length;++n){const M=await k3(n,C.items[n],e,L);if(typeof M=="number")n=M-1;else{if(M===Z2)return Z2;M===M5&&(C.items.splice(n,1),n-=1)}}}else if(z1(C)){L=Object.freeze(L.concat(C));const n=await k3("key",C.key,e,L);if(n===Z2)return Z2;n===M5&&(C.key=null);const M=await k3("value",C.value,e,L);if(M===Z2)return Z2;M===M5&&(C.value=null)}}return a}function kn(H){return typeof H=="object"&&(H.Collection||H.Node||H.Value)?Object.assign({Alias:H.Node,Map:H.Node,Scalar:H.Node,Seq:H.Node},H.Value&&{Map:H.Value,Scalar:H.Value,Seq:H.Value},H.Collection&&{Map:H.Collection,Seq:H.Collection},H):H}function wn(H,C,e,L){var a,n,M,s,A;if(typeof e=="function")return e(H,C,L);if(K3(C))return(a=e.Map)==null?void 0:a.call(e,H,C,L);if($3(C))return(n=e.Seq)==null?void 0:n.call(e,H,C,L);if(z1(C))return(M=e.Pair)==null?void 0:M.call(e,H,C,L);if(D1(C))return(s=e.Scalar)==null?void 0:s.call(e,H,C,L);if(l0(C))return(A=e.Alias)==null?void 0:A.call(e,H,C,L)}function _n(H,C,e){const L=C[C.length-1];if(q1(L))L.items[H]=e;else if(z1(L))H==="key"?L.key=e:L.value=e;else if(D0(L))L.contents=e;else{const a=l0(L)?"alias":"scalar";throw new Error(`Cannot replace node with ${a} parent`)}}const Ex2={"!":"%21",",":"%2C","[":"%5B","]":"%5D","{":"%7B","}":"%7D"},kx2=H=>H.replace(/[!,[\]{}]/g,C=>Ex2[C]);class A2{constructor(C,e){this.docStart=null,this.docEnd=!1,this.yaml=Object.assign({},A2.defaultYaml,C),this.tags=Object.assign({},A2.defaultTags,e)}clone(){const C=new A2(this.yaml,this.tags);return C.docStart=this.docStart,C}atDocument(){const C=new A2(this.yaml,this.tags);switch(this.yaml.version){case"1.1":this.atNextDocument=!0;break;case"1.2":this.atNextDocument=!1,this.yaml={explicit:A2.defaultYaml.explicit,version:"1.2"},this.tags=Object.assign({},A2.defaultTags);break}return C}add(C,e){this.atNextDocument&&(this.yaml={explicit:A2.defaultYaml.explicit,version:"1.1"},this.tags=Object.assign({},A2.defaultTags),this.atNextDocument=!1);const L=C.trim().split(/[ \t]+/),a=L.shift();switch(a){case"%TAG":{if(L.length!==2&&(e(0,"%TAG directive should contain exactly two parts"),L.length<2))return!1;const[n,M]=L;return this.tags[n]=M,!0}case"%YAML":{if(this.yaml.explicit=!0,L.length!==1)return e(0,"%YAML directive should contain exactly one part"),!1;const[n]=L;if(n==="1.1"||n==="1.2")return this.yaml.version=n,!0;{const M=/^\d+\.\d+$/.test(n);return e(6,`Unsupported YAML version ${n}`,M),!1}}default:return e(0,`Unknown directive ${a}`,!0),!1}}tagName(C,e){if(C==="!")return"!";if(C[0]!=="!")return e(`Not a valid tag: ${C}`),null;if(C[1]==="<"){const M=C.slice(2,-1);return M==="!"||M==="!!"?(e(`Verbatim tags aren't resolved, so ${C} is invalid.`),null):(C[C.length-1]!==">"&&e("Verbatim tags must end with a >"),M)}const[,L,a]=C.match(/^(.*!)([^!]*)$/s);a||e(`The ${C} tag has no suffix`);const n=this.tags[L];if(n)try{return n+decodeURIComponent(a)}catch(M){return e(String(M)),null}return L==="!"?C:(e(`Could not resolve tag: ${C}`),null)}tagString(C){for(const[e,L]of Object.entries(this.tags))if(C.startsWith(L))return e+kx2(C.substring(L.length));return C[0]==="!"?C:`!<${C}>`}toString(C){const e=this.yaml.explicit?[`%YAML ${this.yaml.version||"1.2"}`]:[],L=Object.entries(this.tags);let a;if(C&&L.length>0&&K1(C.contents)){const n={};P0(C.contents,(M,s)=>{K1(s)&&s.tag&&(n[s.tag]=!0)}),a=Object.keys(n)}else a=[];for(const[n,M]of L)n==="!!"&&M==="tag:yaml.org,2002:"||(!C||a.some(s=>s.startsWith(M)))&&e.push(`%TAG ${n} ${M}`);return e.join(`

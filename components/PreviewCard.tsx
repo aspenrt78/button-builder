@@ -570,13 +570,22 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
           50% { transform: translateY(-10px); }
         }
         @keyframes cba-breathe {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(0.98); }
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.03); opacity: 0.9; }
         }
         @keyframes cba-ripple {
           0% { box-shadow: 0 0 0 0 currentColor; }
-          70% { box-shadow: 0 0 0 10px transparent; }
-          100% { box-shadow: 0 0 0 0 transparent; }
+          100% { box-shadow: 0 0 0 20px transparent; }
+        }
+        @keyframes lava-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes holo-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
 
         .cba-animate-spin { animation: cba-rotate 2s linear infinite; will-change: transform; display: inline-block; }
