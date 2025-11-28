@@ -97,10 +97,13 @@ async def async_register_panel(hass: HomeAssistant) -> None:
 
 def _integration_version() -> str:
     """Return the integration version for cache busting."""
+    import time
     manifest_path = Path(__file__).parent / "manifest.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return manifest.get("version", "0")
+        version = manifest.get("version", "0")
+        # Add timestamp to ensure cache is always busted on HA restart
+        return f"{version}.{int(time.time())}"
     except Exception as err:  # pragma: no cover - best effort only
         _LOGGER.debug("Failed to read manifest for version: %s", err)
-        return "0"
+        return str(int(time.time()))

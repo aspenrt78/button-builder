@@ -33,9 +33,9 @@
 <body>
         <div id="root"></div>
         <script type="module">
-            // Cache buster version - update with each release
-            const CACHE_VERSION = '1.7.1';
-            const version = CACHE_VERSION;
+            // Cache buster - uses URL param from HA or timestamp fallback
+            const params = new URLSearchParams(window.location.search);
+            const version = params.get('v') || Date.now().toString();
 
             const stylesheet = document.createElement('link');
             stylesheet.rel = 'stylesheet';
