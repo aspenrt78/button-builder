@@ -157,41 +157,21 @@ const App: React.FC = () => {
       setOnStatePreset(preset);
     } else {
       // Setting the main preset
-      // Reset all visual style properties to defaults, then apply preset
-      // This prevents style bleed from previous presets
-      const styleDefaults: Partial<ButtonConfig> = {
-        backgroundColor: DEFAULT_CONFIG.backgroundColor,
-        backgroundColorOpacity: DEFAULT_CONFIG.backgroundColorOpacity,
-        color: DEFAULT_CONFIG.color,
-        borderRadius: DEFAULT_CONFIG.borderRadius,
-        borderWidth: DEFAULT_CONFIG.borderWidth,
-        borderStyle: DEFAULT_CONFIG.borderStyle,
-        borderColor: DEFAULT_CONFIG.borderColor,
-        backdropBlur: DEFAULT_CONFIG.backdropBlur,
-        shadowSize: DEFAULT_CONFIG.shadowSize,
-        shadowColor: DEFAULT_CONFIG.shadowColor,
-        shadowOpacity: DEFAULT_CONFIG.shadowOpacity,
-        iconColor: DEFAULT_CONFIG.iconColor,
-        iconColorAuto: DEFAULT_CONFIG.iconColorAuto,
-        nameColor: DEFAULT_CONFIG.nameColor,
-        stateColor: DEFAULT_CONFIG.stateColor,
-        labelColor: DEFAULT_CONFIG.labelColor,
-        gradientEnabled: DEFAULT_CONFIG.gradientEnabled,
-        gradientType: DEFAULT_CONFIG.gradientType,
-        gradientAngle: DEFAULT_CONFIG.gradientAngle,
-        gradientColor1: DEFAULT_CONFIG.gradientColor1,
-        gradientColor2: DEFAULT_CONFIG.gradientColor2,
-        gradientColor3: DEFAULT_CONFIG.gradientColor3,
-        gradientColor3Enabled: DEFAULT_CONFIG.gradientColor3Enabled,
-        cardAnimation: DEFAULT_CONFIG.cardAnimation,
-        cardAnimationTrigger: DEFAULT_CONFIG.cardAnimationTrigger,
-        cardAnimationSpeed: DEFAULT_CONFIG.cardAnimationSpeed,
-        extraStyles: '',
-      };
+      // Reset ALL config to defaults first, then apply preset
+      // This prevents any style bleed from previous presets
       
       // Use ref flag to prevent clearing preset when applying it
       isApplyingPresetRef.current = true;
-      setConfigInternal(prev => ({ ...prev, ...styleDefaults, ...preset.config }));
+      setConfigInternal(prev => ({
+        ...DEFAULT_CONFIG,
+        // Preserve non-style settings that user likely wants to keep
+        entity: prev.entity,
+        name: prev.name,
+        label: prev.label,
+        icon: prev.icon,
+        // Apply preset config on top
+        ...preset.config
+      }));
       setActivePreset(preset);
       isApplyingPresetRef.current = false;
       // Reset condition-based presets when changing main preset

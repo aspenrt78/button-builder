@@ -1514,11 +1514,11 @@ padding: 14px`,
       showState: false,
       iconColor: 'rgba(255, 255, 255, 0.9)',
       imgCellStyles: `position: absolute
-bottom: 8px
-left: 8px
+top: 8px
+right: 8px
 opacity: 0.85`,
-      extraStyles: `justify-content: flex-start
-align-items: flex-start
+      extraStyles: `justify-content: flex-end
+align-items: flex-end
 padding: 12px`,
     }
   },
@@ -1533,11 +1533,11 @@ padding: 12px`,
       showState: false,
       iconColor: 'rgba(255, 255, 255, 0.9)',
       imgCellStyles: `position: absolute
-bottom: 8px
-right: 8px
+top: 8px
+left: 8px
 opacity: 0.85`,
-      extraStyles: `justify-content: flex-start
-align-items: flex-end
+      extraStyles: `justify-content: flex-end
+align-items: flex-start
 padding: 12px`,
     }
   },
@@ -1549,10 +1549,10 @@ padding: 12px`,
       size: '40%',
       layout: 'vertical',
       imgCellStyles: `position: absolute
-top: 8px
-left: 8px`,
-      extraStyles: `justify-content: flex-end
-align-items: flex-start
+bottom: 8px
+right: 8px`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-end
 padding: 12px`,
     }
   },
@@ -1564,10 +1564,10 @@ padding: 12px`,
       size: '40%',
       layout: 'vertical',
       imgCellStyles: `position: absolute
-top: 8px
-right: 8px`,
-      extraStyles: `justify-content: flex-end
-align-items: flex-end
+bottom: 8px
+left: 8px`,
+      extraStyles: `justify-content: flex-start
+align-items: flex-start
 padding: 12px`,
     }
   },
