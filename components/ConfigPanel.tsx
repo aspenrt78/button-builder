@@ -516,8 +516,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('dimensions') && (
             <>
           <div className="grid grid-cols-2 gap-4">
-            <PresetControl 
-              field="layout"
+            <ControlInput 
               label="Layout" 
               type="select" 
               value={config.layout} 
@@ -743,14 +742,6 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== APPEARANCE > GLASS ===== */}
           {showSection('glass') && (
             <>
-           {isShadowLockedByExtraStyles && (
-             <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg mb-4">
-               <p className="text-xs text-amber-400 flex items-center gap-2">
-                 <span>🔒</span>
-                 <span>Shadow controls are locked because the preset uses Custom CSS box-shadow.</span>
-               </p>
-             </div>
-           )}
            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                  <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
@@ -787,23 +778,15 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== APPEARANCE > ANIMATIONS ===== */}
           {showSection('animations') && (
             <>
-          {isCardAnimationLockedByExtraStyles && (
-            <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg mb-4">
-              <p className="text-xs text-amber-400 flex items-center gap-2">
-                <span>🔒</span>
-                <span>Card animation is controlled by Custom CSS. Icon animation still works!</span>
-              </p>
-            </div>
-          )}
           <div className="space-y-6">
              {/* Card Animation */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Type" type="select" value={config.cardAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('cardAnimation', v)} disabled={isCardAnimationLockedByExtraStyles} disabledReason="Controlled by Custom CSS" />
-                  <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} disabled={isCardAnimationLockedByExtraStyles} disabledReason="Controlled by Custom CSS" />
+                  <ControlInput label="Type" type="select" value={config.cardAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('cardAnimation', v)} />
+                  <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} />
                 </div>
-                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} suffix="s" disabled={isCardAnimationLockedByExtraStyles} disabledReason="Controlled by Custom CSS" />
+                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} suffix="s" />
              </div>
 
              <div className="h-px bg-gray-700/50" />

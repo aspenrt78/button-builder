@@ -1160,8 +1160,8 @@ button_card_templates:
   // Background for non-light entities or base style
   if (!config.gradientEnabled && config.backgroundColor && config.backgroundColorOpacity !== undefined) {
     cardStyles.push(`background: ${hexToRgba(config.backgroundColor, config.backgroundColorOpacity)}`);
-  } else if (config.gradientEnabled && config.gradientStartColor && config.gradientEndColor) {
-    const gradient = `linear-gradient(${config.gradientAngle || 135}deg, ${config.gradientStartColor}, ${config.gradientEndColor})`;
+  } else if (config.gradientEnabled && config.gradientColor1 && config.gradientColor2) {
+    const gradient = `linear-gradient(${config.gradientAngle || 135}deg, ${config.gradientColor1}, ${config.gradientColor2})`;
     cardStyles.push(`background: '${gradient}'`);
   }
 
@@ -1201,8 +1201,23 @@ button_card_templates:
     labelStyles.push(`color: ${config.labelColor}`);
   }
 
+  // Extra styles from config (e.g., Lava Lamp, Holographic presets)
+  if (config.extraStyles) {
+    config.extraStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          const prop = line.substring(0, colonIndex).trim();
+          const value = line.substring(colonIndex + 1).trim();
+          cardStyles.push(`${prop}: ${value}`);
+        }
+      }
+    });
+  }
+
   // Build the styles section
-  if (cardStyles.length > 0 || iconStyles.length > 0 || nameStyles.length > 0 || labelStyles.length > 0) {
+  const hasStyles = cardStyles.length > 0 || iconStyles.length > 0 || nameStyles.length > 0 || labelStyles.length > 0;
+  if (hasStyles) {
     yaml += `    styles:\n`;
     
     if (cardStyles.length > 0) {
@@ -1238,8 +1253,8 @@ button_card_templates:
   if (config.stateStyles && config.stateStyles.length > 0) {
     yaml += `    state:\n`;
     config.stateStyles.forEach(stateStyle => {
-      yaml += `      - value: '${stateStyle.state}'\n`;
-      if (stateStyle.operator && stateStyle.operator !== '==') {
+      yaml += `      - value: '${stateStyle.value}'\n`;
+      if (stateStyle.operator && stateStyle.operator !== '==' as any) {
         yaml += `        operator: '${stateStyle.operator}'\n`;
       }
       
@@ -1269,6 +1284,57 @@ button_card_templates:
         }
       }
     });
+  }
+
+  // Add extra_styles with @keyframes if needed for animations
+  let extraStylesContent = '';
+  
+  // Check if extraStyles references animations that need keyframes
+  if (config.extraStyles) {
+    if (config.extraStyles.includes('lava-shift')) {
+      extraStylesContent += `      @keyframes lava-shift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+`;
+    }
+    if (config.extraStyles.includes('holo-shift')) {
+      extraStylesContent += `      @keyframes holo-shift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+`;
+    }
+  }
+  
+  // Add card animations keyframes
+  if (config.cardAnimation && config.cardAnimation !== 'none') {
+    if (config.cardAnimation === 'pulse') {
+      extraStylesContent += `      @keyframes cba-pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+`;
+    } else if (config.cardAnimation === 'flash') {
+      extraStylesContent += `      @keyframes cba-flash {
+        0%, 50%, 100% { opacity: 1; }
+        25%, 75% { opacity: 0.5; }
+      }
+`;
+    } else if (config.cardAnimation === 'bounce') {
+      extraStylesContent += `      @keyframes cba-bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+`;
+    }
+  }
+  
+  if (extraStylesContent) {
+    yaml += `    extra_styles: |\n${extraStylesContent}`;
   }
 
   // Add usage example with light entity dynamic glow suggestion
