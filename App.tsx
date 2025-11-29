@@ -7,7 +7,7 @@ import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig } from './types';
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Palette, ChevronDown, Settings, Code, Menu, X, ToggleLeft, ToggleRight, Layers } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, ToggleLeft, ToggleRight, Layers } from 'lucide-react';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -39,7 +39,6 @@ const App: React.FC = () => {
   const [config, setConfigInternal] = useState<ButtonConfig>(loadSavedConfig);
   const [isMagicOpen, setIsMagicOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isPresetsOpen, setIsPresetsOpen] = useState(false);
   const [importYaml, setImportYaml] = useState('');
   const [importError, setImportError] = useState('');
   const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
@@ -48,7 +47,6 @@ const App: React.FC = () => {
   const [presetCondition, setPresetCondition] = useState<PresetCondition>('always');
   const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
   const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
-  const [isPresetSettingsOpen, setIsPresetSettingsOpen] = useState(false);
   const [isApplyingPreset, setIsApplyingPreset] = useState(false);
   
   // Wrapper for setConfig that clears the active preset when user makes changes
@@ -200,7 +198,6 @@ const App: React.FC = () => {
         setOnStatePreset(null);
       }
     }
-    setIsPresetsOpen(false);
   };
 
   const handleResetToPreset = () => {
@@ -210,18 +207,6 @@ const App: React.FC = () => {
       setIsApplyingPreset(false);
     }
   };
-
-  // Calculate which fields have been modified from the active preset
-  const modifiedFromPreset = useMemo(() => {
-    if (!activePreset) return new Set<string>();
-    const modified = new Set<string>();
-    for (const [key, presetValue] of Object.entries(activePreset.config)) {
-      if (JSON.stringify(config[key as keyof ButtonConfig]) !== JSON.stringify(presetValue)) {
-        modified.add(key);
-      }
-    }
-    return modified;
-  }, [config, activePreset]);
 
   const handleImportYaml = () => {
     setImportError('');
@@ -259,196 +244,6 @@ const App: React.FC = () => {
         
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-2">
-          <div className="relative">
-            {activePreset && (
-              <div className="flex items-center gap-1 mr-2">
-                <span className="text-xs text-gray-500">Preset:</span>
-                <span className="text-xs text-purple-400 font-medium">{activePreset.name}</span>
-                {presetCondition !== 'always' && (
-                  <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 rounded">
-                    {presetCondition === 'on' ? 'ON only' : 'OFF only'}
-                  </span>
-                )}
-                {modifiedFromPreset.size > 0 && (
-                  <span className="text-[10px] text-yellow-500" title={`${modifiedFromPreset.size} field(s) modified`}>*</span>
-                )}
-                {modifiedFromPreset.size > 0 && (
-                  <button
-                    onClick={handleResetToPreset}
-                    className="ml-1 text-[10px] text-gray-500 hover:text-purple-400 underline"
-                    title="Reset to preset defaults"
-                  >
-                    reset
-                  </button>
-                )}
-                {/* Preset Settings Button */}
-                <button
-                  onClick={() => setIsPresetSettingsOpen(!isPresetSettingsOpen)}
-                  className="ml-1 p-1 text-gray-500 hover:text-purple-400 rounded transition-colors"
-                  title="Preset Conditions"
-                >
-                  <Layers size={12} />
-                </button>
-              </div>
-            )}
-            <button 
-              onClick={() => setIsPresetsOpen(!isPresetsOpen)}
-              className={`flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm font-medium transition-all ${
-                activePreset 
-                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20' 
-                  : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'
-              }`}
-              title="Style Presets"
-            >
-              <Palette size={14} />
-              Presets
-              <ChevronDown size={12} />
-            </button>
-            
-            {/* Preset Settings Panel */}
-            {isPresetSettingsOpen && activePreset && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsPresetSettingsOpen(false)} />
-                <div className="absolute top-full right-0 mt-2 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Layers size={14} className="text-purple-400" />
-                      Preset Conditions
-                    </h3>
-                    <button onClick={() => setIsPresetSettingsOpen(false)} className="text-gray-500 hover:text-white">
-                      <X size={16} />
-                    </button>
-                  </div>
-                  
-                  <p className="text-xs text-gray-400 mb-4">
-                    Choose when "{activePreset.name}" applies and optionally set a different preset for the other state.
-                  </p>
-                  
-                  {/* Condition Selection */}
-                  <div className="space-y-2 mb-4">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Apply Preset When</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['always', 'on', 'off'] as PresetCondition[]).map(cond => (
-                        <button
-                          key={cond}
-                          onClick={() => {
-                            setPresetCondition(cond);
-                            if (cond === 'always') {
-                              setOffStatePreset(null);
-                              setOnStatePreset(null);
-                            }
-                          }}
-                          className={`px-3 py-2 rounded text-xs font-medium transition-all ${
-                            presetCondition === cond
-                              ? 'bg-purple-500 text-white'
-                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                          }`}
-                        >
-                          {cond === 'always' ? 'Always' : cond === 'on' ? 'When ON' : 'When OFF'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Secondary Preset Selection */}
-                  {presetCondition === 'on' && (
-                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
-                        <ToggleLeft size={12} />
-                        When OFF, use:
-                      </label>
-                      {offStatePreset ? (
-                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
-                          <span className="text-sm text-cyan-400">{offStatePreset.name}</span>
-                          <button 
-                            onClick={() => setOffStatePreset(null)}
-                            className="text-gray-500 hover:text-red-400 text-xs"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          onChange={(e) => {
-                            const preset = PRESETS.find(p => p.name === e.target.value);
-                            if (preset) setOffStatePreset(preset);
-                          }}
-                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Select preset for OFF state...</option>
-                          {PRESETS.map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when OFF</p>
-                    </div>
-                  )}
-                  
-                  {presetCondition === 'off' && (
-                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
-                        <ToggleRight size={12} />
-                        When ON, use:
-                      </label>
-                      {onStatePreset ? (
-                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
-                          <span className="text-sm text-green-400">{onStatePreset.name}</span>
-                          <button 
-                            onClick={() => setOnStatePreset(null)}
-                            className="text-gray-500 hover:text-red-400 text-xs"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          onChange={(e) => {
-                            const preset = PRESETS.find(p => p.name === e.target.value);
-                            if (preset) setOnStatePreset(preset);
-                          }}
-                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Select preset for ON state...</option>
-                          {PRESETS.map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when ON</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            
-            {isPresetsOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsPresetsOpen(false)} />
-                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => (
-                    <div key={category}>
-                      <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-800/50 sticky top-0">
-                        {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category}
-                      </div>
-                      {PRESETS.filter(p => p.category === category).map(preset => (
-                        <button
-                          key={preset.name}
-                          onClick={() => handleApplyPreset(preset)}
-                          className="w-full px-3 py-2 text-left hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-b-0"
-                        >
-                          <div className="text-sm text-white font-medium">{preset.name}</div>
-                          <div className="text-xs text-gray-500">{preset.description}</div>
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
           <button 
             onClick={() => setIsImportOpen(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"
@@ -487,13 +282,6 @@ const App: React.FC = () => {
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
           <button 
-            onClick={() => { setIsPresetsOpen(true); setMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
-          >
-            <Palette size={18} className="text-purple-400" />
-            <span>Style Presets</span>
-          </button>
-          <button 
             onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }}
             className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left"
           >
@@ -517,39 +305,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile Presets Modal */}
-      {isPresetsOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-black/90">
-          <div className="h-full flex flex-col">
-            <div className="p-4 border-b border-gray-800 flex justify-between items-center">
-              <h3 className="text-lg font-bold">Style Presets</h3>
-              <button onClick={() => setIsPresetsOpen(false)} className="p-2 text-gray-400">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => (
-                <div key={category}>
-                  <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-800/50 sticky top-0">
-                    {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category}
-                  </div>
-                  {PRESETS.filter(p => p.category === category).map(preset => (
-                    <button
-                      key={preset.name}
-                      onClick={() => handleApplyPreset(preset)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors border-b border-gray-800/50"
-                    >
-                      <div className="text-sm text-white font-medium">{preset.name}</div>
-                      <div className="text-xs text-gray-500">{preset.description}</div>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content - Desktop */}
       <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Configuration */}
@@ -558,7 +313,6 @@ const App: React.FC = () => {
             config={config} 
             setConfig={setConfig} 
             activePreset={activePreset}
-            modifiedFromPreset={modifiedFromPreset}
             onApplyPreset={handleApplyPreset}
             onResetToPreset={handleResetToPreset}
             presetCondition={presetCondition}
@@ -618,7 +372,6 @@ const App: React.FC = () => {
                 config={config} 
                 setConfig={setConfig}
                 activePreset={activePreset}
-                modifiedFromPreset={modifiedFromPreset}
                 onApplyPreset={handleApplyPreset}
                 onResetToPreset={handleResetToPreset}
                 presetCondition={presetCondition}

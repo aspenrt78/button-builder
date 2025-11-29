@@ -145,7 +145,6 @@ interface Props {
   config: ButtonConfig;
   setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>>;
   activePreset?: Preset | null;
-  modifiedFromPreset?: Set<string>;
   // Preset management props
   onApplyPreset?: (preset: Preset, forState?: 'on' | 'off') => void;
   onResetToPreset?: () => void;
@@ -156,30 +155,6 @@ interface Props {
   onSetOffStatePreset?: (preset: Preset | null) => void;
   onSetOnStatePreset?: (preset: Preset | null) => void;
 }
-
-// Helper component to show preset indicator on fields
-const PresetIndicator = ({ field, activePreset, modifiedFromPreset }: { 
-  field: string; 
-  activePreset?: { config: Partial<ButtonConfig> } | null;
-  modifiedFromPreset?: Set<string>;
-}) => {
-  if (!activePreset || !(field in activePreset.config)) return null;
-  
-  const isModified = modifiedFromPreset?.has(field);
-  
-  return (
-    <span 
-      className={`ml-1 text-[8px] px-1 rounded ${
-        isModified 
-          ? 'bg-yellow-500/20 text-yellow-400' 
-          : 'bg-purple-500/20 text-purple-400'
-      }`}
-      title={isModified ? 'Modified from preset' : 'From preset'}
-    >
-      {isModified ? '✎' : '◆'}
-    </span>
-  );
-};
 
 // Section component removed - now using drill-down navigation via ConfigPanelNav
 
@@ -227,7 +202,6 @@ export const ConfigPanel: React.FC<Props> = ({
   config, 
   setConfig, 
   activePreset, 
-  modifiedFromPreset,
   onApplyPreset,
   onResetToPreset,
   presetCondition = 'always',
@@ -242,69 +216,13 @@ export const ConfigPanel: React.FC<Props> = ({
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
-  // Helper to check if a field is from the active preset
-  const isPresetField = (field: string) => activePreset && field in activePreset.config;
-  const isModifiedField = (field: string) => modifiedFromPreset?.has(field);
-
-  // Helper to check if extraStyles contains certain CSS properties that override other controls
-  const extraStylesContains = (property: string): boolean => {
-    const styles = activePreset?.config?.extraStyles || '';
-    return styles.toLowerCase().includes(property.toLowerCase());
-  };
-
-  // Check if CARD animation controls should be locked due to extraStyles containing animation CSS
-  // Note: extraStyles animations only affect the card, NOT the icon - icon animations still work
-  const isCardAnimationLockedByExtraStyles = extraStylesContains('animation:') || extraStylesContains('animation-name:');
-  
-  // Check if background controls should be locked due to extraStyles containing background/gradient CSS
-  const isBackgroundLockedByExtraStyles = extraStylesContains('background:') || extraStylesContains('background-image:') || extraStylesContains('linear-gradient') || extraStylesContains('radial-gradient');
-  
-  // Check if shadow controls should be locked due to extraStyles containing box-shadow CSS
-  const isShadowLockedByExtraStyles = extraStylesContains('box-shadow:');
-  
-  // Check if specific fields should be locked by preset (not just indicated)
-  const isFieldLockedByPreset = (field: string): { locked: boolean; reason?: string } => {
-    if (!activePreset) return { locked: false };
-    
-    // If extraStyles contains animation CSS, lock CARD animation fields only (not icon)
-    if (isCardAnimationLockedByExtraStyles && ['cardAnimation', 'cardAnimationTrigger', 'cardAnimationSpeed'].includes(field)) {
-      return { locked: true, reason: 'Controlled by Custom CSS in preset' };
-    }
-    
-    // If extraStyles contains background CSS, lock background-related fields
-    if (isBackgroundLockedByExtraStyles && ['backgroundColor', 'backgroundColorOpacity'].includes(field)) {
-      return { locked: true, reason: 'Controlled by Custom CSS gradient/background' };
-    }
-    
-    // If extraStyles contains box-shadow CSS, lock shadow-related fields  
-    if (isShadowLockedByExtraStyles && ['shadowSize', 'shadowColor', 'shadowOpacity'].includes(field)) {
-      return { locked: true, reason: 'Controlled by Custom CSS box-shadow' };
-    }
-    
-    return { locked: false };
-  };
-
-  // Wrapper for ControlInput that automatically adds preset indicators and locking
-  const PresetControl = ({ field, ...props }: { field: keyof ButtonConfig } & Omit<React.ComponentProps<typeof ControlInput>, 'isPresetField' | 'isModified' | 'disabled' | 'disabledReason'>) => {
-    const lockInfo = isFieldLockedByPreset(field);
-    return (
-      <ControlInput 
-        {...props} 
-        isPresetField={!!isPresetField(field)} 
-        isModified={!!isModifiedField(field)}
-        disabled={lockInfo.locked}
-        disabledReason={lockInfo.reason}
-      />
-    );
-  };
-
   // Drill-down navigation
   const { nav, goBack, selectCategory, selectSection } = useNavigation();
   const showSection = (sectionId: SectionId) => nav.level === 'content' && nav.sectionId === sectionId;
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
-      <NavHeader nav={nav} goBack={goBack} activePreset={activePreset} modifiedFromPreset={modifiedFromPreset} />
+      <NavHeader nav={nav} goBack={goBack} activePreset={activePreset} />
 
       {/* Category List */}
       {nav.level === 'categories' && <CategoryList onSelect={selectCategory} />}
@@ -623,10 +541,10 @@ export const ConfigPanel: React.FC<Props> = ({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <ControlInput label="Card Height" value={config.height} onChange={(v) => update('height', v)} suffix="px" />
-            <PresetControl field="size" label="Icon Size" value={config.size} onChange={(v) => update('size', v)} suffix="%" />
+            <ControlInput label="Icon Size" value={config.size} onChange={(v) => update('size', v)} suffix="%" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-             <PresetControl field="borderRadius" label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} suffix="px" />
+             <ControlInput label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} suffix="px" />
              <ControlInput label="Padding" value={config.padding} onChange={(v) => update('padding', v)} suffix="px" />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -646,10 +564,10 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('visibility') && (
             <>
           <div className="grid grid-cols-2 gap-3">
-            <PresetControl field="showName" type="checkbox" label="Show Name" value={config.showName} onChange={(v) => update('showName', v)} />
-            <PresetControl field="showIcon" type="checkbox" label="Show Icon" value={config.showIcon} onChange={(v) => update('showIcon', v)} />
-            <PresetControl field="showState" type="checkbox" label="Show State" value={config.showState} onChange={(v) => update('showState', v)} />
-            <PresetControl field="showLabel" type="checkbox" label="Show Label" value={config.showLabel} onChange={(v) => update('showLabel', v)} />
+            <ControlInput type="checkbox" label="Show Name" value={config.showName} onChange={(v) => update('showName', v)} />
+            <ControlInput type="checkbox" label="Show Icon" value={config.showIcon} onChange={(v) => update('showIcon', v)} />
+            <ControlInput type="checkbox" label="Show State" value={config.showState} onChange={(v) => update('showState', v)} />
+            <ControlInput type="checkbox" label="Show Label" value={config.showLabel} onChange={(v) => update('showLabel', v)} />
             <ControlInput type="checkbox" label="Show Last Chg." value={config.showLastChanged} onChange={(v) => update('showLastChanged', v)} />
             <ControlInput type="checkbox" label="Entity Picture" value={config.showEntityPicture} onChange={(v) => update('showEntityPicture', v)} />
             <ControlInput type="checkbox" label="Show Units" value={config.showUnits} onChange={(v) => update('showUnits', v)} />
@@ -680,18 +598,18 @@ export const ConfigPanel: React.FC<Props> = ({
            <div className="space-y-6">
              {/* Global Settings */}
              <div className="space-y-4">
-                <PresetControl field="colorType" type="select" label="Color Type" value={config.colorType} options={COLOR_TYPE_OPTIONS} onChange={(v) => update('colorType', v)} />
+                <ControlInput type="select" label="Color Type" value={config.colorType} options={COLOR_TYPE_OPTIONS} onChange={(v) => update('colorType', v)} />
                 
                 <div className="grid grid-cols-2 gap-4">
-                   <PresetControl field="colorAuto" type="checkbox" label="Auto Color (Light)" value={config.colorAuto} onChange={(v) => update('colorAuto', v)} />
+                   <ControlInput type="checkbox" label="Auto Color (Light)" value={config.colorAuto} onChange={(v) => update('colorAuto', v)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
-                        <PresetControl field="backgroundColor" label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
-                          <PresetControl field="backgroundColorOpacity" label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
+                        <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
+                          <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
                    </div>
-                   <PresetControl field="color" label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
+                   <ControlInput label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
                 </div>
              </div>
              
@@ -814,12 +732,12 @@ export const ConfigPanel: React.FC<Props> = ({
            )}
            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                 <PresetControl field="backdropBlur" label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
-                 <PresetControl field="shadowSize" label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
+                 <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
+                 <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <PresetControl field="shadowColor" label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                  <PresetControl field="shadowOpacity" label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
+                  <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
+                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
               </div>
            </div>
             </>
@@ -830,8 +748,8 @@ export const ConfigPanel: React.FC<Props> = ({
             <>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-               <PresetControl field="borderWidth" label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
-               <PresetControl field="borderStyle" label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
+               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
+               <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
             </div>
 
             <ColorPairInput 

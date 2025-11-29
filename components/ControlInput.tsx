@@ -12,8 +12,6 @@ interface Props {
   max?: number;
   step?: number;
   suffix?: string; // Auto-append suffix like 'px', '%', 's', etc.
-  isPresetField?: boolean;
-  isModified?: boolean;
   disabled?: boolean;
   disabledReason?: string;
 }
@@ -30,8 +28,6 @@ export const ControlInput: React.FC<Props> = ({
   max = 100,
   step = 1,
   suffix,
-  isPresetField = false,
-  isModified = false,
   disabled = false,
   disabledReason
 }) => {
@@ -71,21 +67,13 @@ export const ControlInput: React.FC<Props> = ({
   if (type === 'checkbox') {
     return (
       <label 
-        className={`flex items-center justify-between p-2 bg-gray-800/50 rounded border border-gray-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-800'} ${isPresetField && !isModified ? 'ring-1 ring-purple-500/30' : ''} ${isModified ? 'ring-1 ring-yellow-500/30' : ''} ${className}`}
+        className={`flex items-center justify-between p-2 bg-gray-800/50 rounded border border-gray-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-800'} ${className}`}
         title={disabled ? disabledReason : undefined}
       >
         <span className="text-sm text-gray-300 flex items-center gap-1">
           {label}
           {disabled && (
             <span className="text-[8px] px-1 rounded bg-gray-600/50 text-gray-400" title={disabledReason}>🔒</span>
-          )}
-          {!disabled && isPresetField && (
-            <span 
-              className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
-              title={isModified ? 'Modified from preset' : 'From preset'}
-            >
-              {isModified ? '✎' : '◆'}
-            </span>
           )}
         </span>
         <input 
@@ -107,14 +95,6 @@ export const ControlInput: React.FC<Props> = ({
             {label}
             {disabled && (
               <span className="text-[8px] px-1 rounded bg-gray-600/50 text-gray-400" title={disabledReason}>🔒</span>
-            )}
-            {!disabled && isPresetField && (
-              <span 
-                className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
-                title={isModified ? 'Modified from preset' : 'From preset'}
-              >
-                {isModified ? '✎' : '◆'}
-              </span>
             )}
           </span>
           <span className="text-gray-400 font-mono text-[11px]">{value}</span>
@@ -139,14 +119,6 @@ export const ControlInput: React.FC<Props> = ({
         {label}
         {disabled && (
           <span className="text-[8px] px-1 rounded bg-gray-600/50 text-gray-400" title={disabledReason}>🔒</span>
-        )}
-        {!disabled && isPresetField && (
-          <span 
-            className={`text-[8px] px-1 rounded ${isModified ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}
-            title={isModified ? 'Modified from preset' : 'From preset'}
-          >
-            {isModified ? '✎' : '◆'}
-          </span>
         )}
       </label>
       <div className="flex items-center gap-2">

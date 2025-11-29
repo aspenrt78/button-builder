@@ -94,10 +94,9 @@ interface NavHeaderProps {
   nav: NavState;
   goBack: () => void;
   activePreset?: { name: string } | null;
-  modifiedFromPreset?: Set<string>;
 }
 
-export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset, modifiedFromPreset }) => {
+export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset }) => {
   const currentCategory = nav.level !== 'categories' 
     ? CATEGORIES.find(c => c.id === nav.categoryId) 
     : null;
@@ -114,9 +113,6 @@ export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset,
           {activePreset && (
             <span className="text-xs font-normal text-purple-400 ml-auto">
               {activePreset.name}
-              {modifiedFromPreset && modifiedFromPreset.size > 0 && (
-                <span className="text-yellow-400 ml-1">({modifiedFromPreset.size} changed)</span>
-              )}
             </span>
           )}
         </h2>
