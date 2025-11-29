@@ -538,12 +538,20 @@ export const ConfigPanel: React.FC<Props> = ({
              <ControlInput label="Card Size (1-6)" value={config.cardSize.toString()} onChange={(v) => update('cardSize', Number(v) || 3)} placeholder="3" />
              <ControlInput type="checkbox" label="Section Mode" value={config.sectionMode} onChange={(v) => update('sectionMode', v)} />
           </div>
-          {config.sectionMode && (
-            <div className="grid grid-cols-2 gap-4">
-               <ControlInput label="Grid Rows" value={config.gridRows.toString()} onChange={(v) => update('gridRows', Number(v) || 2)} />
-               <ControlInput label="Grid Columns" value={config.gridColumns.toString()} onChange={(v) => update('gridColumns', Number(v) || 6)} />
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-4">
+             <ControlInput 
+               label="Grid Columns" 
+               value={config.gridColumns.toString()} 
+               onChange={(v) => update('gridColumns', Number(v) || 4)} 
+               placeholder="4"
+             />
+             <ControlInput 
+               label="Grid Rows" 
+               value={config.gridRows === 0 ? 'auto' : config.gridRows.toString()} 
+               onChange={(v) => update('gridRows', v === 'auto' || v === '' ? 0 : Number(v))} 
+               placeholder="auto"
+             />
+          </div>
             </>
           )}
 

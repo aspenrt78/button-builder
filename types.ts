@@ -384,8 +384,8 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   borderRadius: '12px',
   cardSize: 3,
   sectionMode: false,
-  gridRows: 2,
-  gridColumns: 6,
+  gridRows: 0,
+  gridColumns: 4,
   
   borderWidth: '0px',
   borderStyle: 'none',

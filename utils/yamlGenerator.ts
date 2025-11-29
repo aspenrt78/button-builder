@@ -330,13 +330,15 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `card_size: ${config.cardSize}\n`;
   }
 
-  // Section Mode / Grid Options
+  // Section Mode
   if (config.sectionMode) {
     yaml += `section_mode: true\n`;
-    yaml += `grid_options:\n`;
-    yaml += `  rows: ${config.gridRows}\n`;
-    yaml += `  columns: ${config.gridColumns}\n`;
   }
+
+  // Grid Options - always output
+  yaml += `grid_options:\n`;
+  yaml += `  columns: ${config.gridColumns}\n`;
+  yaml += `  rows: ${config.gridRows === 0 ? 'auto' : config.gridRows}\n`;
 
   // Numeric Precision
   if (config.numericPrecision >= 0) {
@@ -1080,13 +1082,20 @@ ${getStateLogic('off', offColorResolved)}
   return yaml;
 };
 
-// Helper to format styles for YAML (handle colons properly)
+// Helper to format styles for YAML (handle colons and special characters properly)
 const formatStyleForYaml = (style: string): string => {
   // If it contains a colon, we need to quote it or format it properly
   if (style.includes(':')) {
-    const [prop, ...valueParts] = style.split(':');
-    const value = valueParts.join(':').trim();
-    return `${prop.trim()}: ${value}`;
+    const colonIndex = style.indexOf(':');
+    const prop = style.substring(0, colonIndex).trim();
+    const value = style.substring(colonIndex + 1).trim();
+    // Quote values that contain special YAML characters (commas, parentheses, etc.)
+    if (value.includes(',') || value.includes('(') || value.includes(')') || value.includes('#') || value.includes("'")) {
+      // Escape any single quotes in the value and wrap in single quotes
+      const escapedValue = value.replace(/'/g, "''");
+      return `${prop}: '${escapedValue}'`;
+    }
+    return `${prop}: ${value}`;
   }
   return style;
 };
@@ -1292,6 +1301,63 @@ button_card_templates:
         }
       }
     });
+  }
+
+  // Add extra_styles for animations (keyframes)
+  let extraStyles = '';
+  
+  // Check if animations are used that need keyframes
+  const needsHoloKeyframes = config.extraStyles?.includes('holo-shift');
+  const needsLavaKeyframes = config.extraStyles?.includes('lava-shift');
+  const needsGenericKeyframes = config.cardAnimation !== 'none' || config.iconAnimation !== 'none';
+  
+  if (needsHoloKeyframes) {
+    extraStyles += `  @keyframes holo-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+`;
+  }
+  
+  if (needsLavaKeyframes) {
+    extraStyles += `  @keyframes lava-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+`;
+  }
+  
+  if (needsGenericKeyframes && !needsHoloKeyframes && !needsLavaKeyframes) {
+    extraStyles += `  @keyframes cba-flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  @keyframes cba-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  @keyframes cba-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes cba-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+  @keyframes cba-glow {
+    0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
+    50% { filter: drop-shadow(0 0 8px currentColor); }
+  }
+  @keyframes cba-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+  }
+  
+  if (extraStyles) {
+    yaml += `    extra_styles: |\n${extraStyles}`;
   }
 
   // Add usage example

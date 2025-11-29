@@ -73,7 +73,10 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   // Section mode / Grid
   if (parsed.section_mode !== undefined) config.sectionMode = Boolean(parsed.section_mode);
   if (parsed.grid_options) {
-    if (parsed.grid_options.rows !== undefined) config.gridRows = Number(parsed.grid_options.rows);
+    if (parsed.grid_options.rows !== undefined) {
+      // Handle 'auto' as 0
+      config.gridRows = parsed.grid_options.rows === 'auto' ? 0 : Number(parsed.grid_options.rows);
+    }
     if (parsed.grid_options.columns !== undefined) config.gridColumns = Number(parsed.grid_options.columns);
   }
   
