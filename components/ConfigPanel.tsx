@@ -585,7 +585,14 @@ export const ConfigPanel: React.FC<Props> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
-                        <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => update('backgroundColor', v)} />
+                        <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => {
+                          // Disable gradient when manually setting background color
+                          if (config.gradientEnabled) {
+                            onChange({ ...config, backgroundColor: v, gradientEnabled: false });
+                          } else {
+                            update('backgroundColor', v);
+                          }
+                        }} />
                           <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
                    </div>
                    <ControlInput label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
@@ -598,7 +605,14 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-gray-400 uppercase">Gradient Background</p>
-                  <ControlInput type="checkbox" label="" value={config.gradientEnabled} onChange={(v) => update('gradientEnabled', v)} />
+                  <ControlInput type="checkbox" label="" value={config.gradientEnabled} onChange={(v) => {
+                    // When enabling gradient, clear solid background color
+                    if (v && config.backgroundColor) {
+                      onChange({ ...config, gradientEnabled: v, backgroundColor: '', backgroundColorOpacity: 100 });
+                    } else {
+                      update('gradientEnabled', v);
+                    }
+                  }} />
                 </div>
                 
                 {config.gradientEnabled && (
