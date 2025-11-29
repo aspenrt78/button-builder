@@ -435,10 +435,15 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   };
 
   const gradientBg = getGradientBackground();
+  
+  // Check if extraStyles has a background property to avoid React warning about conflicting styles
+  const hasExtraBackground = 'background' in extraStylesParsed || 'backgroundImage' in extraStylesParsed;
 
   const containerStyle: React.CSSProperties = {
-    backgroundColor: gradientBg ? undefined : actualBg,
-    background: gradientBg || undefined,
+    // Only set backgroundColor if no gradient and no extraStyles background
+    ...((!gradientBg && !hasExtraBackground) ? { backgroundColor: actualBg } : {}),
+    // Only set background if gradient is enabled
+    ...(gradientBg ? { background: gradientBg } : {}),
     color: config.color || '#ffffff',  // Default text color, overridden by individual element colors
     borderRadius: config.borderRadius,
     padding: config.padding,
@@ -624,7 +629,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                 </div>
                 <input 
                    type="color" 
-                   value={canvasColor}
+                   value={canvasColor || '#0a0a0a'}
                    onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); setCustomBackgroundName(null); }}
                    className="w-full h-8 rounded cursor-pointer mb-3"
                 />

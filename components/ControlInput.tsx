@@ -125,11 +125,11 @@ export const ControlInput: React.FC<Props> = ({
         {type === 'color' && (
           <div 
             className={`w-8 h-9 rounded border border-gray-600 overflow-hidden shrink-0 relative ${disabled ? 'cursor-not-allowed' : ''}`}
-            style={{ backgroundColor: value as string }}
+            style={{ backgroundColor: (value as string) || '#000000' }}
           >
             <input 
               type="color" 
-              value={value} 
+              value={(value as string) || '#000000'} 
               onChange={(e) => !disabled && onChange(e.target.value)}
               disabled={disabled}
               className={`opacity-0 w-full h-full absolute inset-0 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}

@@ -176,11 +176,11 @@ const ColorPairInput = ({ label, colorValue, setColor, autoValue, setAuto }: any
          <div className="flex items-center gap-2">
             <div 
               className="w-8 h-[38px] rounded border border-gray-600 overflow-hidden shrink-0 relative"
-              style={{ backgroundColor: colorValue }}
+              style={{ backgroundColor: colorValue || '#000000' }}
             >
               <input 
                 type="color" 
-                value={colorValue} 
+                value={colorValue || '#000000'} 
                 onChange={(e) => setColor(e.target.value)}
                 className="opacity-0 w-full h-full cursor-pointer absolute inset-0"
               />
@@ -585,30 +585,37 @@ export const ConfigPanel: React.FC<Props> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
-                        <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => {
-                          // Disable gradient and clear extraStyles background when manually setting background color
-                          const updates: Partial<typeof config> = { backgroundColor: v };
-                          
-                          if (config.gradientEnabled) {
-                            updates.gradientEnabled = false;
-                          }
-                          
-                          // Clear background from extraStyles if present (presets use this)
-                          if (config.extraStyles && /background\s*:|linear-gradient|radial-gradient|conic-gradient/i.test(config.extraStyles)) {
-                            // Remove background-related lines from extraStyles
-                            const cleanedStyles = config.extraStyles
-                              .split('\n')
-                              .filter(line => !/^\s*(background\s*:|background-image\s*:)/i.test(line.trim()))
-                              .join('\n')
-                              .trim();
-                            updates.extraStyles = cleanedStyles;
-                          }
-                          
-                          onChange({ ...config, ...updates });
+                        <ControlInput label="Card Background" type="color" value={config.backgroundColor || '#000000'} onChange={(v) => {
+                          // Disable gradient, clear extraStyles background, and clear state colors when manually setting background color
+                          setConfig(prev => {
+                            let newExtraStyles = prev.extraStyles;
+                            
+                            // Clear background from extraStyles if present (presets use this)
+                            if (prev.extraStyles) {
+                              const hasGradient = /background\s*:|linear-gradient|radial-gradient|conic-gradient/i.test(prev.extraStyles);
+                              if (hasGradient) {
+                                newExtraStyles = prev.extraStyles
+                                  .split('\n')
+                                  .filter(line => !/^\s*(background\s*:|background-image\s*:)/i.test(line.trim()))
+                                  .join('\n')
+                                  .trim();
+                              }
+                            }
+                            
+                            return { 
+                              ...prev, 
+                              backgroundColor: v, 
+                              gradientEnabled: false,
+                              extraStyles: newExtraStyles,
+                              // Clear state colors so backgroundColor takes effect
+                              stateOnColor: '',
+                              stateOffColor: ''
+                            };
+                          });
                         }} />
                           <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
                    </div>
-                   <ControlInput label="Default Text Color" type="color" value={config.color} onChange={(v) => update('color', v)} />
+                   <ControlInput label="Default Text Color" type="color" value={config.color || '#ffffff'} onChange={(v) => update('color', v)} />
                 </div>
              </div>
              
@@ -618,12 +625,12 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-gray-400 uppercase">Gradient Background</p>
-                  <ControlInput type="checkbox" label="" value={config.gradientEnabled} onChange={(v) => {
+                  <ControlInput type="checkbox" label="" value={config.gradientEnabled === true} onChange={(v) => {
                     // When enabling gradient, clear solid background color
-                    if (v && config.backgroundColor) {
-                      onChange({ ...config, gradientEnabled: v, backgroundColor: '', backgroundColorOpacity: 100 });
+                    if (v) {
+                      setConfig(prev => ({ ...prev, gradientEnabled: true, backgroundColor: '', backgroundColorOpacity: 100 }));
                     } else {
-                      update('gradientEnabled', v);
+                      update('gradientEnabled', false);
                     }
                   }} />
                 </div>
