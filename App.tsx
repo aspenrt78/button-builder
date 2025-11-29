@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ConfigPanel } from './components/ConfigPanel';
 import { PreviewCard } from './components/PreviewCard';
 import { YamlViewer } from './components/YamlViewer';
@@ -47,11 +47,13 @@ const App: React.FC = () => {
   const [presetCondition, setPresetCondition] = useState<PresetCondition>('always');
   const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
   const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
-  const [isApplyingPreset, setIsApplyingPreset] = useState(false);
+  
+  // Use ref for synchronous preset application flag (not state - avoids batching issues)
+  const isApplyingPresetRef = useRef(false);
   
   // Wrapper for setConfig that clears the active preset when user makes changes
   const setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>> = (action) => {
-    if (!isApplyingPreset && activePreset) {
+    if (!isApplyingPresetRef.current && activePreset) {
       setActivePreset(null);
     }
     setConfigInternal(action);
@@ -187,11 +189,11 @@ const App: React.FC = () => {
         extraStyles: '',
       };
       
-      // Use flag to prevent clearing preset when applying it
-      setIsApplyingPreset(true);
+      // Use ref flag to prevent clearing preset when applying it
+      isApplyingPresetRef.current = true;
       setConfigInternal(prev => ({ ...prev, ...styleDefaults, ...preset.config }));
       setActivePreset(preset);
-      setIsApplyingPreset(false);
+      isApplyingPresetRef.current = false;
       // Reset condition-based presets when changing main preset
       if (presetCondition === 'always') {
         setOffStatePreset(null);
@@ -202,9 +204,9 @@ const App: React.FC = () => {
 
   const handleResetToPreset = () => {
     if (activePreset) {
-      setIsApplyingPreset(true);
+      isApplyingPresetRef.current = true;
       setConfigInternal(prev => ({ ...prev, ...activePreset.config }));
-      setIsApplyingPreset(false);
+      isApplyingPresetRef.current = false;
     }
   };
 

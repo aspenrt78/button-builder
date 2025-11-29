@@ -587,14 +587,6 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== APPEARANCE > COLORS ===== */}
           {showSection('colors') && (
             <>
-           {isBackgroundLockedByExtraStyles && (
-             <div className="p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg mb-4">
-               <p className="text-xs text-amber-400 flex items-center gap-2">
-                 <span>🔒</span>
-                 <span>Background controls are locked because the preset uses Custom CSS gradient.</span>
-               </p>
-             </div>
-           )}
            <div className="space-y-6">
              {/* Global Settings */}
              <div className="space-y-4">
