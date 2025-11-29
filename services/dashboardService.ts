@@ -39,98 +39,146 @@ const DEFAULT_GRID_CONFIGS: Record<string, DashboardGridConfig> = {
   sidebar: { type: 'sidebar', columns: 2 },
 };
 
+// Track if we've already detected HA is unavailable to avoid repeated errors
+let hassAvailabilityChecked = false;
+let hassAvailable = false;
+
 /**
  * Check if we're running inside Home Assistant iframe
  */
 export const isInHomeAssistant = (): boolean => {
   try {
-    // Check if parent window has Home Assistant connection
-    return !!(window.parent as any)?.hassConnection || 
-           !!(window.parent as any)?.hass ||
-           window.location.pathname.includes('/button_builder');
+    // Simple check - don't access parent to avoid triggering auth
+    return window.location.pathname.includes('/button_builder') ||
+           window.location.pathname.includes('/button-builder');
   } catch {
     return false;
   }
 };
 
 /**
+ * Safely check if we can access the parent window
+ * Returns false if cross-origin restrictions apply
+ */
+const canAccessParent = (): boolean => {
+  try {
+    // Try to access a simple property - this will throw if cross-origin
+    const test = window.parent.location.href;
+    return true;
+  } catch {
+    // Cross-origin access denied - this is expected on iOS companion app
+    return false;
+  }
+};
+
+/**
  * Get the Home Assistant hass object from parent window
+ * Returns null silently if not available (e.g., on iOS companion app)
  */
 const getHass = (): any | null => {
+  // If we already know HA isn't available, don't try again
+  if (hassAvailabilityChecked && !hassAvailable) {
+    return null;
+  }
+  
   try {
+    // First check if we can even access the parent
+    if (!canAccessParent()) {
+      hassAvailabilityChecked = true;
+      hassAvailable = false;
+      console.info('Button Builder: Running in restricted context (e.g., iOS app), dashboard features disabled');
+      return null;
+    }
+    
     const parent = window.parent as any;
     
     // Direct hass object on parent
     if (parent?.hass) {
+      hassAvailabilityChecked = true;
+      hassAvailable = true;
       return parent.hass;
     }
     
     // Try to get from home-assistant element
     const haElement = parent?.document?.querySelector?.('home-assistant');
     if (haElement?.hass) {
+      hassAvailabilityChecked = true;
+      hassAvailable = true;
       return haElement.hass;
     }
     
+    hassAvailabilityChecked = true;
+    hassAvailable = false;
     return null;
   } catch (error) {
-    console.error('Failed to get hass object:', error);
+    // Silently fail - this is expected in some contexts
+    hassAvailabilityChecked = true;
+    hassAvailable = false;
     return null;
   }
 };
 
 /**
  * Call a Home Assistant WebSocket API using the connection
+ * Returns null instead of throwing if HA is not available
  */
-const callHassWS = async (type: string, data?: any): Promise<any> => {
+const callHassWS = async (type: string, data?: any): Promise<any | null> => {
   const hass = getHass();
   
   if (!hass) {
-    throw new Error('Home Assistant connection not available');
+    // Silently return null - HA integration not available
+    return null;
   }
   
-  // Use hass.callWS which is available in modern HA
-  if (typeof hass.callWS === 'function') {
-    return await hass.callWS({ type, ...data });
+  try {
+    // Use hass.callWS which is available in modern HA
+    if (typeof hass.callWS === 'function') {
+      return await hass.callWS({ type, ...data });
+    }
+    
+    // Fallback: Use connection.sendMessagePromise
+    if (hass.connection?.sendMessagePromise) {
+      return await hass.connection.sendMessagePromise({ type, ...data });
+    }
+    
+    return null;
+  } catch (error) {
+    // Don't log errors that might be auth-related
+    console.debug('Button Builder: WebSocket call failed (this is normal if HA features are unavailable)');
+    return null;
   }
-  
-  // Fallback: Use connection.sendMessagePromise
-  if (hass.connection?.sendMessagePromise) {
-    return await hass.connection.sendMessagePromise({ type, ...data });
-  }
-  
-  throw new Error('No valid method to call WebSocket API');
 };
 
 /**
  * Fetch list of all dashboards
+ * Returns empty array if HA integration is not available
  */
 export const fetchDashboards = async (): Promise<DashboardInfo[]> => {
   try {
     const dashboards = await callHassWS('lovelace/dashboards');
     
-    // Ensure we always return an array
+    // callHassWS now returns null if HA is unavailable
     if (!dashboards || !Array.isArray(dashboards)) {
-      console.warn('Dashboards response is not an array:', dashboards);
       return [];
     }
     
     return dashboards;
   } catch (error) {
-    console.error('Failed to fetch dashboards:', error);
+    // Silently fail - this is expected in some contexts
     return [];
   }
 };
 
 /**
  * Fetch a specific dashboard's configuration
+ * Returns null if HA integration is not available
  */
 export const fetchDashboardConfig = async (urlPath: string | null): Promise<any> => {
   try {
     const config = await callHassWS('lovelace/config', { url_path: urlPath });
-    
     return config;
   } catch (error) {
-    console.error(`Failed to fetch dashboard config for ${urlPath}:`, error);
+    // Silently fail
     return null;
   }
 };
@@ -212,14 +260,19 @@ const extractGridConfig = (config: any): DashboardGridConfig => {
 
 /**
  * Fetch all dashboard configurations (backgrounds + grid settings)
+ * Returns empty array if HA integration is not available (e.g., on iOS app)
  */
 export const fetchAllDashboardConfigs = async (): Promise<DashboardConfig[]> => {
   const configs: DashboardConfig[] = [];
   
+  // Quick check - if we can't access parent, don't even try
+  if (hassAvailabilityChecked && !hassAvailable) {
+    return configs;
+  }
+  
   try {
     // Always try to fetch the default dashboard first
     const defaultConfig = await fetchDashboardConfig(null);
-    console.log('Default dashboard config:', defaultConfig);
     if (defaultConfig) {
       configs.push({
         dashboardId: 'lovelace',
@@ -232,13 +285,10 @@ export const fetchAllDashboardConfigs = async (): Promise<DashboardConfig[]> => 
     
     // Fetch list of other dashboards
     const dashboards = await fetchDashboards();
-    console.log('Other dashboards:', dashboards);
     
     for (const dashboard of dashboards) {
-      // Fetch both storage and yaml mode dashboards
       try {
         const config = await fetchDashboardConfig(dashboard.url_path);
-        console.log(`Dashboard ${dashboard.url_path} config:`, config);
         
         if (config) {
           configs.push({
@@ -249,15 +299,14 @@ export const fetchAllDashboardConfigs = async (): Promise<DashboardConfig[]> => 
             grid: extractGridConfig(config),
           });
         }
-      } catch (err) {
-        console.warn(`Failed to fetch config for dashboard ${dashboard.url_path}:`, err);
+      } catch {
+        // Silently skip failed dashboard configs
       }
     }
-  } catch (error) {
-    console.error('Failed to fetch dashboard configs:', error);
+  } catch {
+    // Silently fail - HA integration not available
   }
   
-  console.log('Final dashboard configs:', configs);
   return configs;
 };
 
