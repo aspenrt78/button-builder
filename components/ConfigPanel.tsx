@@ -4,7 +4,7 @@ import { ButtonConfig, CustomField, Variable, StateStyleConfig, DEFAULT_LOCK_CON
 import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
-import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS } from '../constants';
+import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS } from '../constants';
 import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
 import { PRESETS, Preset } from '../presets';
@@ -570,7 +570,10 @@ export const ConfigPanel: React.FC<Props> = ({
             <ControlInput type="checkbox" label="Hidden" value={config.hidden} onChange={(v) => update('hidden', v)} />
           </div>
           {config.showLiveStream && (
+            <>
             <ControlInput label="Stream Aspect Ratio" value={config.liveStreamAspectRatio} onChange={(v) => update('liveStreamAspectRatio', v)} placeholder="16x9, 50%, 1.78" className="mt-2" />
+            <ControlInput type="select" label="Stream Fit Mode" value={config.liveStreamFitMode} options={LIVE_STREAM_FIT_OPTIONS} onChange={(v) => update('liveStreamFitMode', v)} className="mt-2" />
+            </>
           )}
           {config.hidden && (
             <ControlInput label="Hidden Template" value={config.hiddenTemplate} onChange={(v) => update('hiddenTemplate', v)} placeholder="[[[ return entity.state === 'off' ]]]" />
@@ -1418,6 +1421,10 @@ export const ConfigPanel: React.FC<Props> = ({
               <ControlInput label="Spin Duration" value={config.spinDuration} onChange={(v) => update('spinDuration', v)} suffix="s" />
             )}
             
+            {config.spinner && (
+              <ControlInput label="Spinner Template" value={config.spinnerTemplate} onChange={(v) => update('spinnerTemplate', v)} placeholder="[[[ return entity.state === 'on' ]]]" />
+            )}
+            
             {config.hidden && (
               <ControlInput label="Hidden Template" value={config.hiddenTemplate} onChange={(v) => update('hiddenTemplate', v)} placeholder="[[[ return ... ]]]" />
             )}
@@ -1435,6 +1442,22 @@ export const ConfigPanel: React.FC<Props> = ({
                 className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
               />
             </div>
+            
+            <div className="h-px bg-gray-700/50" />
+            
+            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Conditional Display</p>
+            <p className="text-[10px] text-gray-500 mb-3">Show/hide this button based on an entity's state</p>
+            <EntitySelector
+              value={config.conditionalEntity}
+              onChange={(v) => update('conditionalEntity', v)}
+              label="Entity"
+            />
+            {config.conditionalEntity && (
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <ControlInput type="select" label="Operator" value={config.conditionalOperator} options={CONDITIONAL_OPERATORS} onChange={(v) => update('conditionalOperator', v)} />
+                <ControlInput label="State Value" value={config.conditionalState} onChange={(v) => update('conditionalState', v)} placeholder="on, off, 50, etc." />
+              </div>
+            )}
             
             <div className="h-px bg-gray-700/50" />
             

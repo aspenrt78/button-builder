@@ -130,6 +130,13 @@ export const PROTECT_TYPE_OPTIONS = [
   { value: 'password', label: 'Password' },
 ];
 
+export const LIVE_STREAM_FIT_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: 'contain', label: 'Contain' },
+  { value: 'cover', label: 'Cover' },
+  { value: 'fill', label: 'Fill' },
+];
+
 export const LETTER_SPACING_OPTIONS = [
   { value: 'normal', label: 'Normal' },
   { value: '-0.05em', label: 'Tighter' },
