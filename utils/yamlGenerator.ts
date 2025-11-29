@@ -606,7 +606,13 @@ export const generateYaml = (config: ButtonConfig): string => {
 `;
   }
   // Add generic keyframes if any animation is used
-  const needsGenericKeyframes = (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') || config.iconAnimation !== 'none' || config.spin || config.rotate;
+  // Also check if extraStyles contains animation references (for presets like Holographic, Lava Lamp)
+  const extraStylesHasAnimation = config.extraStyles && (
+    config.extraStyles.includes('holo-shift') || 
+    config.extraStyles.includes('lava-shift') ||
+    config.extraStyles.includes('animation:')
+  );
+  const needsGenericKeyframes = (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') || config.iconAnimation !== 'none' || config.spin || config.rotate || extraStylesHasAnimation;
   if (needsGenericKeyframes) {
      extraStyles += `  @keyframes cba-flash {
     0%, 50%, 100% { opacity: 1; }

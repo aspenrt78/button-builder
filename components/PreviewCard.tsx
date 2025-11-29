@@ -474,7 +474,8 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     zIndex: 1,
     overflow: isMarquee ? 'hidden' : 'visible', // Only hide overflow for marquee mask
     opacity: Math.min(100, Math.max(0, config.cardOpacity)) / 100,
-    animationDuration: cardAnimationClass ? cardAnimationDuration : undefined,
+    // Only set animationDuration if we have a cardAnimationClass (avoid overriding extraStyles animation)
+    ...(cardAnimationClass ? { animationDuration: cardAnimationDuration } : {}),
     // Apply extra styles LAST so they can override defaults
     ...extraStylesParsed,
   };

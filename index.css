@@ -92,6 +92,19 @@ body, html {
   50% { opacity: 0; }
 }
 
+/* Gradient animation keyframes for presets */
+@keyframes holo-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes lava-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 @keyframes marquee-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
