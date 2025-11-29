@@ -245,20 +245,7 @@ export const ConfigPanel: React.FC<Props> = ({
                       <p className="text-xs text-gray-400">Active Preset</p>
                       <p className="text-sm font-medium text-purple-400">{activePreset.name}</p>
                     </div>
-                    {modifiedFromPreset && modifiedFromPreset.size > 0 && onResetToPreset && (
-                      <button
-                        onClick={onResetToPreset}
-                        className="text-xs text-gray-400 hover:text-purple-400 underline"
-                      >
-                        Reset to preset
-                      </button>
-                    )}
                   </div>
-                  {modifiedFromPreset && modifiedFromPreset.size > 0 && (
-                    <p className="text-[10px] text-yellow-400">
-                      {modifiedFromPreset.size} field(s) modified from preset
-                    </p>
-                  )}
                 </div>
               )}
               
