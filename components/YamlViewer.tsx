@@ -180,8 +180,11 @@ export const YamlViewer: React.FC<Props> = ({ yaml, className = '', config }) =>
             </div>
             
             <div className="p-4 border-b border-gray-700">
-              <p className="text-sm text-gray-400 mb-3">
-                This creates a reusable template with all your current styling. Add this to your dashboard YAML under <code className="bg-gray-800 px-1 rounded">button_card_templates:</code> then reference it in buttons with <code className="bg-gray-800 px-1 rounded">template: {templateName}</code>
+              <p className="text-sm text-gray-400 mb-2">
+                This creates a reusable template. <strong className="text-yellow-400">Important:</strong> Add this to the <em>top level</em> of your dashboard's raw YAML config.
+              </p>
+              <p className="text-xs text-gray-500 mb-3">
+                In your dashboard: ⋮ menu → Edit Dashboard → ⋮ menu → Raw configuration editor. Paste the <code className="bg-gray-800 px-1 rounded">button_card_templates:</code> section at the top (before <code className="bg-gray-800 px-1 rounded">views:</code>). Then use <code className="bg-gray-800 px-1 rounded">template: {templateName}</code> in any button card.
               </p>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-gray-400">Template Name:</label>
@@ -203,7 +206,7 @@ export const YamlViewer: React.FC<Props> = ({ yaml, className = '', config }) =>
             
             <div className="flex items-center justify-between px-4 py-3 bg-[#252526] border-t border-gray-700 rounded-b-lg">
               <p className="text-xs text-gray-500">
-                Paste this at the top level of your dashboard YAML
+                ⚠️ Must be at top level of dashboard YAML (before views:), not inside a card
               </p>
               <div className="flex items-center gap-2">
                 <button

@@ -1813,6 +1813,56 @@ padding: 12px
 margin-right: 8px`,
     }
   },
+
+  // ============================================
+  // ORGANIZATION / UTILITY
+  // ============================================
+  {
+    name: 'Blank Card',
+    description: 'Invisible spacer for layout organization',
+    category: 'minimal',
+    config: {
+      backgroundColor: '#000000',
+      backgroundColorOpacity: 0,
+      color: 'transparent',
+      borderRadius: '0px',
+      borderStyle: 'none',
+      shadowSize: 'none',
+      showName: false,
+      showIcon: false,
+      showState: false,
+      showLabel: false,
+      tapAction: 'none',
+      holdAction: 'none',
+      doubleTapAction: 'none',
+    }
+  },
+  {
+    name: 'Label Card',
+    description: 'Section header/label for organizing dashboard',
+    category: 'minimal',
+    config: {
+      backgroundColor: '#000000',
+      backgroundColorOpacity: 0,
+      color: '#888888',
+      borderRadius: '0px',
+      borderStyle: 'none',
+      shadowSize: 'none',
+      showName: true,
+      showIcon: false,
+      showState: false,
+      showLabel: false,
+      fontWeight: 'bold',
+      fontSize: '14px',
+      textTransform: 'uppercase',
+      letterSpacing: '2px',
+      tapAction: 'none',
+      holdAction: 'none',
+      doubleTapAction: 'none',
+      extraStyles: `justify-self: start
+padding-left: 8px`,
+    }
+  },
 ];
 
 export const applyPreset = (preset: Preset): Partial<ButtonConfig> => {
