@@ -5,8 +5,11 @@ import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS } from '../constants';
-import { Plus, X, Variable as VariableIcon } from 'lucide-react';
+import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
+import { PRESETS, Preset } from '../presets';
+
+export type PresetCondition = 'always' | 'on' | 'off';
 
 // Domain to icon mappings for auto-fill
 const DOMAIN_ICONS: Record<string, string> = {
@@ -141,8 +144,17 @@ function getIconForEntity(entityId: string, domain: string): string {
 interface Props {
   config: ButtonConfig;
   setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>>;
-  activePreset?: { name: string; config: Partial<ButtonConfig> } | null;
+  activePreset?: Preset | null;
   modifiedFromPreset?: Set<string>;
+  // Preset management props
+  onApplyPreset?: (preset: Preset, forState?: 'on' | 'off') => void;
+  onResetToPreset?: () => void;
+  presetCondition?: PresetCondition;
+  onSetPresetCondition?: (condition: PresetCondition) => void;
+  offStatePreset?: Preset | null;
+  onStatePreset?: Preset | null;
+  onSetOffStatePreset?: (preset: Preset | null) => void;
+  onSetOnStatePreset?: (preset: Preset | null) => void;
 }
 
 // Helper component to show preset indicator on fields
@@ -211,7 +223,20 @@ const ColorPairInput = ({ label, colorValue, setColor, autoValue, setAuto }: any
   </div>
 );
 
-export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, modifiedFromPreset }) => {
+export const ConfigPanel: React.FC<Props> = ({ 
+  config, 
+  setConfig, 
+  activePreset, 
+  modifiedFromPreset,
+  onApplyPreset,
+  onResetToPreset,
+  presetCondition = 'always',
+  onSetPresetCondition,
+  offStatePreset,
+  onStatePreset,
+  onSetOffStatePreset,
+  onSetOnStatePreset,
+}) => {
   
   const update = (key: keyof ButtonConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -290,6 +315,183 @@ export const ConfigPanel: React.FC<Props> = ({ config, setConfig, activePreset, 
       {/* Content Sections */}
       {nav.level === 'content' && (
         <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          
+          {/* ===== PRESETS > GALLERY ===== */}
+          {showSection('presetGallery') && (
+            <>
+              {/* Current Preset Info */}
+              {activePreset && (
+                <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-xs text-gray-400">Active Preset</p>
+                      <p className="text-sm font-medium text-purple-400">{activePreset.name}</p>
+                    </div>
+                    {modifiedFromPreset && modifiedFromPreset.size > 0 && onResetToPreset && (
+                      <button
+                        onClick={onResetToPreset}
+                        className="text-xs text-gray-400 hover:text-purple-400 underline"
+                      >
+                        Reset to preset
+                      </button>
+                    )}
+                  </div>
+                  {modifiedFromPreset && modifiedFromPreset.size > 0 && (
+                    <p className="text-[10px] text-yellow-400">
+                      {modifiedFromPreset.size} field(s) modified from preset
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {/* Preset Gallery */}
+              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => (
+                <div key={category} className="mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2 sticky top-0 bg-gray-900 py-1">
+                    {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category.charAt(0).toUpperCase() + category.slice(1)}
+                  </p>
+                  <div className="grid grid-cols-1 gap-1">
+                    {PRESETS.filter(p => p.category === category).map(preset => (
+                      <button
+                        key={preset.name}
+                        onClick={() => onApplyPreset?.(preset)}
+                        className={`w-full px-3 py-2 text-left rounded transition-colors ${
+                          activePreset?.name === preset.name
+                            ? 'bg-purple-500/20 border border-purple-500/50'
+                            : 'hover:bg-gray-800 border border-transparent'
+                        }`}
+                      >
+                        <div className="text-sm text-white font-medium">{preset.name}</div>
+                        <div className="text-[10px] text-gray-500">{preset.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* ===== PRESETS > CONDITIONS ===== */}
+          {showSection('presetConditions') && (
+            <>
+              {!activePreset ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-sm">No preset selected</p>
+                  <p className="text-gray-500 text-xs mt-1">Select a preset from the gallery first</p>
+                </div>
+              ) : (
+                <>
+                  <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg mb-4">
+                    <p className="text-xs text-gray-400">Current Preset</p>
+                    <p className="text-sm font-medium text-purple-400">{activePreset.name}</p>
+                  </div>
+                  
+                  <p className="text-xs text-gray-400 mb-4">
+                    Choose when "{activePreset.name}" applies and optionally set a different preset for the other state.
+                  </p>
+                  
+                  {/* Condition Selection */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Apply Preset When</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['always', 'on', 'off'] as PresetCondition[]).map(cond => (
+                        <button
+                          key={cond}
+                          onClick={() => {
+                            onSetPresetCondition?.(cond);
+                            if (cond === 'always') {
+                              onSetOffStatePreset?.(null);
+                              onSetOnStatePreset?.(null);
+                            }
+                          }}
+                          className={`px-3 py-2 rounded text-xs font-medium transition-all ${
+                            presetCondition === cond
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                          }`}
+                        >
+                          {cond === 'always' ? 'Always' : cond === 'on' ? 'When ON' : 'When OFF'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Secondary Preset Selection - When ON */}
+                  {presetCondition === 'on' && (
+                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
+                        <ToggleLeft size={12} />
+                        When OFF, use:
+                      </label>
+                      {offStatePreset ? (
+                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
+                          <span className="text-sm text-cyan-400">{offStatePreset.name}</span>
+                          <button 
+                            onClick={() => onSetOffStatePreset?.(null)}
+                            className="text-gray-500 hover:text-red-400 text-xs"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          onChange={(e) => {
+                            const preset = PRESETS.find(p => p.name === e.target.value);
+                            if (preset) onSetOffStatePreset?.(preset);
+                          }}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Select preset for OFF state...</option>
+                          {PRESETS.map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when OFF</p>
+                    </div>
+                  )}
+                  
+                  {/* Secondary Preset Selection - When OFF */}
+                  {presetCondition === 'off' && (
+                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
+                        <ToggleRight size={12} />
+                        When ON, use:
+                      </label>
+                      {onStatePreset ? (
+                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
+                          <span className="text-sm text-green-400">{onStatePreset.name}</span>
+                          <button 
+                            onClick={() => onSetOnStatePreset?.(null)}
+                            className="text-gray-500 hover:text-red-400 text-xs"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          onChange={(e) => {
+                            const preset = PRESETS.find(p => p.name === e.target.value);
+                            if (preset) onSetOnStatePreset?.(preset);
+                          }}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Select preset for ON state...</option>
+                          {PRESETS.map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when ON</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
           {/* ===== ENTITY > CORE ===== */}
           {showSection('core') && (
             <>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Zap, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Zap, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2 } from 'lucide-react';
 
 // ============= NAVIGATION TYPES =============
 export type SectionId = 
@@ -8,9 +8,10 @@ export type SectionId =
   | 'colors' | 'glass' | 'borders' | 'animations' | 'typography'
   | 'stateStyles'
   | 'cardActions' | 'momentaryActions' | 'iconActions'
-  | 'confirmation' | 'lock' | 'protect' | 'tooltip' | 'customFields' | 'advancedSettings';
+  | 'confirmation' | 'lock' | 'protect' | 'tooltip' | 'customFields' | 'advancedSettings'
+  | 'presetGallery' | 'presetConditions';
 
-export type CategoryId = 'entity' | 'layout' | 'appearance' | 'effects' | 'actions' | 'advanced';
+export type CategoryId = 'presets' | 'entity' | 'layout' | 'appearance' | 'effects' | 'actions' | 'advanced';
 
 interface SectionDef {
   id: SectionId;
@@ -26,6 +27,13 @@ interface CategoryDef {
 }
 
 export const CATEGORIES: CategoryDef[] = [
+  {
+    id: 'presets', label: 'Presets', icon: Wand2,
+    sections: [
+      { id: 'presetGallery', label: 'Style Presets', icon: Palette },
+      { id: 'presetConditions', label: 'State Conditions', icon: Layers },
+    ]
+  },
   { 
     id: 'entity', label: 'Entity', icon: Target,
     sections: [

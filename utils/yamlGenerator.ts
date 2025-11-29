@@ -194,9 +194,12 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
 
   // --- Build YAML ---
-  let yaml = `type: custom:button-card
-entity: ${config.entity}
-`;
+  let yaml = `type: custom:button-card\n`;
+  
+  // Only include entity if set
+  if (config.entity) {
+    yaml += `entity: ${config.entity}\n`;
+  }
 
   // Trigger Entity
   if (config.triggerEntity) {
@@ -216,21 +219,23 @@ entity: ${config.entity}
     yaml += `units: "${config.units}"\n`;
   }
 
-  // Core fields with templates
+  // Core fields with templates - only output if has value
   if (config.nameTemplate) {
     yaml += `name: ${config.nameTemplate}\n`;
-  } else {
+  } else if (config.name) {
     yaml += `name: ${config.name}\n`;
   }
 
   if (config.iconTemplate) {
     yaml += `icon: ${config.iconTemplate}\n`;
-  } else {
+  } else if (config.icon) {
     yaml += `icon: ${config.icon}\n`;
   }
 
-  // Icon size - logically grouped with icon
-  yaml += `size: ${config.size}\n`;
+  // Icon size - only if not default
+  if (config.size && config.size !== '40%') {
+    yaml += `size: ${config.size}\n`;
+  }
 
   // Label
   if (config.labelTemplate) {
@@ -266,15 +271,27 @@ entity: ${config.entity}
     });
   }
 
-  // Show options
-  yaml += `show_name: ${config.showName}
-show_icon: ${config.showIcon}
-show_state: ${config.showState}
-show_label: ${config.showLabel}
-show_entity_picture: ${config.showEntityPicture}
-show_last_changed: ${config.showLastChanged}
-show_units: ${config.showUnits}
-`;
+  // Show options - only include if true (false is default, so omit for cleaner YAML)
+  // Automatically disable options if their content is not set
+  const hasLabelContent = !!(config.labelTemplate || config.labelEntity || config.label);
+  const hasEntityPicture = !!config.entityPicture;
+  const hasUnits = !!config.units;
+  const hasEntity = !!config.entity;
+  
+  const showLabel = hasLabelContent ? config.showLabel : false;
+  const showEntityPicture = hasEntityPicture ? config.showEntityPicture : false;
+  const showUnits = hasUnits ? config.showUnits : false;
+  const showState = hasEntity ? config.showState : false;
+  const showLastChanged = hasEntity ? config.showLastChanged : false;
+  
+  // Only output show options that are true
+  if (config.showName) yaml += `show_name: true\n`;
+  if (config.showIcon) yaml += `show_icon: true\n`;
+  if (showState) yaml += `show_state: true\n`;
+  if (showLabel) yaml += `show_label: true\n`;
+  if (showEntityPicture) yaml += `show_entity_picture: true\n`;
+  if (showLastChanged) yaml += `show_last_changed: true\n`;
+  if (showUnits) yaml += `show_units: true\n`;
 
   // New show options
   if (config.showRipple === false) {
@@ -290,9 +307,15 @@ show_units: ${config.showUnits}
     }
   }
 
-  yaml += `layout: ${config.layout}
-color_type: ${config.colorType}
-`;
+  // Only output layout if not default
+  if (config.layout && config.layout !== 'vertical') {
+    yaml += `layout: ${config.layout}\n`;
+  }
+  
+  // Only output color_type if not default
+  if (config.colorType && config.colorType !== 'icon') {
+    yaml += `color_type: ${config.colorType}\n`;
+  }
 
   if (config.colorAuto) {
     yaml += `color: auto\n`;
@@ -728,122 +751,144 @@ color_type: ${config.colorType}
     return style;
   };
 
-  // --- Styles Section (Always) ---
-  yaml += `styles:
-  card:
-${cardStyles.map(s => `    - ${formatStyleForYaml(s)}`).join('\n')}
-`;
+  // --- Styles Section (only if there are styles) ---
+  const hasCardStyles = cardStyles.length > 0 || config.extraStyles;
+  const hasIconStyles = iconStyles.length > 0;
+  const nameColorLine = getColorLine(config.nameColor, config.nameColorAuto);
+  const labelColorLine = getColorLine(config.labelColor, config.labelColorAuto);
+  const stateColorLine = getColorLine(config.stateColor, config.stateColorAuto);
+  const hasNameStyles = nameColorLine || (config.fontWeight && config.fontWeight !== 'normal');
+  const hasLabelStyles = !!labelColorLine;
+  const hasStateStyles = !!stateColorLine;
+  const hasEntityPictureStyles = !!config.entityPictureStyles;
+  const hasGridStyles = !!config.gridStyles;
+  const fieldsWithStyles = config.customFields.filter(f => f.styles);
+  const hasLockStyles = config.lock.enabled && config.lockStyles;
+  const hasTooltipStyles = config.tooltip.enabled && config.tooltipStyles;
+  const hasImgCellStyles = !!config.imgCellStyles;
+  
+  const hasAnyStyles = hasCardStyles || hasIconStyles || hasNameStyles || hasLabelStyles || 
+                       hasStateStyles || hasEntityPictureStyles || hasGridStyles || 
+                       fieldsWithStyles.length > 0 || hasLockStyles || hasTooltipStyles || hasImgCellStyles;
 
-  // Extra styles from textarea (need to quote values containing special chars)
-  if (config.extraStyles) {
-    yaml += `    # Custom Extra Styles\n`;
-    config.extraStyles.split('\n').forEach(line => {
-      if (line.trim()) {
-        // Check if line contains a colon (CSS property: value format)
-        const colonIndex = line.indexOf(':');
-        if (colonIndex > 0) {
-          const prop = line.substring(0, colonIndex).trim();
-          const value = line.substring(colonIndex + 1).trim();
-          // Quote the value to prevent YAML parsing issues
-          yaml += `    - ${prop}: '${value}'\n`;
-        } else {
+  if (hasAnyStyles) {
+    yaml += `styles:\n`;
+    
+    if (hasCardStyles) {
+      yaml += `  card:\n`;
+      cardStyles.forEach(s => {
+        yaml += `    - ${formatStyleForYaml(s)}\n`;
+      });
+      // Extra styles from textarea
+      if (config.extraStyles) {
+        yaml += `    # Custom Extra Styles\n`;
+        config.extraStyles.split('\n').forEach(line => {
+          if (line.trim()) {
+            const colonIndex = line.indexOf(':');
+            if (colonIndex > 0) {
+              const prop = line.substring(0, colonIndex).trim();
+              const value = line.substring(colonIndex + 1).trim();
+              yaml += `    - ${prop}: '${value}'\n`;
+            } else {
+              yaml += `    - ${line.trim()}\n`;
+            }
+          }
+        });
+      }
+    }
+
+    if (hasIconStyles) {
+      yaml += `  icon:\n`;
+      iconStyles.forEach(s => {
+        yaml += `    - ${formatStyleForYaml(s)}\n`;
+      });
+    }
+
+    // Name Styles - only if there's actual styling
+    if (hasNameStyles) {
+      yaml += `  name:\n`;
+      if (config.fontWeight && config.fontWeight !== 'normal') {
+        yaml += `    - font-weight: ${config.fontWeight}\n`;
+      }
+      if (nameColorLine) {
+        yaml += nameColorLine;
+      }
+    }
+
+    // Label Styles
+    if (hasLabelStyles) {
+      yaml += `  label:\n`;
+      yaml += labelColorLine;
+    }
+
+    // State Styles (Text)
+    if (hasStateStyles) {
+      yaml += `  state:\n`;
+      yaml += stateColorLine;
+    }
+
+    // Entity Picture Styles
+    if (hasEntityPictureStyles) {
+      yaml += `  entity_picture:\n`;
+      config.entityPictureStyles.split('\n').forEach(line => {
+        if (line.trim()) {
           yaml += `    - ${line.trim()}\n`;
         }
-      }
-    });
-  }
+      });
+    }
 
-  if (iconStyles.length > 0) {
-     yaml += `  icon:
-${iconStyles.map(s => `    - ${formatStyleForYaml(s)}`).join('\n')}
-`;
-  }
-
-  // Name Styles
-  const nameColorLine = getColorLine(config.nameColor, config.nameColorAuto);
-  yaml += `  name:
-    - font-weight: bold
-${nameColorLine || ''}
-`;
-
-  // Label Styles
-  const labelColorLine = getColorLine(config.labelColor, config.labelColorAuto);
-  if (labelColorLine) {
-    yaml += `  label:
-${labelColorLine}
-`;
-  }
-
-  // State Styles (Text)
-  const stateColorLine = getColorLine(config.stateColor, config.stateColorAuto);
-  if (stateColorLine) {
-    yaml += `  state:
-${stateColorLine}
-`;
-  }
-
-  // Entity Picture Styles
-  if (config.entityPictureStyles) {
-    yaml += `  entity_picture:\n`;
-    config.entityPictureStyles.split('\n').forEach(line => {
-      if (line.trim()) {
-        yaml += `    - ${line.trim()}\n`;
-      }
-    });
-  }
-
-  // Grid Styles
-  if (config.gridStyles) {
-    yaml += `  grid:\n`;
-    config.gridStyles.split('\n').forEach(line => {
-      if (line.trim()) {
-        yaml += `    - ${line.trim()}\n`;
-      }
-    });
-  }
-
-  // Custom Field Styles
-  const fieldsWithStyles = config.customFields.filter(f => f.styles);
-  if (fieldsWithStyles.length > 0) {
-    yaml += `  custom_fields:\n`;
-    fieldsWithStyles.forEach(field => {
-      yaml += `    ${field.name}:\n`;
-      field.styles!.split('\n').forEach(line => {
+    // Grid Styles
+    if (hasGridStyles) {
+      yaml += `  grid:\n`;
+      config.gridStyles.split('\n').forEach(line => {
         if (line.trim()) {
-          yaml += `      - ${line.trim()}\n`;
+          yaml += `    - ${line.trim()}\n`;
         }
       });
-    });
-  }
+    }
 
-  // Lock Styles
-  if (config.lock.enabled && config.lockStyles) {
-    yaml += `  lock:\n`;
-    config.lockStyles.split('\n').forEach(line => {
-      if (line.trim()) {
-        yaml += `    - ${line.trim()}\n`;
-      }
-    });
-  }
+    // Custom Field Styles
+    if (fieldsWithStyles.length > 0) {
+      yaml += `  custom_fields:\n`;
+      fieldsWithStyles.forEach(field => {
+        yaml += `    ${field.name}:\n`;
+        field.styles!.split('\n').forEach(line => {
+          if (line.trim()) {
+            yaml += `      - ${line.trim()}\n`;
+          }
+        });
+      });
+    }
 
-  // Tooltip Styles
-  if (config.tooltip.enabled && config.tooltipStyles) {
-    yaml += `  tooltip:\n`;
-    config.tooltipStyles.split('\n').forEach(line => {
-      if (line.trim()) {
-        yaml += `    - ${line.trim()}\n`;
-      }
-    });
-  }
+    // Lock Styles
+    if (hasLockStyles) {
+      yaml += `  lock:\n`;
+      config.lockStyles.split('\n').forEach(line => {
+        if (line.trim()) {
+          yaml += `    - ${line.trim()}\n`;
+        }
+      });
+    }
 
-  // Img Cell Styles (for entity pictures in grid)
-  if (config.imgCellStyles) {
-    yaml += `  img_cell:\n`;
-    config.imgCellStyles.split('\n').forEach(line => {
-      if (line.trim()) {
-        yaml += `    - ${line.trim()}\n`;
-      }
-    });
+    // Tooltip Styles
+    if (hasTooltipStyles) {
+      yaml += `  tooltip:\n`;
+      config.tooltipStyles.split('\n').forEach(line => {
+        if (line.trim()) {
+          yaml += `    - ${line.trim()}\n`;
+        }
+      });
+    }
+
+    // Img Cell Styles
+    if (hasImgCellStyles) {
+      yaml += `  img_cell:\n`;
+      config.imgCellStyles.split('\n').forEach(line => {
+        if (line.trim()) {
+          yaml += `    - ${line.trim()}\n`;
+        }
+      });
+    }
   }
 
   // --- Resolve onColor/offColor for state logic ---
@@ -1025,6 +1070,235 @@ ${getStateLogic('off', offColorResolved)}
       }
     });
   }
+
+  return yaml;
+};
+
+// Helper to format styles for YAML (handle colons properly)
+const formatStyleForYaml = (style: string): string => {
+  // If it contains a colon, we need to quote it or format it properly
+  if (style.includes(':')) {
+    const [prop, ...valueParts] = style.split(':');
+    const value = valueParts.join(':').trim();
+    return `${prop.trim()}: ${value}`;
+  }
+  return style;
+};
+
+/**
+ * Generate a global button_card_templates YAML that can be added to the dashboard
+ * to make all buttons inherit this theme
+ */
+export const generateGlobalTemplate = (config: ButtonConfig, templateName: string = 'custom_theme'): string => {
+  let yaml = `# Button Card Global Template
+# Paste this into your dashboard YAML configuration under button_card_templates:
+# Then use it on any button card with: template: ${templateName}
+
+button_card_templates:
+  ${templateName}:
+`;
+
+  // Generate styles section
+  const cardStyles: string[] = [];
+  const iconStyles: string[] = [];
+  const nameStyles: string[] = [];
+  const stateStyles: string[] = [];
+  const labelStyles: string[] = [];
+
+  // Background & Colors
+  if (config.gradientEnabled && config.gradientStartColor && config.gradientEndColor) {
+    const gradient = `linear-gradient(${config.gradientAngle || 135}deg, ${config.gradientStartColor}, ${config.gradientEndColor})`;
+    cardStyles.push(`background: ${gradient}`);
+  } else if (config.backgroundColor && config.backgroundColorOpacity !== undefined) {
+    cardStyles.push(`background-color: ${hexToRgba(config.backgroundColor, config.backgroundColorOpacity)}`);
+  }
+  
+  if (config.cardOpacity !== undefined && config.cardOpacity !== 100) {
+    cardStyles.push(`opacity: ${config.cardOpacity / 100}`);
+  }
+
+  // Border radius
+  if (config.borderRadius) {
+    cardStyles.push(`border-radius: ${config.borderRadius}`);
+  }
+
+  // Borders
+  if (config.borderStyle !== 'none' && config.borderWidth && config.borderColor) {
+    cardStyles.push(`border: ${config.borderWidth} ${config.borderStyle} ${config.borderColor}`);
+  }
+
+  // Glass effects
+  if (config.backdropBlur && config.backdropBlur !== '0px') {
+    cardStyles.push(`backdrop-filter: blur(${config.backdropBlur})`);
+    cardStyles.push(`-webkit-backdrop-filter: blur(${config.backdropBlur})`);
+  }
+
+  // Shadow
+  const shadowCSS = getShadowCSS(config.shadowSize, config.shadowColor, config.shadowOpacity);
+  if (shadowCSS) {
+    cardStyles.push(shadowCSS);
+  }
+
+  // Card animation (when active)
+  if (config.cardAnimation && config.cardAnimation !== 'none') {
+    const animCSS = getAnimationCSS(config.cardAnimation, config.cardAnimationSpeed);
+    if (animCSS) {
+      // Only apply animation if trigger is 'always'
+      if (config.cardAnimationTrigger === 'always') {
+        cardStyles.push(animCSS);
+      }
+    }
+  }
+
+  // Transform
+  if (config.transform && config.transform !== 'none') {
+    cardStyles.push(`transform: ${config.transform}`);
+  }
+
+  // Extra styles (custom CSS)
+  if (config.extraStyles) {
+    config.extraStyles.split('\n').forEach(line => {
+      if (line.trim()) {
+        cardStyles.push(line.trim());
+      }
+    });
+  }
+
+  // Icon styles
+  if (!config.iconColorAuto && config.iconColor) {
+    iconStyles.push(`color: ${config.iconColor}`);
+  }
+  if (config.iconAnimation && config.iconAnimation !== 'none') {
+    const iconAnimCSS = getAnimationCSS(config.iconAnimation, config.iconAnimationSpeed);
+    if (iconAnimCSS && config.iconAnimationTrigger === 'always') {
+      iconStyles.push(iconAnimCSS);
+    }
+  }
+
+  // Name styles
+  if (config.nameColor) {
+    nameStyles.push(`color: ${config.nameColor}`);
+  }
+  if (config.fontFamily && config.fontFamily !== 'inherit') {
+    nameStyles.push(`font-family: ${config.fontFamily}`);
+  }
+  if (config.fontSize) {
+    nameStyles.push(`font-size: ${config.fontSize}`);
+  }
+  if (config.fontWeight && config.fontWeight !== 'normal') {
+    nameStyles.push(`font-weight: ${config.fontWeight}`);
+  }
+  if (config.textTransform && config.textTransform !== 'none') {
+    nameStyles.push(`text-transform: ${config.textTransform}`);
+  }
+  if (config.letterSpacing && config.letterSpacing !== 'normal') {
+    nameStyles.push(`letter-spacing: ${config.letterSpacing}`);
+  }
+
+  // State styles
+  if (config.stateColor) {
+    stateStyles.push(`color: ${config.stateColor}`);
+  }
+
+  // Label styles
+  if (config.labelColor) {
+    labelStyles.push(`color: ${config.labelColor}`);
+  }
+
+  // Build the styles section
+  if (cardStyles.length > 0 || iconStyles.length > 0 || nameStyles.length > 0 || stateStyles.length > 0 || labelStyles.length > 0) {
+    yaml += `    styles:\n`;
+    
+    if (cardStyles.length > 0) {
+      yaml += `      card:\n`;
+      cardStyles.forEach(s => {
+        yaml += `        - ${formatStyleForYaml(s)}\n`;
+      });
+    }
+    
+    if (iconStyles.length > 0) {
+      yaml += `      icon:\n`;
+      iconStyles.forEach(s => {
+        yaml += `        - ${formatStyleForYaml(s)}\n`;
+      });
+    }
+    
+    if (nameStyles.length > 0) {
+      yaml += `      name:\n`;
+      nameStyles.forEach(s => {
+        yaml += `        - ${formatStyleForYaml(s)}\n`;
+      });
+    }
+    
+    if (stateStyles.length > 0) {
+      yaml += `      state:\n`;
+      stateStyles.forEach(s => {
+        yaml += `        - ${formatStyleForYaml(s)}\n`;
+      });
+    }
+    
+    if (labelStyles.length > 0) {
+      yaml += `      label:\n`;
+      labelStyles.forEach(s => {
+        yaml += `        - ${formatStyleForYaml(s)}\n`;
+      });
+    }
+  }
+
+  // Add state-specific styles if configured
+  if (config.stateStyles && config.stateStyles.length > 0) {
+    yaml += `    state:\n`;
+    config.stateStyles.forEach(stateStyle => {
+      yaml += `      - value: "${stateStyle.state}"\n`;
+      if (stateStyle.operator && stateStyle.operator !== '==') {
+        yaml += `        operator: "${stateStyle.operator}"\n`;
+      }
+      
+      const stateCardStyles: string[] = [];
+      const stateIconStyles: string[] = [];
+      
+      if (stateStyle.backgroundColor) {
+        stateCardStyles.push(`background-color: ${stateStyle.backgroundColor}`);
+      }
+      if (stateStyle.iconColor) {
+        stateIconStyles.push(`color: ${stateStyle.iconColor}`);
+      }
+      if (stateStyle.animation && stateStyle.animation !== 'none') {
+        const animCSS = getAnimationCSS(stateStyle.animation);
+        if (animCSS) {
+          stateCardStyles.push(animCSS);
+        }
+      }
+      
+      if (stateCardStyles.length > 0 || stateIconStyles.length > 0) {
+        yaml += `        styles:\n`;
+        if (stateCardStyles.length > 0) {
+          yaml += `          card:\n`;
+          stateCardStyles.forEach(s => {
+            yaml += `            - ${formatStyleForYaml(s)}\n`;
+          });
+        }
+        if (stateIconStyles.length > 0) {
+          yaml += `          icon:\n`;
+          stateIconStyles.forEach(s => {
+            yaml += `            - ${formatStyleForYaml(s)}\n`;
+          });
+        }
+      }
+    });
+  }
+
+  // Add usage example
+  yaml += `
+# Usage Example:
+# Add template: ${templateName} to any button card:
+#
+# type: custom:button-card
+# entity: light.living_room
+# template: ${templateName}
+# name: Living Room
+# icon: mdi:lightbulb
+`;
 
   return yaml;
 };

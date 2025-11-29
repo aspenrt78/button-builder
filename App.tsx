@@ -36,7 +36,7 @@ const loadSavedConfig = (): ButtonConfig => {
 };
 
 const App: React.FC = () => {
-  const [config, setConfig] = useState<ButtonConfig>(loadSavedConfig);
+  const [config, setConfigInternal] = useState<ButtonConfig>(loadSavedConfig);
   const [isMagicOpen, setIsMagicOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
@@ -49,6 +49,16 @@ const App: React.FC = () => {
   const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
   const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
   const [isPresetSettingsOpen, setIsPresetSettingsOpen] = useState(false);
+  const [isApplyingPreset, setIsApplyingPreset] = useState(false);
+  
+  // Wrapper for setConfig that clears the active preset when user makes changes
+  const setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>> = (action) => {
+    if (!isApplyingPreset && activePreset) {
+      setActivePreset(null);
+    }
+    setConfigInternal(action);
+  };
+  
   // Save config to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -179,8 +189,11 @@ const App: React.FC = () => {
         extraStyles: '',
       };
       
-      setConfig(prev => ({ ...prev, ...styleDefaults, ...preset.config }));
+      // Use flag to prevent clearing preset when applying it
+      setIsApplyingPreset(true);
+      setConfigInternal(prev => ({ ...prev, ...styleDefaults, ...preset.config }));
       setActivePreset(preset);
+      setIsApplyingPreset(false);
       // Reset condition-based presets when changing main preset
       if (presetCondition === 'always') {
         setOffStatePreset(null);
@@ -192,7 +205,9 @@ const App: React.FC = () => {
 
   const handleResetToPreset = () => {
     if (activePreset) {
-      setConfig(prev => ({ ...prev, ...activePreset.config }));
+      setIsApplyingPreset(true);
+      setConfigInternal(prev => ({ ...prev, ...activePreset.config }));
+      setIsApplyingPreset(false);
     }
   };
 
@@ -544,6 +559,14 @@ const App: React.FC = () => {
             setConfig={setConfig} 
             activePreset={activePreset}
             modifiedFromPreset={modifiedFromPreset}
+            onApplyPreset={handleApplyPreset}
+            onResetToPreset={handleResetToPreset}
+            presetCondition={presetCondition}
+            onSetPresetCondition={setPresetCondition}
+            offStatePreset={offStatePreset}
+            onStatePreset={onStatePreset}
+            onSetOffStatePreset={setOffStatePreset}
+            onSetOnStatePreset={setOnStatePreset}
           />
         </aside>
 
@@ -569,7 +592,7 @@ const App: React.FC = () => {
             {/* Right: YAML Output */}
             <div className="w-96 border-l border-gray-800 bg-[#111] flex flex-col shrink-0 min-h-0">
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-4">
-                <YamlViewer yaml={yamlOutput} className="flex-1" />
+                <YamlViewer yaml={yamlOutput} config={config} className="flex-1" />
               </div>
             </div>
           </div>
@@ -596,13 +619,21 @@ const App: React.FC = () => {
                 setConfig={setConfig}
                 activePreset={activePreset}
                 modifiedFromPreset={modifiedFromPreset}
+                onApplyPreset={handleApplyPreset}
+                onResetToPreset={handleResetToPreset}
+                presetCondition={presetCondition}
+                onSetPresetCondition={setPresetCondition}
+                offStatePreset={offStatePreset}
+                onStatePreset={onStatePreset}
+                onSetOffStatePreset={setOffStatePreset}
+                onSetOnStatePreset={setOnStatePreset}
               />
             </div>
           )}
           
           {mobileTab === 'yaml' && (
             <div className="h-full overflow-hidden bg-[#111] p-3">
-              <YamlViewer yaml={yamlOutput} className="h-full" />
+              <YamlViewer yaml={yamlOutput} config={config} className="h-full" />
             </div>
           )}
         </div>

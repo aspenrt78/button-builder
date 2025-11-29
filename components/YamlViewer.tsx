@@ -1,9 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Copy, Check, Download } from 'lucide-react';
+import { Copy, Check, Download, FileCode2, X } from 'lucide-react';
+import { ButtonConfig } from '../types';
+import { generateGlobalTemplate } from '../utils/yamlGenerator';
 
 interface Props {
   yaml: string;
   className?: string;
+  config?: ButtonConfig;
 }
 
 // Simple YAML syntax highlighter
@@ -79,10 +82,18 @@ const highlightYaml = (yaml: string): React.ReactNode[] => {
   });
 };
 
-export const YamlViewer: React.FC<Props> = ({ yaml, className = '' }) => {
+export const YamlViewer: React.FC<Props> = ({ yaml, className = '', config }) => {
   const [copied, setCopied] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('custom_style');
+  const [templateCopied, setTemplateCopied] = useState(false);
 
   const highlightedYaml = useMemo(() => highlightYaml(yaml), [yaml]);
+  
+  const globalTemplate = useMemo(() => {
+    if (!config) return '';
+    return generateGlobalTemplate(config, templateName);
+  }, [config, templateName]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(yaml);
@@ -100,11 +111,37 @@ export const YamlViewer: React.FC<Props> = ({ yaml, className = '' }) => {
     URL.revokeObjectURL(url);
   };
 
+  const handleCopyTemplate = () => {
+    navigator.clipboard.writeText(globalTemplate);
+    setTemplateCopied(true);
+    setTimeout(() => setTemplateCopied(false), 2000);
+  };
+
+  const handleDownloadTemplate = () => {
+    const blob = new Blob([globalTemplate], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${templateName}-template.yaml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className={`flex flex-col h-full min-h-0 bg-[#1e1e1e] text-gray-300 rounded-lg border border-gray-700 shadow-xl ${className}`}>
       <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-gray-700 shrink-0">
         <span className="text-xs font-mono text-gray-400">button-card-config.yaml</span>
         <div className="flex items-center gap-2">
+          {config && (
+            <button 
+              onClick={() => setShowTemplateModal(true)}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 transition-colors p-1 hover:bg-gray-700 rounded"
+              title="Create Global Template"
+            >
+              <FileCode2 size={14} />
+              <span className="hidden sm:inline">Global Template</span>
+            </button>
+          )}
           <button 
             onClick={handleDownload}
             className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors p-1 hover:bg-gray-700 rounded"
@@ -124,6 +161,70 @@ export const YamlViewer: React.FC<Props> = ({ yaml, className = '' }) => {
       <pre className="flex-1 p-4 text-sm font-mono overflow-y-auto overflow-x-auto custom-scrollbar leading-relaxed whitespace-pre min-h-0">
         {highlightedYaml}
       </pre>
+      
+      {/* Global Template Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1e1e1e] rounded-lg border border-gray-700 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#252526] border-b border-gray-700 rounded-t-lg">
+              <div className="flex items-center gap-2">
+                <FileCode2 size={18} className="text-purple-400" />
+                <span className="font-medium">Create Global Template</span>
+              </div>
+              <button 
+                onClick={() => setShowTemplateModal(false)}
+                className="text-gray-400 hover:text-white p-1 hover:bg-gray-700 rounded"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-gray-700">
+              <p className="text-sm text-gray-400 mb-3">
+                This creates a reusable template with all your current styling. Add this to your dashboard YAML under <code className="bg-gray-800 px-1 rounded">button_card_templates:</code> then reference it in buttons with <code className="bg-gray-800 px-1 rounded">template: {templateName}</code>
+              </p>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-400">Template Name:</label>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value.replace(/\s+/g, '_'))}
+                  className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-purple-500 focus:outline-none"
+                  placeholder="custom_style"
+                />
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-4 min-h-0">
+              <pre className="text-sm font-mono bg-[#0d0d0d] p-4 rounded border border-gray-800 overflow-x-auto whitespace-pre">
+                {highlightYaml(globalTemplate)}
+              </pre>
+            </div>
+            
+            <div className="flex items-center justify-between px-4 py-3 bg-[#252526] border-t border-gray-700 rounded-b-lg">
+              <p className="text-xs text-gray-500">
+                Paste this at the top level of your dashboard YAML
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                >
+                  <Download size={14} />
+                  Download
+                </button>
+                <button
+                  onClick={handleCopyTemplate}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors"
+                >
+                  {templateCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {templateCopied ? 'Copied!' : 'Copy Template'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
