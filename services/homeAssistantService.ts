@@ -19,6 +19,73 @@ export interface EntityInfo {
 
 const IS_DEV_ENV = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.DEV;
 
+/**
+ * Safely check if we can access the parent window
+ */
+const canAccessParent = (): boolean => {
+  try {
+    const test = window.parent.location.href;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Get the Home Assistant hass object from parent window
+ * This is the most reliable method for iOS companion app
+ */
+const getHass = (): any | null => {
+  try {
+    if (!canAccessParent()) {
+      return null;
+    }
+    
+    const parent = window.parent as any;
+    
+    // Direct hass object on parent
+    if (parent?.hass) {
+      return parent.hass;
+    }
+    
+    // Try to get from home-assistant element
+    const haElement = parent?.document?.querySelector?.('home-assistant');
+    if (haElement?.hass) {
+      return haElement.hass;
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Call Home Assistant WebSocket API
+ */
+const callHassWS = async (type: string, data?: any): Promise<any | null> => {
+  const hass = getHass();
+  
+  if (!hass) {
+    return null;
+  }
+  
+  try {
+    if (typeof hass.callWS === 'function') {
+      return await hass.callWS({ type, ...data });
+    }
+    
+    if (hass.connection?.sendMessagePromise) {
+      return await hass.connection.sendMessagePromise({ type, ...data });
+    }
+    
+    return null;
+  } catch (error) {
+    console.debug('[ButtonBuilder] WebSocket call failed:', error);
+    return null;
+  }
+};
+
 // Get auth token from parent HA frame (works on mobile app)
 const getParentHassAuth = (): Promise<string | null> => {
   return new Promise((resolve) => {
@@ -120,7 +187,39 @@ class HomeAssistantService {
   }
 
   private async fetchEntitiesFromHA(): Promise<EntityInfo[]> {
-    // Build list of fetch methods to try
+    // Method 1: Try WebSocket via parent's hass object (BEST for iOS companion app)
+    try {
+      const hass = getHass();
+      if (hass?.states) {
+        // Direct access to states object
+        console.log('[ButtonBuilder] Trying direct hass.states access');
+        const states = Object.values(hass.states) as HAEntity[];
+        if (states.length > 0) {
+          const entities = this.parseStates(states);
+          this.entities = entities;
+          console.log(`[ButtonBuilder] ✓ Fetched ${entities.length} entities via hass.states`);
+          return entities;
+        }
+      }
+    } catch (e: any) {
+      console.log('[ButtonBuilder] hass.states failed:', e.message);
+    }
+
+    // Method 2: Try WebSocket API call
+    try {
+      console.log('[ButtonBuilder] Trying WebSocket get_states');
+      const states = await callHassWS('get_states');
+      if (states && Array.isArray(states) && states.length > 0) {
+        const entities = this.parseStates(states);
+        this.entities = entities;
+        console.log(`[ButtonBuilder] ✓ Fetched ${entities.length} entities via WebSocket`);
+        return entities;
+      }
+    } catch (e: any) {
+      console.log('[ButtonBuilder] WebSocket get_states failed:', e.message);
+    }
+
+    // Method 3: Fall back to HTTP fetch methods
     const methods: Array<() => Promise<EntityInfo[]>> = [];
     
     // If we have a token, try it first
@@ -140,12 +239,11 @@ class HomeAssistantService {
         const result = await method();
         if (result.length > 0) {
           this.entities = result;
-          console.log(`[ButtonBuilder] ✓ Fetched ${result.length} entities`);
+          console.log(`[ButtonBuilder] ✓ Fetched ${result.length} entities via HTTP`);
           return result;
         }
       } catch (e: any) {
-        console.log(`[ButtonBuilder] Fetch method failed: ${e.message}`);
-        // Continue to next method
+        console.log(`[ButtonBuilder] HTTP fetch failed: ${e.message}`);
       }
     }
 
