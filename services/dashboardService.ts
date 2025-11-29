@@ -88,39 +88,14 @@ const callHassWS = async (type: string, data?: any): Promise<any> => {
     throw new Error('Home Assistant connection not available');
   }
   
-  // Method 1: Use hass.callWS (available in modern HA)
+  // Use hass.callWS which is available in modern HA
   if (typeof hass.callWS === 'function') {
-    try {
-      return await hass.callWS({ type, ...data });
-    } catch (e) {
-      console.warn('hass.callWS failed:', e);
-    }
+    return await hass.callWS({ type, ...data });
   }
   
-  // Method 2: Use the connection directly
-  if (hass.connection) {
-    return new Promise((resolve, reject) => {
-      const msgId = Date.now();
-      
-      const unsub = hass.connection.subscribeMessage(
-        (msg: any) => {
-          unsub();
-          if (msg.success === false) {
-            reject(new Error(msg.error?.message || 'Unknown error'));
-          } else {
-            resolve(msg.result);
-          }
-        },
-        { type, id: msgId, ...data },
-        { resubscribe: false }
-      );
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        unsub();
-        reject(new Error('Timeout waiting for response'));
-      }, 10000);
-    });
+  // Fallback: Use connection.sendMessagePromise
+  if (hass.connection?.sendMessagePromise) {
+    return await hass.connection.sendMessagePromise({ type, ...data });
   }
   
   throw new Error('No valid method to call WebSocket API');

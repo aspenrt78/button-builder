@@ -147,7 +147,39 @@ const App: React.FC = () => {
       setOnStatePreset(preset);
     } else {
       // Setting the main preset
-      setConfig(prev => ({ ...prev, ...preset.config }));
+      // Reset all visual style properties to defaults, then apply preset
+      // This prevents style bleed from previous presets
+      const styleDefaults: Partial<ButtonConfig> = {
+        backgroundColor: DEFAULT_CONFIG.backgroundColor,
+        backgroundColorOpacity: DEFAULT_CONFIG.backgroundColorOpacity,
+        color: DEFAULT_CONFIG.color,
+        borderRadius: DEFAULT_CONFIG.borderRadius,
+        borderWidth: DEFAULT_CONFIG.borderWidth,
+        borderStyle: DEFAULT_CONFIG.borderStyle,
+        borderColor: DEFAULT_CONFIG.borderColor,
+        backdropBlur: DEFAULT_CONFIG.backdropBlur,
+        shadowSize: DEFAULT_CONFIG.shadowSize,
+        shadowColor: DEFAULT_CONFIG.shadowColor,
+        shadowOpacity: DEFAULT_CONFIG.shadowOpacity,
+        iconColor: DEFAULT_CONFIG.iconColor,
+        iconColorAuto: DEFAULT_CONFIG.iconColorAuto,
+        nameColor: DEFAULT_CONFIG.nameColor,
+        stateColor: DEFAULT_CONFIG.stateColor,
+        labelColor: DEFAULT_CONFIG.labelColor,
+        gradientEnabled: DEFAULT_CONFIG.gradientEnabled,
+        gradientType: DEFAULT_CONFIG.gradientType,
+        gradientAngle: DEFAULT_CONFIG.gradientAngle,
+        gradientColor1: DEFAULT_CONFIG.gradientColor1,
+        gradientColor2: DEFAULT_CONFIG.gradientColor2,
+        gradientColor3: DEFAULT_CONFIG.gradientColor3,
+        gradientColor3Enabled: DEFAULT_CONFIG.gradientColor3Enabled,
+        cardAnimation: DEFAULT_CONFIG.cardAnimation,
+        cardAnimationTrigger: DEFAULT_CONFIG.cardAnimationTrigger,
+        cardAnimationSpeed: DEFAULT_CONFIG.cardAnimationSpeed,
+        extraStyles: '',
+      };
+      
+      setConfig(prev => ({ ...prev, ...styleDefaults, ...preset.config }));
       setActivePreset(preset);
       // Reset condition-based presets when changing main preset
       if (presetCondition === 'always') {

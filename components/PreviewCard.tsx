@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDashboard, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDashboard, RefreshCw, Upload, X, Image } from 'lucide-react';
 import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
 import { getIconComponent } from '../services/iconMapper';
 import { isInHomeAssistant, fetchAllDashboardConfigs, DashboardConfig, DashboardGridConfig, parseBackgroundToCss } from '../services/dashboardService';
@@ -172,6 +172,46 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const [cardHeight, setCardHeight] = useState(100);
   const [gridGap, setGridGap] = useState(8);
   const [showGrid, setShowGrid] = useState(false);
+  
+  // Custom background image upload
+  const [customBackgroundName, setCustomBackgroundName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Handle file upload for custom background
+  const handleBackgroundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be less than 5MB');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setCanvasBackground(`url(${dataUrl})`);
+        setCustomBackgroundName(file.name);
+        setSelectedDashboard(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  // Clear custom background
+  const clearCustomBackground = () => {
+    setCanvasBackground(null);
+    setCustomBackgroundName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Check if we're in HA on mount
   useEffect(() => {
@@ -243,6 +283,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const clearDashboardSelection = () => {
     setSelectedDashboard(null);
     setCanvasBackground(null);
+    setCustomBackgroundName(null);
   };
 
   // Refresh dashboards
@@ -576,7 +617,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                        key={c} 
                        className={`w-8 h-8 rounded-full border shadow-sm transition-all ${canvasColor === c && !canvasBackground ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-600 hover:border-gray-500'}`}
                        style={{ backgroundColor: c }}
-                       onClick={() => { setCanvasColor(c); setCanvasBackground(null); }}
+                       onClick={() => { setCanvasColor(c); setCanvasBackground(null); setCustomBackgroundName(null); }}
                        title={c}
                      />
                    ))}
@@ -584,9 +625,55 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
                 <input 
                    type="color" 
                    value={canvasColor}
-                   onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); }}
+                   onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); setCustomBackgroundName(null); }}
                    className="w-full h-8 rounded cursor-pointer mb-3"
                 />
+
+                {/* Custom Background Upload */}
+                <div className="border-t border-gray-800 pt-3 mt-3">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1 mb-2">
+                    <Image size={12} />
+                    Custom Background
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBackgroundUpload}
+                    className="hidden"
+                    id="background-upload"
+                  />
+                  
+                  {!customBackgroundName ? (
+                    <label
+                      htmlFor="background-upload"
+                      className="flex items-center justify-center gap-2 w-full px-3 py-2 border border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 hover:bg-gray-800/50 transition-colors"
+                    >
+                      <Upload size={14} className="text-gray-400" />
+                      <span className="text-xs text-gray-400">Upload image</span>
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-2 px-2 py-2 bg-gray-800 rounded-lg">
+                      <div 
+                        className="w-8 h-8 rounded border border-gray-600 shrink-0 bg-cover bg-center"
+                        style={canvasBackground ? parseBackgroundToCss(canvasBackground) : {}}
+                      />
+                      <span className="text-xs text-gray-300 truncate flex-1">{customBackgroundName}</span>
+                      <button
+                        onClick={clearCustomBackground}
+                        className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                        title="Remove background"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  
+                  <p className="text-[9px] text-gray-500 mt-1">
+                    Upload your dashboard background image
+                  </p>
+                </div>
 
                 {/* Dashboard Backgrounds Section */}
                 {isHA && (
