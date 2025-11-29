@@ -586,12 +586,25 @@ export const ConfigPanel: React.FC<Props> = ({
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
                         <ControlInput label="Card Background" type="color" value={config.backgroundColor} onChange={(v) => {
-                          // Disable gradient when manually setting background color
+                          // Disable gradient and clear extraStyles background when manually setting background color
+                          const updates: Partial<typeof config> = { backgroundColor: v };
+                          
                           if (config.gradientEnabled) {
-                            onChange({ ...config, backgroundColor: v, gradientEnabled: false });
-                          } else {
-                            update('backgroundColor', v);
+                            updates.gradientEnabled = false;
                           }
+                          
+                          // Clear background from extraStyles if present (presets use this)
+                          if (config.extraStyles && /background\s*:|linear-gradient|radial-gradient|conic-gradient/i.test(config.extraStyles)) {
+                            // Remove background-related lines from extraStyles
+                            const cleanedStyles = config.extraStyles
+                              .split('\n')
+                              .filter(line => !/^\s*(background\s*:|background-image\s*:)/i.test(line.trim()))
+                              .join('\n')
+                              .trim();
+                            updates.extraStyles = cleanedStyles;
+                          }
+                          
+                          onChange({ ...config, ...updates });
                         }} />
                           <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
                    </div>
