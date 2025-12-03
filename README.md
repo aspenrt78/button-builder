@@ -186,6 +186,25 @@ npm run build
 
 The built files will be output to `custom_components/button_builder/www/`
 
+## 📁 Project Structure
+
+```
+button-builder/
+├── src/                    # Source code
+│   ├── components/         # React components
+│   ├── services/           # API services
+│   ├── utils/              # Utility functions
+│   ├── bubble-card/        # Bubble Card builder (beta)
+│   └── assets/             # Images & assets
+├── docs/                   # Documentation
+├── scripts/                # Build & deploy scripts
+├── wiki/                   # GitHub wiki pages
+├── custom_components/      # Home Assistant integration
+│   └── button_builder/
+│       └── www/            # Built frontend files
+└── brands_submission/      # HACS brand assets
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

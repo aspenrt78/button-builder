@@ -21,7 +21,7 @@ export interface PresetState {
   onStatePreset: Preset | null;
 }
 
-import logo from './logo.png';
+import logo from './assets/logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
 

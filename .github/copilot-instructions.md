@@ -6,7 +6,7 @@ Button Builder is a **Home Assistant custom integration** that provides a visual
 ## Architecture
 
 ### Dual-Layer Structure
-1. **Frontend (React/Vite)**: `App.tsx`, `components/`, `services/`, `utils/`
+1. **Frontend (React/Vite)**: `src/App.tsx`, `src/components/`, `src/services/`, `src/utils/`
 2. **HA Integration (Python)**: `custom_components/button_builder/` - registers sidebar panel
 
 ### Key Data Flow
@@ -17,11 +17,29 @@ User Input → ConfigPanel → ButtonConfig state → yamlGenerator.ts → YAML 
 ```
 
 ### Critical Files
-- **`types.ts`**: `ButtonConfig` interface (~100+ properties) - the single source of truth
-- **`App.tsx`**: Main state management, preset handling, import/export
-- **`utils/yamlGenerator.ts`**: Converts `ButtonConfig` → button-card YAML (1300+ lines)
-- **`presets.ts`**: 80+ style presets with `Partial<ButtonConfig>` configs
-- **`services/geminiService.ts`**: AI generation with structured schema output
+- **`src/types.ts`**: `ButtonConfig` interface (~100+ properties) - the single source of truth
+- **`src/ButtonCardApp.tsx`**: Main state management, preset handling, import/export
+- **`src/utils/yamlGenerator.ts`**: Converts `ButtonConfig` → button-card YAML (1300+ lines)
+- **`src/presets.ts`**: 80+ style presets with `Partial<ButtonConfig>` configs
+- **`src/services/geminiService.ts`**: AI generation with structured schema output
+
+## Project Structure
+```
+button-builder/
+├── src/                    # Source code
+│   ├── components/         # React components
+│   ├── services/           # API services
+│   ├── utils/              # Utility functions
+│   ├── bubble-card/        # Bubble Card builder (beta)
+│   └── assets/             # Images & assets
+├── docs/                   # Documentation
+├── scripts/                # Build & deploy scripts
+├── wiki/                   # GitHub wiki pages
+├── custom_components/      # Home Assistant integration
+│   └── button_builder/
+│       └── www/            # Built frontend files
+└── brands_submission/      # HACS brand assets
+```
 
 ## Development Workflow
 
@@ -54,15 +72,15 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "..." --latest
 - Config persists to `localStorage` with key `button-builder-config`
 
 ### Adding New ButtonConfig Properties
-1. Add to `ButtonConfig` interface in `types.ts`
-2. Add default value to `DEFAULT_CONFIG` in `types.ts`
-3. Add UI control in `components/ConfigPanel.tsx`
-4. Handle in `utils/yamlGenerator.ts` to output correct YAML
-5. Add to AI schema in `services/geminiService.ts` if AI should generate it
+1. Add to `ButtonConfig` interface in `src/types.ts`
+2. Add default value to `DEFAULT_CONFIG` in `src/types.ts`
+3. Add UI control in `src/components/ConfigPanel.tsx`
+4. Handle in `src/utils/yamlGenerator.ts` to output correct YAML
+5. Add to AI schema in `src/services/geminiService.ts` if AI should generate it
 
 ### Preset Structure
 ```typescript
-// presets.ts
+// src/presets.ts
 {
   name: 'Preset Name',
   description: 'Short description',
@@ -95,10 +113,10 @@ The panel runs inside HA's iframe sandbox. To test locally with HA APIs:
 
 ## File Relationships
 ```
-ButtonConfig (types.ts)
-    ├── ConfigPanel.tsx (UI inputs)
-    ├── PreviewCard.tsx (live preview)
-    ├── yamlGenerator.ts (YAML output)
-    ├── geminiService.ts (AI schema)
-    └── presets.ts (preset configs)
+ButtonConfig (src/types.ts)
+    ├── src/components/ConfigPanel.tsx (UI inputs)
+    ├── src/components/PreviewCard.tsx (live preview)
+    ├── src/utils/yamlGenerator.ts (YAML output)
+    ├── src/services/geminiService.ts (AI schema)
+    └── src/presets.ts (preset configs)
 ```

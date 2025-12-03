@@ -5,13 +5,14 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      root: 'src',
       base: '/button_builder/',
       server: {
         port: 3000,
         host: '0.0.0.0',
       },
       build: {
-        outDir: 'custom_components/button_builder/www',
+        outDir: '../custom_components/button_builder/www',
         emptyOutDir: false, // Don't delete panel.html
         chunkSizeWarningLimit: 4000, // Suppress warning for large bundles (expected for this app)
         rollupOptions: {
@@ -30,7 +31,7 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
-          '@': path.resolve(__dirname, '.'),
+          '@': path.resolve(__dirname, 'src'),
         }
       }
     };
