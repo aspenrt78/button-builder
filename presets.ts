@@ -5,7 +5,127 @@ export interface Preset {
   description: string;
   category: 'minimal' | 'glass' | 'neon' | 'animated' | 'custom' | '3d' | 'retro' | 'gradient' | 'cyberpunk' | 'nature' | 'icon-styles';
   config: Partial<ButtonConfig>;
+  /** If true, this preset is auto-generated as a dark mode variant */
+  isAutoDark?: boolean;
 }
+
+/**
+ * Helper function to darken a hex color
+ */
+const darkenColor = (hex: string, amount: number = 0.5): string => {
+  if (!hex || !hex.startsWith('#')) return hex;
+  
+  // Handle rgba format
+  if (hex.includes('rgba')) return hex;
+  
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  
+  const newR = Math.round(r * amount);
+  const newG = Math.round(g * amount);
+  const newB = Math.round(b * amount);
+  
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+/**
+ * Helper function to desaturate a hex color (make it more muted/gray)
+ */
+const desaturateColor = (hex: string, amount: number = 0.5): string => {
+  if (!hex || !hex.startsWith('#')) return hex;
+  
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  
+  const gray = (r + g + b) / 3;
+  
+  const newR = Math.round(r + (gray - r) * amount);
+  const newG = Math.round(g + (gray - g) * amount);
+  const newB = Math.round(b + (gray - b) * amount);
+  
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+/**
+ * Generates a dark mode equivalent preset from an existing preset.
+ * This creates a muted, darker version suitable for the "off" state.
+ */
+export const generateDarkModePreset = (preset: Preset): Preset => {
+  const config = { ...preset.config };
+  
+  // Darken background color
+  if (config.backgroundColor) {
+    config.backgroundColor = darkenColor(config.backgroundColor, 0.4);
+  }
+  
+  // Reduce background opacity for glass effects
+  if (config.backgroundColorOpacity && config.backgroundColorOpacity > 30) {
+    config.backgroundColorOpacity = Math.max(20, config.backgroundColorOpacity * 0.5);
+  }
+  
+  // Darken and desaturate icon color
+  if (config.iconColor) {
+    config.iconColor = desaturateColor(darkenColor(config.iconColor, 0.5), 0.6);
+  }
+  
+  // Darken and desaturate name color
+  if (config.nameColor) {
+    config.nameColor = desaturateColor(darkenColor(config.nameColor, 0.5), 0.6);
+  }
+  
+  // Darken and desaturate label color
+  if (config.labelColor) {
+    config.labelColor = desaturateColor(darkenColor(config.labelColor, 0.5), 0.6);
+  }
+  
+  // Darken border color
+  if (config.borderColor) {
+    config.borderColor = darkenColor(config.borderColor, 0.4);
+  }
+  
+  // Darken main text color
+  if (config.color) {
+    config.color = desaturateColor(darkenColor(config.color, 0.6), 0.5);
+  }
+  
+  // Reduce shadow intensity
+  if (config.shadowOpacity) {
+    config.shadowOpacity = Math.max(10, config.shadowOpacity * 0.5);
+  }
+  if (config.shadowColor) {
+    config.shadowColor = '#000000';
+  }
+  
+  // Disable animations for off state
+  config.cardAnimation = 'none';
+  config.iconAnimation = 'none';
+  
+  // Handle gradient presets - darken the gradient or disable it
+  if (config.extraStyles && config.extraStyles.includes('gradient')) {
+    // For gradient presets, we modify the extraStyles to darken it
+    config.extraStyles = config.extraStyles
+      .replace(/linear-gradient\([^)]+\)/g, 'linear-gradient(135deg, #1a1a1a, #2a2a2a)')
+      .replace(/radial-gradient\([^)]+\)/g, 'radial-gradient(circle, #1a1a1a, #2a2a2a)')
+      .replace(/conic-gradient\([^)]+\)/g, 'conic-gradient(from 0deg, #1a1a1a, #2a2a2a, #1a1a1a)');
+  }
+  
+  // Darken gradient colors if using built-in gradient
+  if (config.gradientEnabled) {
+    if (config.gradientColor1) config.gradientColor1 = darkenColor(config.gradientColor1, 0.3);
+    if (config.gradientColor2) config.gradientColor2 = darkenColor(config.gradientColor2, 0.3);
+    if (config.gradientColor3) config.gradientColor3 = darkenColor(config.gradientColor3, 0.3);
+  }
+  
+  return {
+    name: `${preset.name} (Dark)`,
+    description: `Dark mode version of ${preset.name}`,
+    category: preset.category,
+    config,
+    isAutoDark: true,
+  };
+};
 
 export const PRESETS: Preset[] = [
   // ============================================

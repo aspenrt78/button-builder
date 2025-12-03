@@ -7,6 +7,8 @@ import { isInHomeAssistant, fetchAllDashboardConfigs, DashboardConfig, Dashboard
 
 interface Props {
   config: ButtonConfig;
+  simulatedState: 'on' | 'off';
+  onSimulatedStateChange: (state: 'on' | 'off') => void;
 }
 
 // Dashboard layout presets matching common HA configurations
@@ -152,8 +154,8 @@ const getGridCols = (layout: string) => {
   }
 };
 
-export const PreviewCard: React.FC<Props> = ({ config }) => {
-  const [simulatedState, setSimulatedState] = useState<'on' | 'off'>('on');
+export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulatedStateChange }) => {
+  const setSimulatedState = onSimulatedStateChange;
   const [canvasColor, setCanvasColor] = useState('#0a0a0a');
   const [canvasBackground, setCanvasBackground] = useState<string | null>(null);
   const [showCanvasPicker, setShowCanvasPicker] = useState(false);
@@ -354,8 +356,15 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     return defaultColor;
   };
 
+  // 0. Find matching stateStyle for current simulated state (preset conditions)
+  // This allows preset conditions to apply different styles for ON vs OFF
+  const matchingStateStyle = config.stateStyles?.find(ss => 
+    ss.operator === 'equals' && ss.value === simulatedState
+  );
+
   // 1. Resolve Card Background
-  let actualBgHex = isOff ? config.stateOffColor : config.stateOnColor;
+  // First check if there's a matching state style with a background color
+  let actualBgHex = matchingStateStyle?.backgroundColor || (isOff ? config.stateOffColor : config.stateOnColor);
   let actualBgOpacity = isOff ? config.stateOffOpacity : config.stateOnOpacity;
   
   if (config.colorType === 'card' && config.colorAuto && isOn) {
@@ -368,17 +377,18 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const actualBg = hexToRgba(actualBgHex, actualBgOpacity);
 
   // 2. Resolve Colors - Auto flag should use simulated entity color when ON
-  const actualIconColor = resolveColor(
+  // Also check matchingStateStyle for state-specific colors
+  const actualIconColor = matchingStateStyle?.iconColor || resolveColor(
     config.iconColor, 
     config.iconColorAuto, 
     config.color || '#ffffff', 
     isOn // Use simulated color when iconColorAuto is true AND state is ON
   );
   
-  const actualNameColor = resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn);
+  const actualNameColor = matchingStateStyle?.nameColor || resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn);
   const actualStateColor = resolveColor(config.stateColor, config.stateColorAuto, config.color || '#ffffff', isOn);
-  const actualLabelColor = resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn);
-  const actualBorderColor = resolveColor(config.borderColor, config.borderColorAuto, 'transparent', isOn);
+  const actualLabelColor = matchingStateStyle?.labelColor || resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn);
+  const actualBorderColor = matchingStateStyle?.borderColor || resolveColor(config.borderColor, config.borderColorAuto, 'transparent', isOn);
 
   // 3. Border Logic
   const borderStyle = config.borderStyle !== 'none' ? `${config.borderWidth} ${config.borderStyle} ${actualBorderColor}` : 'none';
@@ -392,8 +402,20 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     return '';
   };
 
-  const cardAnimationClass = getAnimationClass(config.cardAnimation, config.cardAnimationTrigger);
-  const cardAnimationDuration = config.cardAnimationSpeed || '2s';
+  // Check for state-specific animations from matchingStateStyle
+  const stateCardAnimation = matchingStateStyle?.cardAnimation;
+  const stateCardAnimationSpeed = matchingStateStyle?.cardAnimationSpeed;
+  
+  // Use state-specific animation if it exists and is not 'none', otherwise use config animation
+  const effectiveCardAnimation = (stateCardAnimation && stateCardAnimation !== 'none') 
+    ? stateCardAnimation 
+    : config.cardAnimation;
+  const effectiveCardAnimationTrigger = (stateCardAnimation && stateCardAnimation !== 'none')
+    ? simulatedState as AnimationTrigger // State animations always apply in their state
+    : config.cardAnimationTrigger;
+
+  const cardAnimationClass = getAnimationClass(effectiveCardAnimation, effectiveCardAnimationTrigger);
+  const cardAnimationDuration = stateCardAnimationSpeed || config.cardAnimationSpeed || '2s';
 
   const iconAnimationFromSelect = getAnimationClass(config.iconAnimation, config.iconAnimationTrigger);
   // Include rotate flag (same as spin)
@@ -403,16 +425,27 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const iconAnimationDuration = ((config.spin || config.rotate) ? config.spinDuration : config.iconAnimationSpeed) || '2s';
 
   // Marquee Logic: If marquee is active and valid
-  const isMarquee = config.cardAnimation === 'marquee' && 
-                    ((config.cardAnimationTrigger === 'always') ||
-                     (config.cardAnimationTrigger === 'on' && isOn) ||
-                     (config.cardAnimationTrigger === 'off' && isOff));
+  const isMarquee = effectiveCardAnimation === 'marquee' && 
+                    ((effectiveCardAnimationTrigger === 'always') ||
+                     (effectiveCardAnimationTrigger === 'on' && isOn) ||
+                     (effectiveCardAnimationTrigger === 'off' && isOff));
 
   // 5. Shadow Logic
   const shadowStyle = getShadowStyle(config.shadowSize, config.shadowColor, config.shadowOpacity);
 
   // 6. Parse extra styles
   const extraStylesParsed = parseExtraStyles(config.extraStyles);
+
+  // 6b. Parse the matching state style's extraStyles (if any)
+  // matchingStateStyle was found earlier (section 0)
+  const stateExtraStylesParsed = matchingStateStyle?.styles 
+    ? parseExtraStyles(matchingStateStyle.styles) 
+    : {};
+  
+  // Determine which extraStyles to use - state-specific takes precedence
+  const effectiveExtraStyles = Object.keys(stateExtraStylesParsed).length > 0 
+    ? stateExtraStylesParsed 
+    : extraStylesParsed;
 
   // 7. Gradient Background
   const getGradientBackground = () => {
@@ -437,7 +470,7 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
   const gradientBg = getGradientBackground();
   
   // Check if extraStyles has a background property to avoid React warning about conflicting styles
-  const hasExtraBackground = 'background' in extraStylesParsed || 'backgroundImage' in extraStylesParsed;
+  const hasExtraBackground = 'background' in effectiveExtraStyles || 'backgroundImage' in effectiveExtraStyles;
 
   const containerStyle: React.CSSProperties = {
     // Only set backgroundColor if no gradient and no extraStyles background
@@ -455,9 +488,10 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     cursor: 'pointer',
     boxShadow: shadowStyle,
     backdropFilter: config.backdropBlur !== '0px' ? `blur(${config.backdropBlur})` : 'none',
-    gridTemplateAreas: getGridTemplate(config.layout),
-    gridTemplateRows: getGridRows(config.layout),
-    gridTemplateColumns: getGridCols(config.layout),
+    // Use custom grid if enabled, otherwise use preset layout
+    gridTemplateAreas: config.customGridEnabled ? config.customGridTemplateAreas : getGridTemplate(config.layout),
+    gridTemplateRows: config.customGridEnabled ? config.customGridTemplateRows : getGridRows(config.layout),
+    gridTemplateColumns: config.customGridEnabled ? config.customGridTemplateColumns : getGridCols(config.layout),
     justifyItems: 'center',
     alignItems: 'center',
     gap: '4px',
@@ -477,7 +511,8 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
     // Only set animationDuration if we have a cardAnimationClass (avoid overriding extraStyles animation)
     ...(cardAnimationClass ? { animationDuration: cardAnimationDuration } : {}),
     // Apply extra styles LAST so they can override defaults
-    ...extraStylesParsed,
+    // Use effectiveExtraStyles which respects state-specific styles from preset conditions
+    ...effectiveExtraStyles,
   };
 
   // Calculate canvas style - support both color and background image
@@ -856,8 +891,34 @@ export const PreviewCard: React.FC<Props> = ({ config }) => {
             </div>
           )}
 
-          {/* Custom Fields */}
-          {config.customFields.length > 0 && (
+          {/* Custom Fields - Render in their grid areas when custom grid is enabled */}
+          {config.customGridEnabled && config.customFields.length > 0 ? (
+            config.customFields.map((field, idx) => (
+              <div 
+                key={field.name || idx}
+                style={{ 
+                  gridArea: field.gridArea || field.name,
+                  ...parseExtraStyles(field.styles || ''),
+                  fontSize: '0.75em',
+                  opacity: 0.9,
+                }}
+                className="flex items-center justify-center text-center"
+              >
+                {field.icon && (
+                  <IconMapper 
+                    name={field.icon}
+                    size="16px"
+                    color={config.color || '#ffffff'}
+                    animationClass=""
+                    animationDuration="0s"
+                  />
+                )}
+                <span className="ml-1">
+                  {field.prefix}{field.type === 'entity' ? (field.attribute ? '—' : '—') : field.value}{field.suffix}
+                </span>
+              </div>
+            ))
+          ) : config.customFields.length > 0 && (
             <div className="absolute bottom-1 right-1 text-[8px] text-gray-400 opacity-50">
               +{config.customFields.length} field{config.customFields.length > 1 ? 's' : ''}
             </div>

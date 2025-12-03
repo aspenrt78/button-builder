@@ -1,5 +1,5 @@
 
-import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig } from "../types";
+import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig, ThresholdColorConfig } from "../types";
 
 // Helper to convert hex + opacity (0-100) to RGBA string
 const hexToRgba = (hex: string, opacity: number) => {
@@ -43,6 +43,40 @@ const getAnimationCSS = (type: AnimationType, speed: string = '2s') => {
     case 'breathe': return `animation: cba-breathe ${speed} ease-in-out infinite`;
     case 'ripple': return `animation: cba-ripple 1.5s ease-out infinite`;
     default: return null;
+  }
+};
+
+// Helper to generate threshold color template
+const generateThresholdColorTemplate = (config: ThresholdColorConfig): string => {
+  if (!config.enabled) return '';
+  
+  const entityId = config.entity || 'entity';
+  const valueSource = config.attribute 
+    ? `states['${entityId}'].attributes.${config.attribute}`
+    : entityId === 'entity' 
+      ? `entity.state` 
+      : `states['${entityId}'].state`;
+  
+  if (config.mode === 'ascending') {
+    // Low values = green, high values = red
+    return `|
+      [[[
+        var val = parseFloat(${valueSource});
+        if (isNaN(val)) return 'inherit';
+        if (val <= ${config.greenThreshold}) return '${config.greenColor}';
+        if (val <= ${config.yellowThreshold}) return '${config.yellowColor}';
+        return '${config.redColor}';
+      ]]]`;
+  } else {
+    // High values = green, low values = red (descending)
+    return `|
+      [[[
+        var val = parseFloat(${valueSource});
+        if (isNaN(val)) return 'inherit';
+        if (val >= ${config.greenThreshold}) return '${config.greenColor}';
+        if (val >= ${config.yellowThreshold}) return '${config.yellowColor}';
+        return '${config.redColor}';
+      ]]]`;
   }
 };
 
@@ -571,7 +605,37 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.customFields.length > 0) {
     yaml += `custom_fields:\n`;
     config.customFields.forEach(field => {
-      yaml += `  ${field.name}: "${field.value}"\n`;
+      if (field.type === 'entity' && field.entity) {
+        // Entity-based field - generate template automatically
+        const entityId = field.entity;
+        const attr = field.attribute;
+        const prefix = field.prefix || '';
+        const suffix = field.suffix || '';
+        const icon = field.icon;
+        
+        let template = '[[[';
+        if (icon) {
+          template += `\n    var icon = '<ha-icon icon="${icon}" style="width:14px;height:14px;margin-right:4px;"></ha-icon>';`;
+        }
+        if (attr) {
+          template += `\n    var val = states['${entityId}'].attributes.${attr};`;
+        } else {
+          template += `\n    var val = states['${entityId}'].state;`;
+        }
+        if (icon) {
+          template += `\n    return icon + '${prefix}' + val + '${suffix}';`;
+        } else {
+          template += `\n    return '${prefix}' + val + '${suffix}';`;
+        }
+        template += '\n  ]]]';
+        
+        yaml += `  ${field.name}: |\n    ${template}\n`;
+      } else if (field.value.includes('[[[') && field.value.includes(']]]')) {
+        // Template with JS syntax
+        yaml += `  ${field.name}: |\n    ${field.value}\n`;
+      } else {
+        yaml += `  ${field.name}: "${field.value}"\n`;
+      }
     });
   }
 
@@ -761,19 +825,20 @@ export const generateYaml = (config: ButtonConfig): string => {
 
   // --- Styles Section (only if there are styles) ---
   const hasCardStyles = cardStyles.length > 0 || config.extraStyles;
-  const hasIconStyles = iconStyles.length > 0;
+  const hasIconStyles = iconStyles.length > 0 || (config.thresholdColor.enabled && config.thresholdColor.applyToIcon);
   const nameColorLine = getColorLine(config.nameColor, config.nameColorAuto);
   const labelColorLine = getColorLine(config.labelColor, config.labelColorAuto);
   const stateColorLine = getColorLine(config.stateColor, config.stateColorAuto);
-  const hasNameStyles = nameColorLine || (config.fontWeight && config.fontWeight !== 'normal');
-  const hasLabelStyles = !!labelColorLine;
-  const hasStateStyles = !!stateColorLine;
+  const hasNameStyles = nameColorLine || (config.fontWeight && config.fontWeight !== 'normal') || (config.thresholdColor.enabled && config.thresholdColor.applyToName);
+  const hasLabelStyles = !!labelColorLine || (config.thresholdColor.enabled && config.thresholdColor.applyToLabel);
+  const hasStateStyles = !!stateColorLine || (config.thresholdColor.enabled && config.thresholdColor.applyToState);
   const hasEntityPictureStyles = !!config.entityPictureStyles;
-  const hasGridStyles = !!config.gridStyles;
-  const fieldsWithStyles = config.customFields.filter(f => f.styles);
+  const hasGridStyles = !!config.gridStyles || config.customGridEnabled;
+  const fieldsWithStyles = config.customFields.filter(f => f.styles || f.gridArea);
   const hasLockStyles = config.lock.enabled && config.lockStyles;
   const hasTooltipStyles = config.tooltip.enabled && config.tooltipStyles;
   const hasImgCellStyles = !!config.imgCellStyles;
+  const thresholdColorTemplate = generateThresholdColorTemplate(config.thresholdColor);
   
   const hasAnyStyles = hasCardStyles || hasIconStyles || hasNameStyles || hasLabelStyles || 
                        hasStateStyles || hasEntityPictureStyles || hasGridStyles || 
@@ -810,6 +875,10 @@ export const generateYaml = (config: ButtonConfig): string => {
       iconStyles.forEach(s => {
         yaml += `    - ${formatStyleForYaml(s)}\n`;
       });
+      // Threshold color for icon
+      if (config.thresholdColor.enabled && config.thresholdColor.applyToIcon && thresholdColorTemplate) {
+        yaml += `    - color: ${thresholdColorTemplate}\n`;
+      }
     }
 
     // Name Styles - only if there's actual styling
@@ -818,7 +887,9 @@ export const generateYaml = (config: ButtonConfig): string => {
       if (config.fontWeight && config.fontWeight !== 'normal') {
         yaml += `    - font-weight: ${config.fontWeight}\n`;
       }
-      if (nameColorLine) {
+      if (config.thresholdColor.enabled && config.thresholdColor.applyToName && thresholdColorTemplate) {
+        yaml += `    - color: ${thresholdColorTemplate}\n`;
+      } else if (nameColorLine) {
         yaml += nameColorLine;
       }
     }
@@ -826,13 +897,21 @@ export const generateYaml = (config: ButtonConfig): string => {
     // Label Styles
     if (hasLabelStyles) {
       yaml += `  label:\n`;
-      yaml += labelColorLine;
+      if (config.thresholdColor.enabled && config.thresholdColor.applyToLabel && thresholdColorTemplate) {
+        yaml += `    - color: ${thresholdColorTemplate}\n`;
+      } else {
+        yaml += labelColorLine;
+      }
     }
 
     // State Styles (Text)
     if (hasStateStyles) {
       yaml += `  state:\n`;
-      yaml += stateColorLine;
+      if (config.thresholdColor.enabled && config.thresholdColor.applyToState && thresholdColorTemplate) {
+        yaml += `    - color: ${thresholdColorTemplate}\n`;
+      } else {
+        yaml += stateColorLine;
+      }
     }
 
     // Entity Picture Styles
@@ -848,23 +927,43 @@ export const generateYaml = (config: ButtonConfig): string => {
     // Grid Styles
     if (hasGridStyles) {
       yaml += `  grid:\n`;
-      config.gridStyles.split('\n').forEach(line => {
-        if (line.trim()) {
-          yaml += `    - ${line.trim()}\n`;
+      // Custom grid template areas
+      if (config.customGridEnabled) {
+        yaml += `    - grid-template-areas: ${config.customGridTemplateAreas}\n`;
+        if (config.customGridTemplateColumns) {
+          yaml += `    - grid-template-columns: ${config.customGridTemplateColumns}\n`;
         }
-      });
+        if (config.customGridTemplateRows) {
+          yaml += `    - grid-template-rows: ${config.customGridTemplateRows}\n`;
+        }
+      }
+      // Additional raw grid styles
+      if (config.gridStyles) {
+        config.gridStyles.split('\n').forEach(line => {
+          if (line.trim()) {
+            yaml += `    - ${line.trim()}\n`;
+          }
+        });
+      }
     }
 
-    // Custom Field Styles
+    // Custom Field Styles (including grid-area positioning)
     if (fieldsWithStyles.length > 0) {
       yaml += `  custom_fields:\n`;
       fieldsWithStyles.forEach(field => {
         yaml += `    ${field.name}:\n`;
-        field.styles!.split('\n').forEach(line => {
-          if (line.trim()) {
-            yaml += `      - ${line.trim()}\n`;
-          }
-        });
+        // Add grid-area if specified
+        if (field.gridArea) {
+          yaml += `      - grid-area: ${field.gridArea}\n`;
+        }
+        // Add other styles
+        if (field.styles) {
+          field.styles.split('\n').forEach(line => {
+            if (line.trim()) {
+              yaml += `      - ${line.trim()}\n`;
+            }
+          });
+        }
       });
     }
 
@@ -1034,10 +1133,20 @@ ${getStateLogic('off', offColorResolved)}
         }
       }
       
+      // Parse extra styles and add to card styles
+      // These are CSS properties like "background: linear-gradient(...)" or "animation: ..."
+      if (stateStyle.styles) {
+        stateStyle.styles.split('\n').forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed && trimmed.includes(':')) {
+            conditionalCardStyles.push(trimmed);
+          }
+        });
+      }
+      
       // Output styles section if any conditional styles exist
       const hasConditionalStyles = conditionalCardStyles.length > 0 || conditionalIconStyles.length > 0 || 
-                                   conditionalNameStyles.length > 0 || conditionalLabelStyles.length > 0 || 
-                                   stateStyle.styles;
+                                   conditionalNameStyles.length > 0 || conditionalLabelStyles.length > 0;
       
       if (hasConditionalStyles) {
         yaml += `    styles:\n`;
@@ -1064,15 +1173,6 @@ ${getStateLogic('off', offColorResolved)}
           yaml += `      label:\n`;
           conditionalLabelStyles.forEach(s => {
             yaml += `        - ${formatStyleForYaml(s)}\n`;
-          });
-        }
-        
-        // Additional raw styles from textarea
-        if (stateStyle.styles) {
-          stateStyle.styles.split('\n').forEach(line => {
-            if (line.trim()) {
-              yaml += `      ${line.trim()}\n`;
-            }
           });
         }
       }

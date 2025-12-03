@@ -13,9 +13,15 @@ export type StateOperator = 'equals' | 'not_equals' | 'above' | 'below' | 'regex
 
 export interface CustomField {
   name: string;
-  type: 'text' | 'template';
+  type: 'text' | 'template' | 'entity';
   value: string;
   styles?: string;
+  gridArea?: string;
+  entity?: string;
+  attribute?: string;
+  icon?: string;
+  prefix?: string;
+  suffix?: string;
 }
 
 export interface Variable {
@@ -59,6 +65,41 @@ export interface ToastConfig {
   dismissable: boolean;
 }
 
+// Threshold-based color configuration for numeric entity values
+export interface ThresholdColorConfig {
+  enabled: boolean;
+  entity: string;
+  attribute: string;
+  mode: 'ascending' | 'descending'; // ascending: green=low, red=high; descending: green=high, red=low
+  greenThreshold: number;
+  yellowThreshold: number;
+  redThreshold: number;
+  applyToIcon: boolean;
+  applyToState: boolean;
+  applyToName: boolean;
+  applyToLabel: boolean;
+  greenColor: string;
+  yellowColor: string;
+  redColor: string;
+}
+
+export const DEFAULT_THRESHOLD_CONFIG: ThresholdColorConfig = {
+  enabled: false,
+  entity: '',
+  attribute: '',
+  mode: 'ascending',
+  greenThreshold: 30,
+  yellowThreshold: 60,
+  redThreshold: 80,
+  applyToIcon: true,
+  applyToState: true,
+  applyToName: false,
+  applyToLabel: false,
+  greenColor: '#22c55e',
+  yellowColor: '#eab308',
+  redColor: '#ef4444',
+};
+
 export interface StateStyleConfig {
   id: string;
   operator: StateOperator;
@@ -83,6 +124,65 @@ export interface StateStyleConfig {
   iconAnimation: AnimationType;
   iconAnimationSpeed: string;
 }
+
+// State-specific appearance configuration for ON/OFF state editing
+// This is used by the UI to store separate appearance for each state
+export interface StateAppearanceConfig {
+  // Colors
+  backgroundColor: string;
+  backgroundColorOpacity: number;
+  color: string;
+  iconColor: string;
+  nameColor: string;
+  labelColor: string;
+  borderColor: string;
+  // Gradient
+  gradientEnabled: boolean;
+  gradientType: 'linear' | 'radial' | 'conic';
+  gradientAngle: number;
+  gradientColor1: string;
+  gradientColor2: string;
+  gradientColor3: string;
+  gradientColor3Enabled: boolean;
+  // Glass / Depth
+  backdropBlur: string;
+  shadowSize: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner';
+  shadowColor: string;
+  shadowOpacity: number;
+  // Animations
+  cardAnimation: AnimationType;
+  cardAnimationSpeed: string;
+  iconAnimation: AnimationType;
+  iconAnimationSpeed: string;
+  // Extra styles
+  extraStyles: string;
+}
+
+export const DEFAULT_STATE_APPEARANCE: StateAppearanceConfig = {
+  backgroundColor: '',
+  backgroundColorOpacity: 100,
+  color: '',
+  iconColor: '',
+  nameColor: '',
+  labelColor: '',
+  borderColor: '',
+  gradientEnabled: false,
+  gradientType: 'linear',
+  gradientAngle: 135,
+  gradientColor1: '#667eea',
+  gradientColor2: '#764ba2',
+  gradientColor3: '#f093fb',
+  gradientColor3Enabled: false,
+  backdropBlur: 'none',
+  shadowSize: 'none',
+  shadowColor: '#000000',
+  shadowOpacity: 25,
+  cardAnimation: 'none',
+  cardAnimationSpeed: '2s',
+  iconAnimation: 'none',
+  iconAnimationSpeed: '2s',
+  extraStyles: '',
+};
 
 export interface ButtonConfig {
   // Core
@@ -287,6 +387,12 @@ export interface ButtonConfig {
   spin: boolean;
   spinDuration: string;
   
+  // Custom Grid Layout (for custom_fields positioning)
+  customGridEnabled: boolean;
+  customGridTemplateAreas: string;
+  customGridTemplateColumns: string;
+  customGridTemplateRows: string;
+  
   // Extra Styles (raw CSS)
   extraStyles: string;
   entityPictureStyles: string;
@@ -315,6 +421,9 @@ export interface ButtonConfig {
   conditionalEntity: string;
   conditionalState: string;
   conditionalOperator: string;
+  
+  // Threshold-based Color Alerts
+  thresholdColor: ThresholdColorConfig;
 }
 
 export const DEFAULT_TOAST_CONFIG: ToastConfig = {
@@ -431,9 +540,9 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   lineHeight: 'normal',
   numericPrecision: -1,
   
-  stateOnColor: '#f1c40f',
+  stateOnColor: '',
   stateOnOpacity: 100,
-  stateOffColor: '#4a4a4a',
+  stateOffColor: '',
   stateOffOpacity: 100,
   stateStyles: [],
   
@@ -529,6 +638,11 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   spin: false,
   spinDuration: '2s',
   
+  customGridEnabled: false,
+  customGridTemplateAreas: '"i n" "i s"',
+  customGridTemplateColumns: 'min-content 1fr',
+  customGridTemplateRows: 'min-content min-content',
+  
   extraStyles: '',
   entityPictureStyles: '',
   gridStyles: '',
@@ -556,4 +670,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   conditionalEntity: '',
   conditionalState: '',
   conditionalOperator: 'equals',
+  
+  // Threshold-based Color Alerts
+  thresholdColor: { ...DEFAULT_THRESHOLD_CONFIG },
 };

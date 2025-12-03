@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Zap, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Zap, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2, Gauge } from 'lucide-react';
 
 // ============= NAVIGATION TYPES =============
 export type SectionId = 
   | 'core' | 'variables' 
-  | 'dimensions' | 'visibility'
-  | 'colors' | 'glass' | 'borders' | 'animations' | 'typography'
+  | 'dimensions' | 'visibility' | 'gridLayout'
+  | 'colors' | 'glass' | 'borders' | 'animations' | 'typography' | 'thresholdColors'
   | 'stateStyles'
   | 'cardActions' | 'momentaryActions' | 'iconActions'
   | 'confirmation' | 'lock' | 'protect' | 'tooltip' | 'customFields' | 'advancedSettings'
@@ -46,6 +46,7 @@ export const CATEGORIES: CategoryDef[] = [
     sections: [
       { id: 'dimensions', label: 'Dimensions', icon: Layout },
       { id: 'visibility', label: 'Visibility', icon: ToggleRight },
+      { id: 'gridLayout', label: 'Grid Layout', icon: Grid3X3 },
     ]
   },
   { 
@@ -55,6 +56,7 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'borders', label: 'Borders', icon: BoxSelect },
       { id: 'typography', label: 'Typography', icon: Type },
       { id: 'stateStyles', label: 'State Colors & Styles', icon: Zap },
+      { id: 'thresholdColors', label: 'Threshold Alerts', icon: Gauge },
     ]
   },
   { 

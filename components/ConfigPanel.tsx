@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
-import { ButtonConfig, CustomField, Variable, StateStyleConfig, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG, DEFAULT_TOAST_CONFIG } from '../types';
+import { ButtonConfig, CustomField, Variable, StateStyleConfig, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG, DEFAULT_TOAST_CONFIG, StateAppearanceConfig, DEFAULT_STATE_APPEARANCE, ThresholdColorConfig, DEFAULT_THRESHOLD_CONFIG } from '../types';
 import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
+import { GridDesigner } from './GridDesigner';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS } from '../constants';
-import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
-import { PRESETS, Preset } from '../presets';
+import { PRESETS, Preset, generateDarkModePreset } from '../presets';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -154,6 +155,16 @@ interface Props {
   onStatePreset?: Preset | null;
   onSetOffStatePreset?: (preset: Preset | null) => void;
   onSetOnStatePreset?: (preset: Preset | null) => void;
+  useAutoDarkMode?: boolean;
+  onSetUseAutoDarkMode?: (value: boolean) => void;
+  // State editing props
+  editingState?: 'on' | 'off';
+  onEditingStateChange?: (state: 'on' | 'off') => void;
+  // State-specific appearance props
+  onStateAppearance?: Partial<StateAppearanceConfig>;
+  offStateAppearance?: Partial<StateAppearanceConfig>;
+  onSetOnStateAppearance?: (appearance: Partial<StateAppearanceConfig>) => void;
+  onSetOffStateAppearance?: (appearance: Partial<StateAppearanceConfig>) => void;
 }
 
 // Section component removed - now using drill-down navigation via ConfigPanelNav
@@ -210,15 +221,50 @@ export const ConfigPanel: React.FC<Props> = ({
   onStatePreset,
   onSetOffStatePreset,
   onSetOnStatePreset,
+  useAutoDarkMode = true,
+  onSetUseAutoDarkMode,
+  editingState = 'on',
+  onEditingStateChange,
+  onStateAppearance = {},
+  offStateAppearance = {},
+  onSetOnStateAppearance,
+  onSetOffStateAppearance,
 }) => {
   
   const update = (key: keyof ButtonConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
+  // Get the current state appearance based on editing state
+  const currentAppearance = editingState === 'on' ? onStateAppearance : offStateAppearance;
+  const setCurrentAppearance = editingState === 'on' ? onSetOnStateAppearance : onSetOffStateAppearance;
+  
+  // Update appearance for current editing state
+  const updateAppearance = (key: keyof StateAppearanceConfig, value: any) => {
+    if (setCurrentAppearance) {
+      setCurrentAppearance({ ...currentAppearance, [key]: value });
+    }
+  };
+  
+  // Get value from current appearance or fall back to config
+  const getAppearanceValue = <K extends keyof StateAppearanceConfig>(key: K): StateAppearanceConfig[K] => {
+    const appearanceValue = currentAppearance[key];
+    if (appearanceValue !== undefined && appearanceValue !== '') {
+      return appearanceValue as StateAppearanceConfig[K];
+    }
+    // Fall back to base config value if applicable
+    if (key in config) {
+      return (config as any)[key];
+    }
+    return DEFAULT_STATE_APPEARANCE[key];
+  };
+
   // Drill-down navigation
   const { nav, goBack, selectCategory, selectSection } = useNavigation();
   const showSection = (sectionId: SectionId) => nav.level === 'content' && nav.sectionId === sectionId;
+  
+  // Grid designer modal state
+  const [showGridDesigner, setShowGridDesigner] = useState(false);
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
@@ -233,6 +279,42 @@ export const ConfigPanel: React.FC<Props> = ({
       {/* Content Sections */}
       {nav.level === 'content' && (
         <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          
+          {/* State Editing Toggle - Shows for appearance-related sections */}
+          {(showSection('colors') || showSection('glass') || showSection('borders') || showSection('animations') || showSection('typography') || showSection('stateStyles')) && (
+            <div className="mb-4 p-3 bg-gradient-to-r from-blue-900/30 to-gray-900/30 border border-blue-500/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Editing State</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Changes apply to <span className={editingState === 'on' ? 'text-green-400 font-medium' : 'text-gray-400 font-medium'}>{editingState.toUpperCase()}</span> state
+                  </p>
+                </div>
+                <div className="flex bg-gray-800/80 rounded-full p-0.5 border border-gray-700">
+                  <button
+                    onClick={() => onEditingStateChange?.('on')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                      editingState === 'on' 
+                        ? 'bg-green-600 text-white shadow-lg' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
+                  >
+                    ON
+                  </button>
+                  <button
+                    onClick={() => onEditingStateChange?.('off')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                      editingState === 'off' 
+                        ? 'bg-gray-600 text-white shadow-lg' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
+                  >
+                    OFF
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* ===== PRESETS > GALLERY ===== */}
           {showSection('presetGallery') && (
@@ -307,6 +389,10 @@ export const ConfigPanel: React.FC<Props> = ({
                             if (cond === 'always') {
                               onSetOffStatePreset?.(null);
                               onSetOnStatePreset?.(null);
+                            } else if (cond === 'on' && useAutoDarkMode && activePreset) {
+                              // Re-apply auto dark mode when switching to 'on' condition
+                              const darkPreset = generateDarkModePreset(activePreset);
+                              onSetOffStatePreset?.(darkPreset);
                             }
                           }}
                           className={`px-3 py-2 rounded text-xs font-medium transition-all ${
@@ -321,6 +407,44 @@ export const ConfigPanel: React.FC<Props> = ({
                     </div>
                   </div>
                   
+                  {/* Auto Dark Mode Toggle - Only shown when condition is 'on' */}
+                  {presetCondition === 'on' && (
+                    <div className="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-[10px] text-gray-500 uppercase font-bold">Auto Dark Mode for OFF</label>
+                          <p className="text-[9px] text-gray-500 mt-0.5">
+                            Automatically generate a muted/dark version of the preset for the off state
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newValue = !useAutoDarkMode;
+                            onSetUseAutoDarkMode?.(newValue);
+                            if (newValue && activePreset) {
+                              const darkPreset = generateDarkModePreset(activePreset);
+                              onSetOffStatePreset?.(darkPreset);
+                            } else if (!newValue) {
+                              // Clear the auto-generated preset when disabling
+                              if (offStatePreset?.isAutoDark) {
+                                onSetOffStatePreset?.(null);
+                              }
+                            }
+                          }}
+                          className={`relative w-10 h-5 rounded-full transition-colors ${
+                            useAutoDarkMode ? 'bg-purple-500' : 'bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                              useAutoDarkMode ? 'translate-x-5' : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Secondary Preset Selection - When ON */}
                   {presetCondition === 'on' && (
                     <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
@@ -330,9 +454,20 @@ export const ConfigPanel: React.FC<Props> = ({
                       </label>
                       {offStatePreset ? (
                         <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
-                          <span className="text-sm text-cyan-400">{offStatePreset.name}</span>
+                          <div>
+                            <span className="text-sm text-cyan-400">{offStatePreset.name}</span>
+                            {offStatePreset.isAutoDark && (
+                              <span className="ml-2 text-[9px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">Auto-generated</span>
+                            )}
+                          </div>
                           <button 
-                            onClick={() => onSetOffStatePreset?.(null)}
+                            onClick={() => {
+                              onSetOffStatePreset?.(null);
+                              // If clearing an auto-generated preset, disable auto dark mode
+                              if (offStatePreset.isAutoDark) {
+                                onSetUseAutoDarkMode?.(false);
+                              }
+                            }}
                             className="text-gray-500 hover:text-red-400 text-xs"
                           >
                             Clear
@@ -342,7 +477,11 @@ export const ConfigPanel: React.FC<Props> = ({
                         <select
                           onChange={(e) => {
                             const preset = PRESETS.find(p => p.name === e.target.value);
-                            if (preset) onSetOffStatePreset?.(preset);
+                            if (preset) {
+                              onSetOffStatePreset?.(preset);
+                              // User manually selected a preset, disable auto dark mode
+                              onSetUseAutoDarkMode?.(false);
+                            }
                           }}
                           className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
                           defaultValue=""
@@ -353,7 +492,11 @@ export const ConfigPanel: React.FC<Props> = ({
                           ))}
                         </select>
                       )}
-                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when OFF</p>
+                      <p className="text-[9px] text-gray-500">
+                        {useAutoDarkMode 
+                          ? "Using auto-generated dark mode. Select a preset manually to override."
+                          : "Or leave empty to use default styling when OFF"}
+                      </p>
                     </div>
                   )}
                   
@@ -581,6 +724,150 @@ export const ConfigPanel: React.FC<Props> = ({
             </>
           )}
 
+          {/* ===== LAYOUT > GRID LAYOUT ===== */}
+          {showSection('gridLayout') && (
+            <>
+          <div className="space-y-4">
+            <p className="text-xs text-gray-400 mb-2">
+              Configure the internal CSS Grid layout for custom field positioning. This uses CSS Grid Template Areas.
+            </p>
+            
+            <ControlInput 
+              type="checkbox" 
+              label="Enable Custom Grid Layout" 
+              value={config.customGridEnabled} 
+              onChange={(v) => update('customGridEnabled', v)} 
+            />
+            
+            {config.customGridEnabled && (
+              <>
+                {/* Visual Grid Designer Button */}
+                <button
+                  onClick={() => setShowGridDesigner(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg text-sm text-white font-medium transition-all shadow-lg hover:shadow-blue-500/25"
+                >
+                  <Pencil size={16} />
+                  Open Visual Grid Designer
+                </button>
+                
+                <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Grid Template Areas</p>
+                  <p className="text-[10px] text-gray-500 mb-2">
+                    Define named grid areas. Use: <code className="text-blue-400">i</code> (icon), <code className="text-blue-400">n</code> (name), <code className="text-blue-400">s</code> (state), <code className="text-blue-400">l</code> (label), or custom field names.
+                  </p>
+                  <textarea
+                    value={config.customGridTemplateAreas}
+                    onChange={(e) => update('customGridTemplateAreas', e.target.value)}
+                    placeholder={'"i n" "i s"'}
+                    className="w-full h-20 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Grid Columns</label>
+                      <input
+                        type="text"
+                        value={config.customGridTemplateColumns}
+                        onChange={(e) => update('customGridTemplateColumns', e.target.value)}
+                        placeholder="min-content 1fr"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Grid Rows</label>
+                      <input
+                        type="text"
+                        value={config.customGridTemplateRows}
+                        onChange={(e) => update('customGridTemplateRows', e.target.value)}
+                        placeholder="min-content min-content"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Grid Presets */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Quick Presets</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        update('customGridTemplateAreas', '"i n" "i s"');
+                        update('customGridTemplateColumns', 'min-content 1fr');
+                        update('customGridTemplateRows', 'min-content min-content');
+                      }}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">Icon Left</span>
+                      <span className="block text-[10px] text-gray-500">Icon | Name/State</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        update('customGridTemplateAreas', '"i" "n" "s"');
+                        update('customGridTemplateColumns', '1fr');
+                        update('customGridTemplateRows', '1fr min-content min-content');
+                      }}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">Stacked</span>
+                      <span className="block text-[10px] text-gray-500">Icon / Name / State</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        update('customGridTemplateAreas', '"i" "n" "l" "field1 field2"');
+                        update('customGridTemplateColumns', '1fr 1fr');
+                        update('customGridTemplateRows', '1fr min-content min-content min-content');
+                      }}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">Info Card</span>
+                      <span className="block text-[10px] text-gray-500">Icon / Name / Custom Fields</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        update('customGridTemplateAreas', '"i i" "n s" "field1 field2" "field3 field4"');
+                        update('customGridTemplateColumns', '1fr 1fr');
+                        update('customGridTemplateRows', '1fr min-content min-content min-content');
+                      }}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">Stats Grid</span>
+                      <span className="block text-[10px] text-gray-500">Like the HassOS example</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Custom Fields Grid Areas */}
+                {config.customFields.length > 0 && (
+                  <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase">Custom Field Grid Areas</p>
+                    <p className="text-[10px] text-gray-500 mb-2">
+                      Assign grid areas to your custom fields. Use the same names in your template areas above.
+                    </p>
+                    {config.customFields.map((field, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 w-20 truncate">{field.name}:</span>
+                        <input
+                          type="text"
+                          value={field.gridArea || field.name}
+                          onChange={(e) => {
+                            const updated = [...config.customFields];
+                            updated[idx] = { ...field, gridArea: e.target.value };
+                            update('customFields', updated);
+                          }}
+                          placeholder={field.name}
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+            </>
+          )}
+
           {/* ===== APPEARANCE > COLORS ===== */}
           {showSection('colors') && (
             <>
@@ -595,37 +882,13 @@ export const ConfigPanel: React.FC<Props> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
-                        <ControlInput label="Card Background" type="color" value={config.backgroundColor || '#000000'} onChange={(v) => {
-                          // Disable gradient, clear extraStyles background, and clear state colors when manually setting background color
-                          setConfig(prev => {
-                            let newExtraStyles = prev.extraStyles;
-                            
-                            // Clear background from extraStyles if present (presets use this)
-                            if (prev.extraStyles) {
-                              const hasGradient = /background\s*:|linear-gradient|radial-gradient|conic-gradient/i.test(prev.extraStyles);
-                              if (hasGradient) {
-                                newExtraStyles = prev.extraStyles
-                                  .split('\n')
-                                  .filter(line => !/^\s*(background\s*:|background-image\s*:)/i.test(line.trim()))
-                                  .join('\n')
-                                  .trim();
-                              }
-                            }
-                            
-                            return { 
-                              ...prev, 
-                              backgroundColor: v, 
-                              gradientEnabled: false,
-                              extraStyles: newExtraStyles,
-                              // Clear state colors so backgroundColor takes effect
-                              stateOnColor: '',
-                              stateOffColor: ''
-                            };
-                          });
+                        <ControlInput label="Card Background" type="color" value={getAppearanceValue('backgroundColor') || '#000000'} onChange={(v) => {
+                          updateAppearance('backgroundColor', v);
+                          updateAppearance('gradientEnabled', false);
                         }} />
-                          <ControlInput label="Opacity" type="slider" value={config.backgroundColorOpacity} min={0} max={100} onChange={(v) => update('backgroundColorOpacity', v)} />
+                          <ControlInput label="Opacity" type="slider" value={getAppearanceValue('backgroundColorOpacity')} min={0} max={100} onChange={(v) => updateAppearance('backgroundColorOpacity', v)} />
                    </div>
-                   <ControlInput label="Default Text Color" type="color" value={config.color || '#ffffff'} onChange={(v) => update('color', v)} />
+                   <ControlInput label="Default Text Color" type="color" value={getAppearanceValue('color') || '#ffffff'} onChange={(v) => updateAppearance('color', v)} />
                 </div>
              </div>
              
@@ -635,27 +898,29 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-gray-400 uppercase">Gradient Background</p>
-                  <ControlInput type="checkbox" label="" value={config.gradientEnabled === true} onChange={(v) => {
+                  <ControlInput type="checkbox" label="" value={getAppearanceValue('gradientEnabled') === true} onChange={(v) => {
                     // When enabling gradient, clear solid background color
                     if (v) {
-                      setConfig(prev => ({ ...prev, gradientEnabled: true, backgroundColor: '', backgroundColorOpacity: 100 }));
+                      updateAppearance('gradientEnabled', true);
+                      updateAppearance('backgroundColor', '');
+                      updateAppearance('backgroundColorOpacity', 100);
                     } else {
-                      update('gradientEnabled', false);
+                      updateAppearance('gradientEnabled', false);
                     }
                   }} />
                 </div>
                 
-                {config.gradientEnabled && (
+                {getAppearanceValue('gradientEnabled') && (
                   <div className="space-y-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
                     {/* Gradient Preview */}
                     <div 
                       className="h-12 rounded-lg border border-gray-600"
                       style={{
-                        background: config.gradientType === 'linear' 
-                          ? `linear-gradient(${config.gradientAngle}deg, ${config.gradientColor1}, ${config.gradientColor2}${config.gradientColor3Enabled ? `, ${config.gradientColor3}` : ''})`
-                          : config.gradientType === 'radial'
-                          ? `radial-gradient(circle, ${config.gradientColor1}, ${config.gradientColor2}${config.gradientColor3Enabled ? `, ${config.gradientColor3}` : ''})`
-                          : `conic-gradient(from ${config.gradientAngle}deg, ${config.gradientColor1}, ${config.gradientColor2}${config.gradientColor3Enabled ? `, ${config.gradientColor3}` : ''}, ${config.gradientColor1})`
+                        background: getAppearanceValue('gradientType') === 'linear' 
+                          ? `linear-gradient(${getAppearanceValue('gradientAngle')}deg, ${getAppearanceValue('gradientColor1')}, ${getAppearanceValue('gradientColor2')}${getAppearanceValue('gradientColor3Enabled') ? `, ${getAppearanceValue('gradientColor3')}` : ''})`
+                          : getAppearanceValue('gradientType') === 'radial'
+                          ? `radial-gradient(circle, ${getAppearanceValue('gradientColor1')}, ${getAppearanceValue('gradientColor2')}${getAppearanceValue('gradientColor3Enabled') ? `, ${getAppearanceValue('gradientColor3')}` : ''})`
+                          : `conic-gradient(from ${getAppearanceValue('gradientAngle')}deg, ${getAppearanceValue('gradientColor1')}, ${getAppearanceValue('gradientColor2')}${getAppearanceValue('gradientColor3Enabled') ? `, ${getAppearanceValue('gradientColor3')}` : ''}, ${getAppearanceValue('gradientColor1')})`
                       }}
                     />
                     
@@ -663,36 +928,36 @@ export const ConfigPanel: React.FC<Props> = ({
                       <ControlInput 
                         type="select" 
                         label="Type" 
-                        value={config.gradientType} 
+                        value={getAppearanceValue('gradientType')} 
                         options={[
                           { value: 'linear', label: 'Linear' },
                           { value: 'radial', label: 'Radial' },
                           { value: 'conic', label: 'Conic' },
                         ]} 
-                        onChange={(v) => update('gradientType', v)} 
+                        onChange={(v) => updateAppearance('gradientType', v)} 
                       />
-                      {(config.gradientType === 'linear' || config.gradientType === 'conic') && (
+                      {(getAppearanceValue('gradientType') === 'linear' || getAppearanceValue('gradientType') === 'conic') && (
                         <ControlInput 
                           type="slider" 
                           label="Angle" 
-                          value={config.gradientAngle} 
+                          value={getAppearanceValue('gradientAngle')} 
                           min={0} 
                           max={360} 
-                          onChange={(v) => update('gradientAngle', v)} 
+                          onChange={(v) => updateAppearance('gradientAngle', v)} 
                         />
                       )}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
-                      <ControlInput label="Color 1" type="color" value={config.gradientColor1} onChange={(v) => update('gradientColor1', v)} />
-                      <ControlInput label="Color 2" type="color" value={config.gradientColor2} onChange={(v) => update('gradientColor2', v)} />
+                      <ControlInput label="Color 1" type="color" value={getAppearanceValue('gradientColor1')} onChange={(v) => updateAppearance('gradientColor1', v)} />
+                      <ControlInput label="Color 2" type="color" value={getAppearanceValue('gradientColor2')} onChange={(v) => updateAppearance('gradientColor2', v)} />
                     </div>
                     
                     <div className="flex items-center gap-3">
-                      <ControlInput type="checkbox" label="3rd Color" value={config.gradientColor3Enabled} onChange={(v) => update('gradientColor3Enabled', v)} />
-                      {config.gradientColor3Enabled && (
+                      <ControlInput type="checkbox" label="3rd Color" value={getAppearanceValue('gradientColor3Enabled')} onChange={(v) => updateAppearance('gradientColor3Enabled', v)} />
+                      {getAppearanceValue('gradientColor3Enabled') && (
                         <div className="flex-1">
-                          <ControlInput label="" type="color" value={config.gradientColor3} onChange={(v) => update('gradientColor3', v)} />
+                          <ControlInput label="" type="color" value={getAppearanceValue('gradientColor3')} onChange={(v) => updateAppearance('gradientColor3', v)} />
                         </div>
                       )}
                     </div>
@@ -708,16 +973,16 @@ export const ConfigPanel: React.FC<Props> = ({
                 
                 <ColorPairInput 
                   label="Icon Color"
-                  colorValue={config.iconColor}
-                  setColor={(v: string) => update('iconColor', v)}
+                  colorValue={getAppearanceValue('iconColor')}
+                  setColor={(v: string) => updateAppearance('iconColor', v)}
                   autoValue={config.iconColorAuto}
                   setAuto={(v: boolean) => update('iconColorAuto', v)}
                 />
 
                 <ColorPairInput 
                   label="Name Color"
-                  colorValue={config.nameColor}
-                  setColor={(v: string) => update('nameColor', v)}
+                  colorValue={getAppearanceValue('nameColor')}
+                  setColor={(v: string) => updateAppearance('nameColor', v)}
                   autoValue={config.nameColorAuto}
                   setAuto={(v: boolean) => update('nameColorAuto', v)}
                 />
@@ -732,8 +997,8 @@ export const ConfigPanel: React.FC<Props> = ({
 
                 <ColorPairInput 
                   label="Label Color"
-                  colorValue={config.labelColor}
-                  setColor={(v: string) => update('labelColor', v)}
+                  colorValue={getAppearanceValue('labelColor')}
+                  setColor={(v: string) => updateAppearance('labelColor', v)}
                   autoValue={config.labelColorAuto}
                   setAuto={(v: boolean) => update('labelColorAuto', v)}
                 />
@@ -747,12 +1012,12 @@ export const ConfigPanel: React.FC<Props> = ({
             <>
            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                 <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
-                 <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
+                 <ControlInput label="Backdrop Blur" type="select" value={getAppearanceValue('backdropBlur')} options={BLUR_OPTIONS} onChange={(v) => updateAppearance('backdropBlur', v)} />
+                 <ControlInput label="Shadow Size" type="select" value={getAppearanceValue('shadowSize')} options={SHADOW_SIZE_OPTIONS} onChange={(v) => updateAppearance('shadowSize', v)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
+                  <ControlInput label="Shadow Color" type="color" value={getAppearanceValue('shadowColor')} onChange={(v) => updateAppearance('shadowColor', v)} />
+                  <ControlInput label="Shadow Opacity" type="slider" value={getAppearanceValue('shadowOpacity')} min={0} max={100} onChange={(v) => updateAppearance('shadowOpacity', v)} />
               </div>
            </div>
             </>
@@ -769,8 +1034,8 @@ export const ConfigPanel: React.FC<Props> = ({
 
             <ColorPairInput 
                label="Border Color"
-               colorValue={config.borderColor}
-               setColor={(v: string) => update('borderColor', v)}
+               colorValue={getAppearanceValue('borderColor')}
+               setColor={(v: string) => updateAppearance('borderColor', v)}
                autoValue={config.borderColorAuto}
                setAuto={(v: boolean) => update('borderColorAuto', v)}
             />
@@ -786,10 +1051,10 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Type" type="select" value={config.cardAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('cardAnimation', v)} />
+                  <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
                   <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} />
                 </div>
-                <ControlInput label="Speed/Duration" value={config.cardAnimationSpeed} onChange={(v) => update('cardAnimationSpeed', v)} suffix="s" />
+                <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
              </div>
 
              <div className="h-px bg-gray-700/50" />
@@ -798,10 +1063,10 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Type" type="select" value={config.iconAnimation} options={ANIMATION_OPTIONS} onChange={(v) => update('iconAnimation', v)} />
+                  <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
                   <ControlInput label="Condition" type="select" value={config.iconAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('iconAnimationTrigger', v)} />
                 </div>
-                <ControlInput label="Speed/Duration" value={config.iconAnimationSpeed} onChange={(v) => update('iconAnimationSpeed', v)} suffix="s" />
+                <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
                 <ControlInput type="checkbox" label="Rotate Icon" value={config.rotate} onChange={(v) => update('rotate', v)} />
              </div>
           </div>
@@ -1056,6 +1321,341 @@ export const ConfigPanel: React.FC<Props> = ({
                 </div>
               )}
             </div>
+          </div>
+            </>
+          )}
+
+          {/* ===== APPEARANCE > THRESHOLD ALERTS ===== */}
+          {showSection('thresholdColors') && (
+            <>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-600/20 via-yellow-600/20 to-red-600/20 rounded-lg border border-gray-700">
+              <Gauge className="text-yellow-400" size={24} />
+              <div>
+                <p className="text-sm font-medium text-white">Threshold Color Alerts</p>
+                <p className="text-xs text-gray-400">Automatically color icons/text based on numeric sensor values</p>
+              </div>
+            </div>
+            
+            <ControlInput 
+              type="checkbox" 
+              label="Enable Threshold Colors" 
+              value={config.thresholdColor.enabled} 
+              onChange={(v) => update('thresholdColor', { ...config.thresholdColor, enabled: v })} 
+            />
+            
+            {config.thresholdColor.enabled && (
+              <>
+                <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Data Source</p>
+                  
+                  <EntitySelector 
+                    label="Entity" 
+                    value={config.thresholdColor.entity || config.entity} 
+                    onChange={(v) => update('thresholdColor', { ...config.thresholdColor, entity: v })}
+                    allowAll={true}
+                  />
+                  
+                  <ControlInput 
+                    label="Attribute (optional)" 
+                    value={config.thresholdColor.attribute} 
+                    onChange={(v) => update('thresholdColor', { ...config.thresholdColor, attribute: v })} 
+                    placeholder="Leave empty to use state"
+                  />
+                </div>
+                
+                <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Threshold Mode</p>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => update('thresholdColor', { ...config.thresholdColor, mode: 'ascending' })}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        config.thresholdColor.mode === 'ascending'
+                          ? 'bg-blue-600/20 border-blue-500 text-white'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-xs font-bold mb-1">📈 Ascending</div>
+                      <div className="text-[10px] text-gray-500">Low = Green, High = Red</div>
+                      <div className="text-[10px] text-gray-500 mt-1">e.g., CPU %, Temperature</div>
+                    </button>
+                    <button
+                      onClick={() => update('thresholdColor', { ...config.thresholdColor, mode: 'descending' })}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        config.thresholdColor.mode === 'descending'
+                          ? 'bg-blue-600/20 border-blue-500 text-white'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-xs font-bold mb-1">📉 Descending</div>
+                      <div className="text-[10px] text-gray-500">High = Green, Low = Red</div>
+                      <div className="text-[10px] text-gray-500 mt-1">e.g., Battery %, Signal</div>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Thresholds</p>
+                  <p className="text-[10px] text-gray-500 mb-2">
+                    {config.thresholdColor.mode === 'ascending' 
+                      ? 'Values ≤ Green threshold are green, > Yellow threshold are red, between is yellow'
+                      : 'Values ≥ Green threshold are green, < Yellow threshold are red, between is yellow'
+                    }
+                  </p>
+                  
+                  {/* Visual threshold bar */}
+                  <div className="relative h-8 rounded-lg overflow-hidden bg-gray-700">
+                    <div 
+                      className="absolute inset-y-0 left-0 transition-all"
+                      style={{ 
+                        width: `${config.thresholdColor.mode === 'ascending' ? config.thresholdColor.greenThreshold : 100 - config.thresholdColor.greenThreshold}%`,
+                        backgroundColor: config.thresholdColor.greenColor
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-y-0 transition-all"
+                      style={{ 
+                        left: config.thresholdColor.mode === 'ascending' 
+                          ? `${config.thresholdColor.greenThreshold}%` 
+                          : `${100 - config.thresholdColor.greenThreshold}%`,
+                        width: config.thresholdColor.mode === 'ascending'
+                          ? `${config.thresholdColor.yellowThreshold - config.thresholdColor.greenThreshold}%`
+                          : `${config.thresholdColor.greenThreshold - config.thresholdColor.yellowThreshold}%`,
+                        backgroundColor: config.thresholdColor.yellowColor
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-y-0 right-0 transition-all"
+                      style={{ 
+                        width: config.thresholdColor.mode === 'ascending' 
+                          ? `${100 - config.thresholdColor.yellowThreshold}%`
+                          : `${config.thresholdColor.yellowThreshold}%`,
+                        backgroundColor: config.thresholdColor.redColor
+                      }}
+                    />
+                    {/* Markers */}
+                    <div className="absolute inset-0 flex items-center justify-between px-2 text-[9px] font-bold text-white/80">
+                      <span>0</span>
+                      <span>50</span>
+                      <span>100</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: config.thresholdColor.greenColor }} />
+                        <span className="text-xs text-gray-400">Green ≤</span>
+                      </div>
+                      <input
+                        type="number"
+                        value={config.thresholdColor.greenThreshold}
+                        onChange={(e) => update('thresholdColor', { ...config.thresholdColor, greenThreshold: Number(e.target.value) })}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-green-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: config.thresholdColor.yellowColor }} />
+                        <span className="text-xs text-gray-400">Yellow ≤</span>
+                      </div>
+                      <input
+                        type="number"
+                        value={config.thresholdColor.yellowThreshold}
+                        onChange={(e) => update('thresholdColor', { ...config.thresholdColor, yellowThreshold: Number(e.target.value) })}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-yellow-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: config.thresholdColor.redColor }} />
+                        <span className="text-xs text-gray-400">Red &gt;</span>
+                      </div>
+                      <input
+                        type="number"
+                        value={config.thresholdColor.redThreshold}
+                        onChange={(e) => update('thresholdColor', { ...config.thresholdColor, redThreshold: Number(e.target.value) })}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-red-500"
+                        disabled
+                      />
+                      <p className="text-[9px] text-gray-600">Auto (above yellow)</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Apply To</p>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <ControlInput 
+                      type="checkbox" 
+                      label="Icon" 
+                      value={config.thresholdColor.applyToIcon} 
+                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToIcon: v })} 
+                    />
+                    <ControlInput 
+                      type="checkbox" 
+                      label="State/Value" 
+                      value={config.thresholdColor.applyToState} 
+                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToState: v })} 
+                    />
+                    <ControlInput 
+                      type="checkbox" 
+                      label="Name" 
+                      value={config.thresholdColor.applyToName} 
+                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToName: v })} 
+                    />
+                    <ControlInput 
+                      type="checkbox" 
+                      label="Label" 
+                      value={config.thresholdColor.applyToLabel} 
+                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToLabel: v })} 
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Custom Colors</p>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Green</label>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-8 h-8 rounded border border-gray-600 overflow-hidden relative"
+                          style={{ backgroundColor: config.thresholdColor.greenColor }}
+                        >
+                          <input 
+                            type="color" 
+                            value={config.thresholdColor.greenColor} 
+                            onChange={(e) => update('thresholdColor', { ...config.thresholdColor, greenColor: e.target.value })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={config.thresholdColor.greenColor}
+                          onChange={(e) => update('thresholdColor', { ...config.thresholdColor, greenColor: e.target.value })}
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[10px] text-white font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Yellow</label>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-8 h-8 rounded border border-gray-600 overflow-hidden relative"
+                          style={{ backgroundColor: config.thresholdColor.yellowColor }}
+                        >
+                          <input 
+                            type="color" 
+                            value={config.thresholdColor.yellowColor} 
+                            onChange={(e) => update('thresholdColor', { ...config.thresholdColor, yellowColor: e.target.value })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={config.thresholdColor.yellowColor}
+                          onChange={(e) => update('thresholdColor', { ...config.thresholdColor, yellowColor: e.target.value })}
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[10px] text-white font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Red</label>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-8 h-8 rounded border border-gray-600 overflow-hidden relative"
+                          style={{ backgroundColor: config.thresholdColor.redColor }}
+                        >
+                          <input 
+                            type="color" 
+                            value={config.thresholdColor.redColor} 
+                            onChange={(e) => update('thresholdColor', { ...config.thresholdColor, redColor: e.target.value })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={config.thresholdColor.redColor}
+                          onChange={(e) => update('thresholdColor', { ...config.thresholdColor, redColor: e.target.value })}
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[10px] text-white font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => update('thresholdColor', { 
+                      ...config.thresholdColor, 
+                      greenColor: DEFAULT_THRESHOLD_CONFIG.greenColor,
+                      yellowColor: DEFAULT_THRESHOLD_CONFIG.yellowColor,
+                      redColor: DEFAULT_THRESHOLD_CONFIG.redColor,
+                    })}
+                    className="w-full px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300"
+                  >
+                    Reset to Default Colors
+                  </button>
+                </div>
+                
+                {/* Preset configurations */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Quick Presets</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => update('thresholdColor', { 
+                        ...config.thresholdColor, 
+                        mode: 'ascending',
+                        greenThreshold: 30,
+                        yellowThreshold: 70,
+                      })}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">🌡️ Temperature/CPU</span>
+                      <span className="block text-[10px] text-gray-500">Green ≤30, Yellow ≤70, Red &gt;70</span>
+                    </button>
+                    <button
+                      onClick={() => update('thresholdColor', { 
+                        ...config.thresholdColor, 
+                        mode: 'descending',
+                        greenThreshold: 50,
+                        yellowThreshold: 20,
+                      })}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">🔋 Battery</span>
+                      <span className="block text-[10px] text-gray-500">Green ≥50, Yellow ≥20, Red &lt;20</span>
+                    </button>
+                    <button
+                      onClick={() => update('thresholdColor', { 
+                        ...config.thresholdColor, 
+                        mode: 'ascending',
+                        greenThreshold: 50,
+                        yellowThreshold: 80,
+                      })}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">💾 Disk/Memory</span>
+                      <span className="block text-[10px] text-gray-500">Green ≤50%, Yellow ≤80%, Red &gt;80%</span>
+                    </button>
+                    <button
+                      onClick={() => update('thresholdColor', { 
+                        ...config.thresholdColor, 
+                        mode: 'descending',
+                        greenThreshold: 80,
+                        yellowThreshold: 40,
+                      })}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 border border-gray-700 text-left"
+                    >
+                      <span className="font-medium">📶 Signal Strength</span>
+                      <span className="block text-[10px] text-gray-500">Green ≥80, Yellow ≥40, Red &lt;40</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
             </>
           )}
@@ -1336,25 +1936,43 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('customFields') && (
             <>
           <div className="space-y-4">
+            <p className="text-xs text-gray-400">
+              Add custom fields to display entity states, attributes, or custom content in your button.
+            </p>
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-gray-400 uppercase">Custom Fields</p>
-                <button
-                  onClick={() => update('customFields', [...config.customFields, { name: 'field' + (config.customFields.length + 1), type: 'text', value: '', styles: '' }])}
-                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white"
-                >
-                  <Plus size={12} /> Add Field
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => update('customFields', [...config.customFields, { name: 'field' + (config.customFields.length + 1), type: 'entity', value: '', entity: '', attribute: '', icon: '', prefix: '', suffix: '', styles: '' }])}
+                    className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs text-white"
+                  >
+                    <Plus size={12} /> Entity
+                  </button>
+                  <button
+                    onClick={() => update('customFields', [...config.customFields, { name: 'field' + (config.customFields.length + 1), type: 'text', value: '', styles: '' }])}
+                    className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white"
+                  >
+                    <Plus size={12} /> Custom
+                  </button>
+                </div>
               </div>
               
               {config.customFields.length === 0 ? (
-                <div className="text-xs text-gray-500 italic text-center py-2">No custom fields</div>
+                <div className="text-xs text-gray-500 italic text-center py-4 bg-gray-800/50 rounded-lg border border-dashed border-gray-700">
+                  No custom fields. Add an Entity field to display sensor data or a Custom field for templates.
+                </div>
               ) : (
                 <div className="space-y-3">
                   {config.customFields.map((field, idx) => (
                     <div key={idx} className="p-3 bg-gray-800 rounded border border-gray-700">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-gray-400">Field {idx + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${field.type === 'entity' ? 'bg-green-600/30 text-green-400' : field.type === 'template' ? 'bg-purple-600/30 text-purple-400' : 'bg-blue-600/30 text-blue-400'}`}>
+                            {field.type === 'entity' ? 'Entity' : field.type === 'template' ? 'Template' : 'Custom'}
+                          </span>
+                          <span className="text-xs font-bold text-gray-400">{field.name}</span>
+                        </div>
                         <button
                           onClick={() => update('customFields', config.customFields.filter((_, i) => i !== idx))}
                           className="text-red-400 hover:text-red-300"
@@ -1363,21 +1981,91 @@ export const ConfigPanel: React.FC<Props> = ({
                         </button>
                       </div>
                       <div className="space-y-2">
-                        <ControlInput label="Name" value={field.name} onChange={(v) => {
-                          const updated = [...config.customFields];
-                          updated[idx] = { ...field, name: v };
-                          update('customFields', updated);
-                        }} />
-                        <ControlInput label="Value/Template" value={field.value} onChange={(v) => {
-                          const updated = [...config.customFields];
-                          updated[idx] = { ...field, value: v };
-                          update('customFields', updated);
-                        }} placeholder="[[[ return entity.state ]]]" />
-                        <ControlInput label="Styles (YAML)" value={field.styles || ''} onChange={(v) => {
+                        <div className="grid grid-cols-2 gap-2">
+                          <ControlInput label="Field Name" value={field.name} onChange={(v) => {
+                            const updated = [...config.customFields];
+                            updated[idx] = { ...field, name: v };
+                            update('customFields', updated);
+                          }} placeholder="field1" />
+                          <ControlInput 
+                            label="Type" 
+                            type="select" 
+                            value={field.type} 
+                            options={[
+                              { value: 'entity', label: 'Entity State' },
+                              { value: 'template', label: 'Template' },
+                              { value: 'text', label: 'Static Text' },
+                            ]}
+                            onChange={(v) => {
+                              const updated = [...config.customFields];
+                              updated[idx] = { ...field, type: v as 'text' | 'template' | 'entity' };
+                              update('customFields', updated);
+                            }} 
+                          />
+                        </div>
+                        
+                        {/* Entity Type Fields */}
+                        {field.type === 'entity' && (
+                          <>
+                            <EntitySelector 
+                              label="Entity" 
+                              value={field.entity || ''} 
+                              onChange={(v) => {
+                                const updated = [...config.customFields];
+                                updated[idx] = { ...field, entity: v };
+                                update('customFields', updated);
+                              }}
+                              allowAll={true}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <ControlInput label="Attribute (optional)" value={field.attribute || ''} onChange={(v) => {
+                                const updated = [...config.customFields];
+                                updated[idx] = { ...field, attribute: v };
+                                update('customFields', updated);
+                              }} placeholder="temperature, battery..." />
+                              <ControlInput label="Icon (optional)" value={field.icon || ''} onChange={(v) => {
+                                const updated = [...config.customFields];
+                                updated[idx] = { ...field, icon: v };
+                                update('customFields', updated);
+                              }} placeholder="mdi:thermometer" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <ControlInput label="Prefix" value={field.prefix || ''} onChange={(v) => {
+                                const updated = [...config.customFields];
+                                updated[idx] = { ...field, prefix: v };
+                                update('customFields', updated);
+                              }} placeholder="CPU: " />
+                              <ControlInput label="Suffix" value={field.suffix || ''} onChange={(v) => {
+                                const updated = [...config.customFields];
+                                updated[idx] = { ...field, suffix: v };
+                                update('customFields', updated);
+                              }} placeholder="%" />
+                            </div>
+                          </>
+                        )}
+                        
+                        {/* Template/Text Fields */}
+                        {(field.type === 'template' || field.type === 'text') && (
+                          <ControlInput label="Value/Template" value={field.value} onChange={(v) => {
+                            const updated = [...config.customFields];
+                            updated[idx] = { ...field, value: v };
+                            update('customFields', updated);
+                          }} placeholder={field.type === 'template' ? "[[[ return entity.state ]]]" : "Static text"} />
+                        )}
+                        
+                        {config.customGridEnabled && (
+                          <ControlInput label="Grid Area" value={field.gridArea || ''} onChange={(v) => {
+                            const updated = [...config.customFields];
+                            updated[idx] = { ...field, gridArea: v };
+                            update('customFields', updated);
+                          }} placeholder={field.name} />
+                        )}
+                        
+                        <ControlInput label="Styles (CSS)" value={field.styles || ''} onChange={(v) => {
                           const updated = [...config.customFields];
                           updated[idx] = { ...field, styles: v };
                           update('customFields', updated);
-                        }} placeholder="- font-size: 12px" />
+                        }} placeholder="font-size: 12px; color: #fff" />
                       </div>
                     </div>
                   ))}
@@ -1517,6 +2205,29 @@ export const ConfigPanel: React.FC<Props> = ({
           
           <div className="h-10"></div>
         </div>
+      )}
+      
+      {/* Grid Designer Modal */}
+      {showGridDesigner && (
+        <GridDesigner
+          gridTemplateAreas={config.customGridTemplateAreas}
+          gridTemplateColumns={config.customGridTemplateColumns}
+          gridTemplateRows={config.customGridTemplateRows}
+          existingCustomFields={config.customFields}
+          onUpdate={(areas, columns, rows, customFields) => {
+            update('customGridTemplateAreas', areas);
+            update('customGridTemplateColumns', columns);
+            update('customGridTemplateRows', rows);
+            if (customFields) {
+              // Merge new custom fields with existing ones (preserving non-grid fields)
+              const existingNonGridFields = config.customFields.filter(
+                f => !customFields.some(cf => cf.name === f.name)
+              );
+              update('customFields', [...existingNonGridFields, ...customFields]);
+            }
+          }}
+          onClose={() => setShowGridDesigner(false)}
+        />
       )}
     </div>
   );
