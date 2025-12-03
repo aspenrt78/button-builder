@@ -115,17 +115,31 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
                 </p>
               </div>
               
-              <button 
-                onClick={() => window.open('https://aistudio.google.com/apikey', '_blank', 'noopener,noreferrer')}
-                className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors text-sm font-medium cursor-pointer"
-              >
-                <ExternalLink size={16} />
-                Get Free API Key from Google AI Studio
-              </button>
-              <p className="text-xs text-gray-500 text-center">
-                If the link doesn't open, copy this URL to your browser:<br/>
-                <code className="text-purple-400 select-all">https://aistudio.google.com/apikey</code>
-              </p>
+              <div className="space-y-3 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                <p className="text-sm text-gray-300 text-center">
+                  Copy this URL and open it in a new browser tab:
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value="https://aistudio.google.com/apikey"
+                    className="flex-1 bg-black/50 border border-gray-600 rounded px-3 py-2 text-purple-400 font-mono text-sm select-all"
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('https://aistudio.google.com/apikey');
+                    }}
+                    className="px-3 py-2 bg-purple-600/20 border border-purple-500/30 text-purple-400 rounded hover:bg-purple-600/30 transition-colors text-sm"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                  Sign in with Google, create a key, then paste it below
+                </p>
+              </div>
               
               <div className="space-y-2">
                 <label className="text-xs text-gray-500 uppercase tracking-wider">Paste your API key</label>
