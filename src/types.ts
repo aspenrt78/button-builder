@@ -412,7 +412,7 @@ export interface ButtonConfig {
   holdTime: number;
   
   // Haptic
-  hapticFeedback: boolean;
+  hapticFeedback: string;
   
   // Spinner Template
   spinnerTemplate: string;
@@ -661,7 +661,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   holdTime: 500,
   
   // Haptic
-  hapticFeedback: false,
+  hapticFeedback: '',
   
   // Spinner Template
   spinnerTemplate: '',

@@ -5,7 +5,7 @@ import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
-import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS } from '../constants';
+import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
 import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
 import { PRESETS, Preset, generateDarkModePreset } from '../presets';
@@ -1011,13 +1011,14 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('glass') && (
             <>
            <div className="space-y-4">
+              <p className="text-xs text-gray-500 italic">Glass & depth effects apply to all states</p>
               <div className="grid grid-cols-2 gap-4">
-                 <ControlInput label="Backdrop Blur" type="select" value={getAppearanceValue('backdropBlur')} options={BLUR_OPTIONS} onChange={(v) => updateAppearance('backdropBlur', v)} />
-                 <ControlInput label="Shadow Size" type="select" value={getAppearanceValue('shadowSize')} options={SHADOW_SIZE_OPTIONS} onChange={(v) => updateAppearance('shadowSize', v)} />
+                 <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
+                 <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Shadow Color" type="color" value={getAppearanceValue('shadowColor')} onChange={(v) => updateAppearance('shadowColor', v)} />
-                  <ControlInput label="Shadow Opacity" type="slider" value={getAppearanceValue('shadowOpacity')} min={0} max={100} onChange={(v) => updateAppearance('shadowOpacity', v)} />
+                  <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
+                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
               </div>
            </div>
             </>
@@ -1895,6 +1896,46 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput label="Unlock Icon" value={config.lock.unlockIcon} onChange={(v) => update('lock', { ...config.lock, unlockIcon: v })} placeholder="mdi:lock-open-outline" />
                 </div>
                 <ControlInput type="checkbox" label="Keep Unlock Icon" value={config.lock.keepUnlockIcon} onChange={(v) => update('lock', { ...config.lock, keepUnlockIcon: v })} />
+                
+                {/* Lock Exemptions */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-gray-400">Exempt Users (won't see lock)</label>
+                    <button
+                      onClick={() => update('lock', { ...config.lock, exemptions: [...config.lock.exemptions, ''] })}
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white"
+                    >
+                      <Plus size={12} /> Add
+                    </button>
+                  </div>
+                  {config.lock.exemptions.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">No exemptions (all users see lock)</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {config.lock.exemptions.map((userId, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={userId}
+                            onChange={(e) => {
+                              const updated = [...config.lock.exemptions];
+                              updated[idx] = e.target.value;
+                              update('lock', { ...config.lock, exemptions: updated });
+                            }}
+                            placeholder="user_id or username"
+                            className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                          />
+                          <button
+                            onClick={() => update('lock', { ...config.lock, exemptions: config.lock.exemptions.filter((_, i) => i !== idx) })}
+                            className="p-1 text-red-400 hover:text-red-300"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -2096,7 +2137,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <ControlInput type="checkbox" label="Haptic Feedback" value={config.hapticFeedback} onChange={(v) => update('hapticFeedback', v)} />
+              <ControlInput label="Haptic Feedback" type="select" value={config.hapticFeedback} options={HAPTIC_TYPE_OPTIONS} onChange={(v) => update('hapticFeedback', v)} />
               <ControlInput type="checkbox" label="Disable Keyboard" value={config.disableKeyboard} onChange={(v) => update('disableKeyboard', v)} />
             </div>
             

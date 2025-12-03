@@ -130,6 +130,17 @@ export const PROTECT_TYPE_OPTIONS = [
   { value: 'password', label: 'Password' },
 ];
 
+export const HAPTIC_TYPE_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'success', label: 'Success' },
+  { value: 'warning', label: 'Warning' },
+  { value: 'failure', label: 'Failure' },
+  { value: 'light', label: 'Light' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'heavy', label: 'Heavy' },
+  { value: 'selection', label: 'Selection' },
+];
+
 export const LIVE_STREAM_FIT_OPTIONS = [
   { value: '', label: 'Default' },
   { value: 'contain', label: 'Contain' },

@@ -453,11 +453,6 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `template: ${config.template}\n`;
   }
 
-  // Haptic
-  if (config.hapticFeedback) {
-    yaml += `haptic: true\n`;
-  }
-
   // Disable Keyboard
   if (config.disableKeyboard) {
     yaml += `disable_keyboard: true\n`;
@@ -472,8 +467,10 @@ export const generateYaml = (config: ButtonConfig): string => {
     config.tapActionJavascript,
     config.tapActionToast
   );
-  if (config.tapActionSound) {
-    yaml += `  haptic: ${config.tapActionSound}\n`;
+  // Haptic: use per-action if set, otherwise use global haptic
+  const tapHaptic = config.tapActionSound || config.hapticFeedback;
+  if (tapHaptic) {
+    yaml += `  haptic: ${tapHaptic}\n`;
   }
 
   // Actions - Hold
@@ -487,8 +484,9 @@ export const generateYaml = (config: ButtonConfig): string => {
     config.holdActionRepeat,
     config.holdActionRepeatLimit
   );
-  if (config.holdActionSound) {
-    yaml += `  haptic: ${config.holdActionSound}\n`;
+  const holdHaptic = config.holdActionSound || config.hapticFeedback;
+  if (holdHaptic) {
+    yaml += `  haptic: ${holdHaptic}\n`;
   }
 
   // Actions - Double Tap
@@ -500,8 +498,9 @@ export const generateYaml = (config: ButtonConfig): string => {
     config.doubleTapActionJavascript,
     config.doubleTapActionToast
   );
-  if (config.doubleTapActionSound) {
-    yaml += `  haptic: ${config.doubleTapActionSound}\n`;
+  const doubleTapHaptic = config.doubleTapActionSound || config.hapticFeedback;
+  if (doubleTapHaptic) {
+    yaml += `  haptic: ${doubleTapHaptic}\n`;
   }
 
   // Momentary Actions - Press
