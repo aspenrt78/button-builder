@@ -10,7 +10,7 @@
 
 ### Optional
 - **Gemini API Key** (for AI-powered design generation)
-  - Get a free key at: https://aistudio.google.com/app/apikey
+  - Get a free key at: https://aistudio.google.com/apikey
 
 ## Installation Methods
 

@@ -5,7 +5,7 @@
 Generate button configurations using natural language descriptions.
 
 ### Setup
-1. Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey)
 2. Click **Magic Build** in Button Builder
 3. Enter your API key (stored locally in your browser)
 

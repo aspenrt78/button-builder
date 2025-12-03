@@ -98,7 +98,7 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 
 1. Click the "Magic Build" button in the top right
 2. **First time?** You'll be prompted to enter your free Gemini API key:
-   - Click the link to [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Click the link to [Google AI Studio](https://aistudio.google.com/apikey)
    - Create a free API key (takes 30 seconds)
    - Paste it into the app — it's stored locally in your browser, never sent to our servers
 3. Describe your ideal button in plain English:
@@ -116,7 +116,7 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 **Important**: This tool generates YAML for the [custom:button-card](https://github.com/custom-cards/button-card) integration. You must install button-card separately through HACS or manually.
 
 **For AI Features**: The Magic Builder requires a free Gemini API key:
-1. Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (free tier, no credit card required)
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey) (free tier, no credit card required)
 2. Enter it when prompted in the Magic Builder dialog
 3. Your key is stored locally in your browser — we never see it
 

@@ -115,15 +115,17 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
                 </p>
               </div>
               
-              <a 
-                href="https://aistudio.google.com/app/apikey" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors text-sm font-medium"
+              <button 
+                onClick={() => window.open('https://aistudio.google.com/apikey', '_blank', 'noopener,noreferrer')}
+                className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors text-sm font-medium cursor-pointer"
               >
                 <ExternalLink size={16} />
                 Get Free API Key from Google AI Studio
-              </a>
+              </button>
+              <p className="text-xs text-gray-500 text-center">
+                If the link doesn't open, copy this URL to your browser:<br/>
+                <code className="text-purple-400 select-all">https://aistudio.google.com/apikey</code>
+              </p>
               
               <div className="space-y-2">
                 <label className="text-xs text-gray-500 uppercase tracking-wider">Paste your API key</label>

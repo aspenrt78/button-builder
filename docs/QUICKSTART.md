@@ -20,7 +20,7 @@ This guide will help you get Button Builder up and running in minutes.
 - ✅ [custom:button-card](https://github.com/custom-cards/button-card) installed (via HACS)
 
 **Optional:**
-- 🤖 [Gemini API Key](https://aistudio.google.com/app/apikey) (for AI features - free tier available)
+- 🤖 [Gemini API Key](https://aistudio.google.com/apikey) (for AI features - free tier available)
 
 ## 🎨 Your First Button
 
