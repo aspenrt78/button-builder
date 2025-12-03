@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Minus, Check, Trash2, Grid3X3 } from 'lucide-react';
+import { X, Plus, Minus, Check, Trash2, Grid3X3, ChevronDown } from 'lucide-react';
 import { EntitySelector } from './EntitySelector';
+import { IconPicker } from './IconPicker';
+import { haService, EntityInfo } from '../services/homeAssistantService';
 
 interface GridCell {
   row: number;
@@ -18,6 +20,8 @@ interface GridArea {
 interface GridAreaContent {
   type: 'icon' | 'name' | 'state' | 'label' | 'entity' | 'custom';
   entity?: string;
+  entityInfo?: EntityInfo;
+  entityAttributes?: string[];
   attribute?: string;
   prefix?: string;
   suffix?: string;
@@ -565,19 +569,87 @@ export const GridDesigner: React.FC<GridDesignerProps> = ({
                             <EntitySelector
                               label="Entity"
                               value={area.content.entity || ''}
-                              onChange={(v) => updateAreaContent(selectedArea, { ...area.content!, entity: v })}
+                              onChange={(v) => updateAreaContent(selectedArea, { ...area.content!, entity: v, entityAttributes: [], entityInfo: undefined })}
+                              onEntitySelect={async (entityInfo) => {
+                                // Fetch full entity with attributes from HA
+                                try {
+                                  const entities = await haService.getEntities();
+                                  const fullEntity = entities.find(e => e.id === entityInfo.id);
+                                  
+                                  // Get attributes from the hass object if available
+                                  let attributes: string[] = [];
+                                  try {
+                                    const hass = (window.parent as any)?.hass || 
+                                                 (window.parent as any)?.document?.querySelector?.('home-assistant')?.hass;
+                                    if (hass?.states?.[entityInfo.id]?.attributes) {
+                                      attributes = Object.keys(hass.states[entityInfo.id].attributes);
+                                    }
+                                  } catch (e) {
+                                    // Fallback: common attributes based on domain
+                                    const domain = entityInfo.id.split('.')[0];
+                                    const commonAttrs: Record<string, string[]> = {
+                                      light: ['brightness', 'color_temp', 'rgb_color', 'hs_color', 'effect'],
+                                      climate: ['temperature', 'current_temperature', 'humidity', 'hvac_action', 'fan_mode'],
+                                      sensor: ['unit_of_measurement', 'device_class', 'state_class'],
+                                      media_player: ['volume_level', 'media_title', 'media_artist', 'source'],
+                                      cover: ['current_position', 'current_tilt_position'],
+                                      fan: ['percentage', 'preset_mode', 'direction'],
+                                      vacuum: ['battery_level', 'fan_speed', 'status'],
+                                      lock: ['is_jammed', 'is_locked'],
+                                    };
+                                    attributes = commonAttrs[domain] || [];
+                                  }
+                                  
+                                  updateAreaContent(selectedArea, { 
+                                    ...area.content!, 
+                                    entity: entityInfo.id,
+                                    entityInfo: fullEntity || entityInfo,
+                                    entityAttributes: attributes,
+                                    icon: entityInfo.icon || area.content!.icon || ''
+                                  });
+                                } catch (e) {
+                                  updateAreaContent(selectedArea, { 
+                                    ...area.content!, 
+                                    entity: entityInfo.id,
+                                    entityInfo: entityInfo,
+                                    entityAttributes: []
+                                  });
+                                }
+                              }}
                               allowAll={true}
                             />
+                            
+                            {/* Attribute Selector */}
                             <div>
                               <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Attribute</label>
-                              <input
-                                type="text"
-                                value={area.content.attribute || ''}
-                                onChange={(e) => updateAreaContent(selectedArea, { ...area.content!, attribute: e.target.value })}
-                                placeholder="Leave empty for state"
-                                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-white"
-                              />
+                              {area.content.entityAttributes && area.content.entityAttributes.length > 0 ? (
+                                <div className="relative">
+                                  <select
+                                    value={area.content.attribute || ''}
+                                    onChange={(e) => updateAreaContent(selectedArea, { ...area.content!, attribute: e.target.value })}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-white appearance-none"
+                                  >
+                                    <option value="">State (default)</option>
+                                    {area.content.entityAttributes.map(attr => (
+                                      <option key={attr} value={attr}>{attr}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={area.content.attribute || ''}
+                                  onChange={(e) => updateAreaContent(selectedArea, { ...area.content!, attribute: e.target.value })}
+                                  placeholder="Leave empty for state"
+                                  className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-white"
+                                />
+                              )}
+                              <p className="text-[9px] text-gray-500 mt-1">
+                                {area.content.entityInfo?.state && `Current: ${area.content.entityInfo.state}`}
+                              </p>
                             </div>
+                            
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Prefix</label>
@@ -600,16 +672,13 @@ export const GridDesigner: React.FC<GridDesignerProps> = ({
                                 />
                               </div>
                             </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Icon</label>
-                              <input
-                                type="text"
-                                value={area.content.icon || ''}
-                                onChange={(e) => updateAreaContent(selectedArea, { ...area.content!, icon: e.target.value })}
-                                placeholder="mdi:thermometer"
-                                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-white"
-                              />
-                            </div>
+                            
+                            {/* Icon Picker */}
+                            <IconPicker
+                              label="Icon"
+                              value={area.content.icon || ''}
+                              onChange={(v) => updateAreaContent(selectedArea, { ...area.content!, icon: v })}
+                            />
                           </div>
                         );
                       }

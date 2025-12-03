@@ -25,6 +25,59 @@ const DASHBOARD_PRESETS = [
 // Simulate the "Light Color" provided by HA when state is ON
 const SIMULATED_ENTITY_COLOR = '#FFC107'; // Warm Amber/Gold
 
+// Get domain-appropriate state display based on entity domain and simulated state
+const getDomainStateDisplay = (entityId: string, simulatedState: 'on' | 'off', attribute?: string): string => {
+  // If there's an attribute, show a placeholder for it
+  if (attribute) {
+    // Show sample values based on common attributes
+    const attrSamples: Record<string, string> = {
+      'brightness': '80%',
+      'temperature': '72°F',
+      'current_temperature': '68°F',
+      'humidity': '45%',
+      'volume_level': '75%',
+      'battery_level': '85%',
+      'percentage': '50%',
+      'media_title': 'Now Playing',
+      'media_artist': 'Artist Name',
+      'current_position': '50%',
+      'fan_speed': 'Medium',
+      'hvac_action': simulatedState === 'on' ? 'heating' : 'idle',
+    };
+    return attrSamples[attribute] || attribute;
+  }
+  
+  // Get domain from entity ID
+  const domain = entityId?.split('.')[0] || '';
+  
+  // Domain-specific state displays
+  const stateMap: Record<string, { on: string; off: string }> = {
+    'lock': { on: 'Locked', off: 'Unlocked' },
+    'cover': { on: 'Open', off: 'Closed' },
+    'door': { on: 'Open', off: 'Closed' },
+    'window': { on: 'Open', off: 'Closed' },
+    'garage': { on: 'Open', off: 'Closed' },
+    'binary_sensor': { on: 'Detected', off: 'Clear' },
+    'motion': { on: 'Motion', off: 'Clear' },
+    'occupancy': { on: 'Occupied', off: 'Clear' },
+    'presence': { on: 'Home', off: 'Away' },
+    'person': { on: 'Home', off: 'Away' },
+    'device_tracker': { on: 'Home', off: 'Away' },
+    'vacuum': { on: 'Cleaning', off: 'Docked' },
+    'media_player': { on: 'Playing', off: 'Idle' },
+    'climate': { on: 'Heating', off: 'Off' },
+    'alarm_control_panel': { on: 'Armed', off: 'Disarmed' },
+  };
+  
+  const domainStates = stateMap[domain];
+  if (domainStates) {
+    return simulatedState === 'on' ? domainStates.on : domainStates.off;
+  }
+  
+  // Default: capitalize the state
+  return simulatedState.charAt(0).toUpperCase() + simulatedState.slice(1);
+};
+
 // Helper to convert Hex to RGBA
 const hexToRgba = (hex: string, alpha: number) => {
   if (!hex || hex.length < 7) return 'transparent';
@@ -914,7 +967,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
                   />
                 )}
                 <span className="ml-1">
-                  {field.prefix}{field.type === 'entity' ? (field.attribute ? '—' : '—') : field.value}{field.suffix}
+                  {field.prefix}{field.type === 'entity' ? getDomainStateDisplay(field.entity || config.entity, simulatedState, field.attribute) : field.value}{field.suffix}
                 </span>
               </div>
             ))
