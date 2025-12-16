@@ -23,12 +23,11 @@ import {
   CARD_TYPE_OPTIONS,
 } from './constants';
 import { generateBubbleYaml } from './utils/yamlGenerator';
-import { validateBubbleCard, ValidationWarning } from './utils/validation';
 import { BUBBLE_PRESETS } from './presets';
 import { BubbleConfigPanel } from './components/ConfigPanel';
 import { BubblePreview } from './components/Preview';
 import { BubbleYamlViewer } from './components/YamlViewer';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Check, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Check } from 'lucide-react';
 
 // ============================================
 // DEFAULT CONFIGS FOR EACH CARD TYPE
@@ -40,12 +39,7 @@ const DEFAULT_SEPARATOR_CONFIG: BubbleSeparatorConfig = {
   icon: '',
   card_layout: 'normal',
   rows: 1,
-  grid_options: {
-    rows: 2,
-    columns: 3,
-  },
   sub_button: [],
-  modules: [],
   styles: '',
 };
 
@@ -73,7 +67,6 @@ const DEFAULT_POPUP_CONFIG: BubblePopUpConfig = {
   trigger_state: '',
   trigger_close: false,
   styles: '',
-  modules: [],
 };
 
 const DEFAULT_COVER_CONFIG: BubbleCoverConfig = {
@@ -98,12 +91,7 @@ const DEFAULT_COVER_CONFIG: BubbleCoverConfig = {
   close_service: '',
   card_layout: 'normal',
   rows: 1,
-  grid_options: {
-    rows: 2,
-    columns: 3,
-  },
   sub_button: [],
-  modules: [],
   styles: '',
 };
 
@@ -124,7 +112,6 @@ const DEFAULT_MEDIA_PLAYER_CONFIG: BubbleMediaPlayerConfig = {
   min_volume: 0,
   max_volume: 100,
   cover_background: true,
-  columns: 1,
   hide: {
     play_pause_button: false,
     volume_button: false,
@@ -134,12 +121,7 @@ const DEFAULT_MEDIA_PLAYER_CONFIG: BubbleMediaPlayerConfig = {
   },
   card_layout: 'normal',
   rows: 1,
-  grid_options: {
-    rows: 2,
-    columns: 3,
-  },
   sub_button: [],
-  modules: [],
   styles: '',
 };
 
@@ -160,12 +142,7 @@ const DEFAULT_CLIMATE_CONFIG: BubbleClimateConfig = {
   max_temp: 30,
   card_layout: 'normal',
   rows: 1,
-  grid_options: {
-    rows: 2,
-    columns: 3,
-  },
   sub_button: [],
-  modules: [],
   styles: '',
 };
 
@@ -185,12 +162,7 @@ const DEFAULT_SELECT_CONFIG: BubbleSelectConfig = {
   scrolling_effect: true,
   card_layout: 'normal',
   rows: 1,
-  grid_options: {
-    rows: 2,
-    columns: 3,
-  },
   sub_button: [],
-  modules: [],
   styles: '',
 };
 
@@ -204,12 +176,7 @@ const DEFAULT_CALENDAR_CONFIG: BubbleCalendarConfig = {
   scrolling_effect: true,
   card_layout: 'normal',
   rows: 1,
-  grid_options: {
-    rows: 2,
-    columns: 3,
-  },
   sub_button: [],
-  modules: [],
   styles: '',
 };
 
@@ -224,12 +191,10 @@ const DEFAULT_HORIZONTAL_BUTTONS_CONFIG: BubbleHorizontalButtonsStackConfig = {
   highlight_current_view: false,
   hide_gradient: false,
   styles: '',
-  modules: [],
 };
 
 const DEFAULT_EMPTY_COLUMN_CONFIG: BubbleEmptyColumnConfig = {
   card_type: 'empty-column',
-  modules: [],
 };
 
 // ============================================
@@ -275,7 +240,6 @@ export function BubbleCardApp() {
   // Core state
   const [config, setConfigInternal] = useState<BubbleConfig>(loadSavedConfig);
   const [activePreset, setActivePreset] = useState<BubblePreset | null>(null);
-  const [simulatedState, setSimulatedState] = useState<'on' | 'off'>('on');
   
   // UI state
   const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
@@ -303,11 +267,6 @@ export function BubbleCardApp() {
 
   // Generate YAML output
   const yamlOutput = useMemo(() => generateBubbleYaml(config), [config]);
-  
-  // Validate current config
-  const validationWarnings = useMemo(() => validateBubbleCard(config), [config]);
-  const errors = validationWarnings.filter(w => w.severity === 'error');
-  const warnings = validationWarnings.filter(w => w.severity === 'warning');
 
   // Save to localStorage
   useEffect(() => {
@@ -368,16 +327,6 @@ export function BubbleCardApp() {
       setActivePreset(null);
       localStorage.removeItem(BUBBLE_STORAGE_KEY);
     }
-  };
-  
-  // Duplicate current card
-  const handleDuplicate = () => {
-    const duplicated = JSON.parse(JSON.stringify(config));
-    if (duplicated.name) {
-      duplicated.name = `${duplicated.name} (Copy)`;
-    }
-    setConfigInternal(duplicated);
-    setActivePreset(null);
   };
 
   // Update config helper (for ConfigPanel)
@@ -444,14 +393,6 @@ export function BubbleCardApp() {
           >
             <Upload size={14} />
             Import
-          </button>
-          <button 
-            onClick={handleDuplicate}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"
-            title="Duplicate current card"
-          >
-            <Copy size={14} />
-            Duplicate
           </button>
           <button 
             onClick={handleReset}
@@ -544,11 +485,7 @@ export function BubbleCardApp() {
                 </span>
               </div>
               <div className="flex-1 relative overflow-hidden z-0 w-full h-full min-h-0 min-w-0 flex items-center justify-center p-8">
-                <BubblePreview 
-                  config={config} 
-                  simulatedState={simulatedState}
-                  onSimulatedStateChange={setSimulatedState}
-                />
+                <BubblePreview config={config as BubbleButtonConfig} />
               </div>
             </div>
 
@@ -674,11 +611,7 @@ export function BubbleCardApp() {
             <div className="h-full bg-[#0a0a0a] relative flex flex-col">
               <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
               <div className="flex-1 relative overflow-hidden z-0 flex items-center justify-center p-4">
-                <BubblePreview 
-                  config={config} 
-                  simulatedState={simulatedState}
-                  onSimulatedStateChange={setSimulatedState}
-                />
+                <BubblePreview config={config as BubbleButtonConfig} />
               </div>
             </div>
           )}

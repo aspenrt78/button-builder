@@ -158,7 +158,9 @@ export const generateYaml = (config: ButtonConfig): string => {
   const borderStyle = config.borderStyle !== 'none' ? `border: ${config.borderWidth} ${config.borderStyle} ${borderColor || 'var(--primary-text-color)'}` : 'border: none';
 
   // Resolve Backgrounds
-  const bgColor = config.backgroundColor ? hexToRgba(config.backgroundColor, config.backgroundColorOpacity) : '';
+  const bgColor = hexToRgba(config.backgroundColor, config.backgroundColorOpacity);
+  const onColor = hexToRgba(config.stateOnColor, config.stateOnOpacity);
+  const offColor = hexToRgba(config.stateOffColor, config.stateOffOpacity);
 
   // Resolve Shadow
   const shadowCSS = getShadowCSS(config.shadowSize, config.shadowColor, config.shadowOpacity);
@@ -187,7 +189,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   const cardStyles = [
     config.height !== 'auto' ? `height: ${config.height}` : null,
     config.aspectRatio ? `aspect-ratio: ${config.aspectRatio}` : null,
-    gradientCSS ? gradientCSS : (bgColor ? `background-color: ${bgColor}` : null),
+    gradientCSS ? gradientCSS : `background-color: ${bgColor}`,
     config.cardOpacity < 100 ? `opacity: ${config.cardOpacity / 100}` : null,
     `border-radius: ${config.borderRadius}`,
     `padding: ${config.padding}`,
@@ -216,12 +218,11 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
 
   // --- Apply ALWAYS Animations ---
-  // If alwaysAnimate is enabled, output animations regardless of trigger
-  if (config.cardAnimation !== 'none' && (config.alwaysAnimateCard || config.cardAnimationTrigger === 'always')) {
+  if (config.cardAnimation !== 'none' && config.cardAnimationTrigger === 'always') {
     const anim = getAnimationCSS(config.cardAnimation, config.cardAnimationSpeed);
     if (anim) cardStyles.push(anim);
   }
-  if (config.iconAnimation !== 'none' && (config.alwaysAnimateIcon || config.iconAnimationTrigger === 'always')) {
+  if (config.iconAnimation !== 'none' && config.iconAnimationTrigger === 'always') {
     const anim = getAnimationCSS(config.iconAnimation, config.iconAnimationSpeed);
     if (anim) iconStyles.push(anim);
   }
@@ -452,6 +453,11 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `template: ${config.template}\n`;
   }
 
+  // Haptic
+  if (config.hapticFeedback) {
+    yaml += `haptic: true\n`;
+  }
+
   // Disable Keyboard
   if (config.disableKeyboard) {
     yaml += `disable_keyboard: true\n`;
@@ -466,10 +472,8 @@ export const generateYaml = (config: ButtonConfig): string => {
     config.tapActionJavascript,
     config.tapActionToast
   );
-  // Haptic: use per-action if set, otherwise use global haptic
-  const tapHaptic = config.tapActionSound || config.hapticFeedback;
-  if (tapHaptic) {
-    yaml += `  haptic: ${tapHaptic}\n`;
+  if (config.tapActionSound) {
+    yaml += `  haptic: ${config.tapActionSound}\n`;
   }
 
   // Actions - Hold
@@ -483,9 +487,8 @@ export const generateYaml = (config: ButtonConfig): string => {
     config.holdActionRepeat,
     config.holdActionRepeatLimit
   );
-  const holdHaptic = config.holdActionSound || config.hapticFeedback;
-  if (holdHaptic) {
-    yaml += `  haptic: ${holdHaptic}\n`;
+  if (config.holdActionSound) {
+    yaml += `  haptic: ${config.holdActionSound}\n`;
   }
 
   // Actions - Double Tap
@@ -497,9 +500,8 @@ export const generateYaml = (config: ButtonConfig): string => {
     config.doubleTapActionJavascript,
     config.doubleTapActionToast
   );
-  const doubleTapHaptic = config.doubleTapActionSound || config.hapticFeedback;
-  if (doubleTapHaptic) {
-    yaml += `  haptic: ${doubleTapHaptic}\n`;
+  if (config.doubleTapActionSound) {
+    yaml += `  haptic: ${config.doubleTapActionSound}\n`;
   }
 
   // Momentary Actions - Press
@@ -850,19 +852,6 @@ export const generateYaml = (config: ButtonConfig): string => {
       cardStyles.forEach(s => {
         yaml += `    - ${formatStyleForYaml(s)}\n`;
       });
-      // Marquee special handling for alwaysAnimate or trigger='always'
-      if (config.cardAnimation === 'marquee' && (config.alwaysAnimateCard || config.cardAnimationTrigger === 'always')) {
-        yaml += `    - overflow: hidden\n`;
-        yaml += `    - position: relative\n`;
-        yaml += `    - "::before":\n`;
-        yaml += `        - content: '""'\n`;
-        yaml += `        - position: absolute\n`;
-        yaml += `        - inset: -4px\n`;
-        yaml += `        - border-radius: inherit\n`;
-        yaml += `        - background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.6) 50%, transparent 70%)\n`;
-        yaml += `        - background-size: 200% 200%\n`;
-        yaml += `        - animation: cba-marquee-spin ${config.cardAnimationSpeed || '4s'} linear infinite\n`;
-      }
       // Extra styles from textarea
       if (config.extraStyles) {
         yaml += `    # Custom Extra Styles\n`;
@@ -1009,27 +998,30 @@ export const generateYaml = (config: ButtonConfig): string => {
     }
   }
 
+  // --- Resolve onColor/offColor for state logic ---
+  const onColorResolved = hexToRgba(config.stateOnColor, config.stateOnOpacity);
+  const offColorResolved = hexToRgba(config.stateOffColor, config.stateOffOpacity);
+
   // --- Conditional State Logic ---
-  const getStateLogic = (stateVal: 'on' | 'off') => {
-     // Background color is now handled by state appearance, not hardcoded on/off colors
-     const stateCardStyles: string[] = [];
+  const getStateLogic = (stateVal: 'on' | 'off', bgColor: string) => {
+     const stateCardStyles = [`background-color: ${bgColor}`];
      const stateIconStyles: string[] = [];
      
-     // Conditional Card Animation (skip if alwaysAnimateCard is enabled - handled globally)
-     if (!config.alwaysAnimateCard && config.cardAnimation !== 'none' && config.cardAnimationTrigger === stateVal) {
+     // Conditional Card Animation
+     if (config.cardAnimation !== 'none' && config.cardAnimationTrigger === stateVal) {
          const anim = getAnimationCSS(config.cardAnimation, config.cardAnimationSpeed);
          if (anim) stateCardStyles.push(anim);
      }
      
-     // Conditional Icon Animation (skip if alwaysAnimateIcon is enabled - handled globally)
-     if (!config.alwaysAnimateIcon && config.iconAnimation !== 'none' && config.iconAnimationTrigger === stateVal) {
+     // Conditional Icon Animation
+     if (config.iconAnimation !== 'none' && config.iconAnimationTrigger === stateVal) {
          const anim = getAnimationCSS(config.iconAnimation, config.iconAnimationSpeed);
          if (anim) stateIconStyles.push(anim);
      }
      
      // Marquee Special Handling
      let marqueePseudo = '';
-     if (!config.alwaysAnimateCard && config.cardAnimation === 'marquee' && (config.cardAnimationTrigger === stateVal || config.cardAnimationTrigger === 'always')) {
+     if (config.cardAnimation === 'marquee' && (config.cardAnimationTrigger === stateVal || config.cardAnimationTrigger === 'always')) {
        marqueePseudo = `        - overflow: hidden
         - position: relative
         - "::before":
@@ -1041,34 +1033,22 @@ export const generateYaml = (config: ButtonConfig): string => {
             - animation: cba-marquee-spin ${config.cardAnimationSpeed || '4s'} linear infinite`;
      }
 
-     // Only return state entry if there are actual styles to output
-     if (stateCardStyles.length === 0 && stateIconStyles.length === 0 && !marqueePseudo) {
-       return '';
-     }
-
      return `  - value: '${stateVal}'
     styles:
-${stateCardStyles.length > 0 || marqueePseudo ? `      card:
+      card:
 ${stateCardStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}
-${marqueePseudo}` : ''}${stateIconStyles.length > 0 ? `      icon:
+${marqueePseudo}
+${stateIconStyles.length > 0 ? `      icon:
 ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : ''}`;
   };
 
-  const onStateLogic = getStateLogic('on');
-  const offStateLogic = getStateLogic('off');
-  
-  // Output state section if we have state logic OR state styles (conditionals)
-  const hasStateConditionals = config.stateStyles && config.stateStyles.length > 0;
-  
-  if (onStateLogic || offStateLogic || hasStateConditionals) {
-    yaml += `state:
+  yaml += `state:
+${getStateLogic('on', onColorResolved)}
+${getStateLogic('off', offColorResolved)}
 `;
-    if (onStateLogic) yaml += onStateLogic + '\n';
-    if (offStateLogic) yaml += offStateLogic + '\n';
-  }
-  
+
   // Custom State Styles / Conditionals
-  if (hasStateConditionals) {
+  if (config.stateStyles && config.stateStyles.length > 0) {
     config.stateStyles.forEach(stateStyle => {
       yaml += `  - `;
       
@@ -1120,46 +1100,10 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
       const conditionalCardStyles: string[] = [];
       const conditionalIconStyles: string[] = [];
       const conditionalNameStyles: string[] = [];
-      const conditionalStateStyles: string[] = [];
       const conditionalLabelStyles: string[] = [];
       
       // Conditional Colors
-      // Handle gradient if enabled, otherwise use backgroundColor
-      if (stateStyle.gradientEnabled) {
-        const gradientOpacity = (stateStyle.gradientOpacity ?? 100) / 100;
-        
-        // Convert hex to rgba with opacity
-        const toRgba = (hex: string, alpha: number) => {
-          const r = parseInt(hex.slice(1, 3), 16);
-          const g = parseInt(hex.slice(3, 5), 16);
-          const b = parseInt(hex.slice(5, 7), 16);
-          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        };
-        
-        const color1 = toRgba(stateStyle.gradientColor1 || '#667eea', gradientOpacity);
-        const color2 = toRgba(stateStyle.gradientColor2 || '#764ba2', gradientOpacity);
-        const color3 = toRgba(stateStyle.gradientColor3 || '#f093fb', gradientOpacity);
-        
-        const colors = stateStyle.gradientColor3Enabled 
-          ? `${color1}, ${color2}, ${color3}`
-          : `${color1}, ${color2}`;
-        
-        let gradientBg = '';
-        switch (stateStyle.gradientType) {
-          case 'linear':
-            gradientBg = `background: linear-gradient(${stateStyle.gradientAngle}deg, ${colors})`;
-            break;
-          case 'radial':
-            gradientBg = `background: radial-gradient(circle, ${colors})`;
-            break;
-          case 'conic':
-            gradientBg = `background: conic-gradient(from ${stateStyle.gradientAngle}deg, ${colors}, ${color1})`;
-            break;
-        }
-        if (gradientBg) {
-          conditionalCardStyles.push(gradientBg);
-        }
-      } else if (stateStyle.backgroundColor) {
+      if (stateStyle.backgroundColor) {
         conditionalCardStyles.push(`background-color: ${stateStyle.backgroundColor}`);
       }
       if (stateStyle.borderColor) {
@@ -1170,9 +1114,6 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
       }
       if (stateStyle.nameColor) {
         conditionalNameStyles.push(`color: ${stateStyle.nameColor}`);
-      }
-      if (stateStyle.stateColor) {
-        conditionalStateStyles.push(`color: ${stateStyle.stateColor}`);
       }
       if (stateStyle.labelColor) {
         conditionalLabelStyles.push(`color: ${stateStyle.labelColor}`);
@@ -1205,8 +1146,7 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
       
       // Output styles section if any conditional styles exist
       const hasConditionalStyles = conditionalCardStyles.length > 0 || conditionalIconStyles.length > 0 || 
-                                   conditionalNameStyles.length > 0 || conditionalStateStyles.length > 0 || 
-                                   conditionalLabelStyles.length > 0;
+                                   conditionalNameStyles.length > 0 || conditionalLabelStyles.length > 0;
       
       if (hasConditionalStyles) {
         yaml += `    styles:\n`;
@@ -1226,12 +1166,6 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
         if (conditionalNameStyles.length > 0) {
           yaml += `      name:\n`;
           conditionalNameStyles.forEach(s => {
-            yaml += `        - ${formatStyleForYaml(s)}\n`;
-          });
-        }
-        if (conditionalStateStyles.length > 0) {
-          yaml += `      state:\n`;
-          conditionalStateStyles.forEach(s => {
             yaml += `        - ${formatStyleForYaml(s)}\n`;
           });
         }

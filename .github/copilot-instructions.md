@@ -1,122 +1,13 @@
-# Button Builder - AI Agent Instructions
-
-## Project Overview
-Button Builder is a **Home Assistant custom integration** that provides a visual UI for designing `custom:button-card` YAML configurations. It's a React/TypeScript frontend embedded in HA via iframe panel.
-
-## Architecture
-
-### Dual-Layer Structure
-1. **Frontend (React/Vite)**: `src/App.tsx`, `src/components/`, `src/services/`, `src/utils/`
-2. **HA Integration (Python)**: `custom_components/button_builder/` - registers sidebar panel
-
-### Key Data Flow
-```
-User Input → ConfigPanel → ButtonConfig state → yamlGenerator.ts → YAML Output
-                              ↓
-                         PreviewCard (live preview)
-```
-
-### Critical Files
-- **`src/types.ts`**: `ButtonConfig` interface (~100+ properties) - the single source of truth
-- **`src/ButtonCardApp.tsx`**: Main state management, preset handling, import/export
-- **`src/utils/yamlGenerator.ts`**: Converts `ButtonConfig` → button-card YAML (1300+ lines)
-- **`src/presets.ts`**: 80+ style presets with `Partial<ButtonConfig>` configs
-- **`src/services/geminiService.ts`**: AI generation with structured schema output
-
-## Project Structure
-```
-button-builder/
-├── src/                    # Source code
-│   ├── components/         # React components
-│   ├── services/           # API services
-│   ├── utils/              # Utility functions
-│   ├── bubble-card/        # Bubble Card builder (beta)
-│   └── assets/             # Images & assets
-├── docs/                   # Documentation
-├── scripts/                # Build & deploy scripts
-├── wiki/                   # GitHub wiki pages
-├── custom_components/      # Home Assistant integration
-│   └── button_builder/
-│       └── www/            # Built frontend files
-└── brands_submission/      # HACS brand assets
-```
-
-## Development Workflow
-
-### Commands
-```bash
-npm run dev      # Local dev server at localhost:3000
-npm run build    # Build to custom_components/button_builder/www/
-```
-
-### Version Bump Checklist (CRITICAL)
-When releasing, update version in **BOTH**:
-1. `package.json` → `"version"`
-2. `custom_components/button_builder/manifest.json` → `"version"`
-
-Cache busting uses `manifest.json` version + timestamp, so mismatched versions cause stale cache issues.
-
-### Release Process
-```bash
-npm run build
-git add -A && git commit -m "message"
-git tag vX.Y.Z && git push origin main --tags
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "..." --latest
-```
-
-## Code Patterns
-
-### State Management
-- `isApplyingPresetRef` uses `useRef` (not `useState`) to avoid React batching race conditions
-- `setConfig` wrapper auto-clears `activePreset` when user modifies config manually
-- Config persists to `localStorage` with key `button-builder-config`
-
-### Adding New ButtonConfig Properties
-1. Add to `ButtonConfig` interface in `src/types.ts`
-2. Add default value to `DEFAULT_CONFIG` in `src/types.ts`
-3. Add UI control in `src/components/ConfigPanel.tsx`
-4. Handle in `src/utils/yamlGenerator.ts` to output correct YAML
-5. Add to AI schema in `src/services/geminiService.ts` if AI should generate it
-
-### Preset Structure
-```typescript
-// src/presets.ts
-{
-  name: 'Preset Name',
-  description: 'Short description',
-  category: 'minimal' | 'glass' | 'neon' | 'gradient' | 'animated' | '3d' | 'cyberpunk' | 'retro' | 'nature' | 'icon-styles' | 'custom',
-  config: Partial<ButtonConfig>  // Only override properties, rest use defaults
-}
-```
-
-### YAML Generation Pattern
-```typescript
-// yamlGenerator.ts - only output non-default values
-if (config.propertyName !== DEFAULT_CONFIG.propertyName) {
-  yaml += `property_name: ${config.propertyName}\n`;
-}
-```
-
-## Common Pitfalls
-
-1. **Removing props/state**: Search ALL `.tsx` files for references before removing - leftover references cause runtime crashes (not caught by build)
-2. **HA caching**: After HACS update, users need: Restart HA + hard refresh browser (Ctrl+Shift+R)
-3. **Panel registration**: Uses 2-second delay in `__init__.py` to ensure HA frontend is ready
-4. **Tailwind in production**: Uses CDN (`cdn.tailwindcss.com`) - expected console warning
-
-## Testing in Home Assistant
-
-The panel runs inside HA's iframe sandbox. To test locally with HA APIs:
-- Panel URL: `/button_builder/panel.html?v={version}`
-- Static assets served from `/button_builder/`
-- Auth token read from `localStorage.hassTokens`
-
-## File Relationships
-```
-ButtonConfig (src/types.ts)
-    ├── src/components/ConfigPanel.tsx (UI inputs)
-    ├── src/components/PreviewCard.tsx (live preview)
-    ├── src/utils/yamlGenerator.ts (YAML output)
-    ├── src/services/geminiService.ts (AI schema)
-    └── src/presets.ts (preset configs)
-```
+# Button Builder – AI Agent Guide
+- What this is: Home Assistant custom integration plus a React/Vite UI to design `custom:button-card` YAML (and a beta bubble-card builder). The panel is served from `custom_components/button_builder/www/` into an HA iframe registered in `custom_components/button_builder/__init__.py` (2s delayed setup).
+- Frontend map: Main entry `src/ButtonCardApp.tsx`, shell `src/App.tsx`, UI pieces under `src/components/`, YAML logic in `src/utils/yamlGenerator.ts`, presets in `src/presets.ts`, services in `src/services/`. Bubble-card has a parallel stack in `src/bubble-card/` (`BubbleCardApp`, `components/Preview.tsx`, `utils/yamlGenerator.ts`).
+- State/data flow: User input in `components/ConfigPanel.tsx` updates `ButtonConfig` state (held in `ButtonCardApp.tsx`) → `utils/yamlGenerator.ts` emits YAML (only non-defaults) → live preview `components/PreviewCard.tsx` and YAML viewer. Bubble-card mirrors this with its own types and generator.
+- Canonical schema: `src/types.ts` defines `ButtonConfig` + `DEFAULT_CONFIG`. When adding a field, update `DEFAULT_CONFIG`, expose controls in `components/ConfigPanel.tsx`, render/preview as needed, emit via `utils/yamlGenerator.ts`, include in presets (`src/presets.ts`) and AI schema (`services/geminiService.ts`). Bubble-card equivalents live in `src/bubble-card/types.ts` and friends.
+- Presets: ~80 presets in `src/presets.ts` (bubble-card has its own). Application uses `isApplyingPresetRef` to avoid React batching glitches; manual edits clear `activePreset` through the `setConfig` wrapper.
+- Persistence/import: Button config persists to `localStorage` key `button-builder-config`; Gemini key lives only in-browser. YAML import path: `utils/yamlImporter.ts` maps button-card options back into `ButtonConfig`.
+- Services: `services/geminiService.ts` uses `@google/genai` with a structured schema returning `ButtonConfig`. `homeAssistantService.ts` and `dashboardService.ts` wrap HA APIs; auth tokens expected in `localStorage.hassTokens`.
+- Styling/assets: Lucide + MDI icons; Tailwind injected via CDN in production (console warning is normal). Core styles `src/index.css`; HTML entry `src/index.html`. Keep ASCII; existing assets in `src/assets/`.
+- Build/dev: `npm run dev` (Vite on :3000), `npm run build` outputs to `custom_components/button_builder/www/`, `npm run preview` to inspect the build. Windows scripts in `scripts/*.ps1` wrap build/deploy steps.
+- Deploy/HA: Served in HA at `/button_builder/panel.html?v={version}`. Keep versions in `package.json` and `custom_components/button_builder/manifest.json` in lockstep for cache busting; HA caches aggressively—rebuild, copy to HA, restart HA, hard-refresh browser.
+- Patterns to preserve: Do not remove props/state without updating all `.tsx` call sites. Keep schema aligned between `DEFAULT_CONFIG` and both YAML generators (button + bubble) to avoid missing YAML. Presets/AI schema must track new fields.
+- Files to know: `src/components/` (UI controls + preview + MagicBuilder), `src/utils/yamlGenerator.ts` and `src/utils/yamlImporter.ts`, `src/services/` (Gemini/HA APIs), `src/presets.ts`, `custom_components/button_builder/__init__.py` (panel registration) and `manifest.json` (versioning), `custom_components/button_builder/www/` (built assets, do not hand-edit).

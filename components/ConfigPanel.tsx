@@ -5,7 +5,7 @@ import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
-import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
+import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS } from '../constants';
 import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
 import { PRESETS, Preset, generateDarkModePreset } from '../presets';
@@ -242,7 +242,7 @@ export const ConfigPanel: React.FC<Props> = ({
   // Update appearance for current editing state
   const updateAppearance = (key: keyof StateAppearanceConfig, value: any) => {
     if (setCurrentAppearance) {
-      setCurrentAppearance(prev => ({ ...prev, [key]: value }));
+      setCurrentAppearance({ ...currentAppearance, [key]: value });
     }
   };
   
@@ -708,6 +708,7 @@ export const ConfigPanel: React.FC<Props> = ({
             <ControlInput type="checkbox" label="Show Last Chg." value={config.showLastChanged} onChange={(v) => update('showLastChanged', v)} />
             <ControlInput type="checkbox" label="Entity Picture" value={config.showEntityPicture} onChange={(v) => update('showEntityPicture', v)} />
             <ControlInput type="checkbox" label="Show Units" value={config.showUnits} onChange={(v) => update('showUnits', v)} />
+            <ControlInput type="checkbox" label="Show Ripple" value={config.showRipple} onChange={(v) => update('showRipple', v)} />
             <ControlInput type="checkbox" label="Live Stream" value={config.showLiveStream} onChange={(v) => update('showLiveStream', v)} />
             <ControlInput type="checkbox" label="Hidden" value={config.hidden} onChange={(v) => update('hidden', v)} />
           </div>
@@ -879,13 +880,13 @@ export const ConfigPanel: React.FC<Props> = ({
                    <ControlInput type="checkbox" label="Auto Color (Light)" value={config.colorAuto} onChange={(v) => update('colorAuto', v)} />
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
                         <ControlInput label="Card Background" type="color" value={getAppearanceValue('backgroundColor') || '#000000'} onChange={(v) => {
                           updateAppearance('backgroundColor', v);
                           updateAppearance('gradientEnabled', false);
                         }} />
-                        <ControlInput label="Opacity" type="slider" value={getAppearanceValue('backgroundColorOpacity')} min={0} max={100} onChange={(v) => updateAppearance('backgroundColorOpacity', v)} />
+                          <ControlInput label="Opacity" type="slider" value={getAppearanceValue('backgroundColorOpacity')} min={0} max={100} onChange={(v) => updateAppearance('backgroundColorOpacity', v)} />
                    </div>
                    <ControlInput label="Default Text Color" type="color" value={getAppearanceValue('color') || '#ffffff'} onChange={(v) => updateAppearance('color', v)} />
                 </div>
@@ -897,26 +898,12 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-gray-400 uppercase">Gradient Background</p>
-                  <ControlInput type="checkbox" label="" value={!!getAppearanceValue('gradientEnabled')} onChange={(v) => {
-                    // When enabling gradient, clear solid background color and set defaults
+                  <ControlInput type="checkbox" label="" value={getAppearanceValue('gradientEnabled') === true} onChange={(v) => {
+                    // When enabling gradient, clear solid background color
                     if (v) {
-                      if (setCurrentAppearance) {
-                        setCurrentAppearance(prev => ({ 
-                          ...prev, 
-                          gradientEnabled: true,
-                          backgroundColor: '',
-                          backgroundColorOpacity: 100,
-                          gradientType: prev.gradientType || DEFAULT_STATE_APPEARANCE.gradientType,
-                          gradientAngle: prev.gradientAngle ?? DEFAULT_STATE_APPEARANCE.gradientAngle,
-                          gradientColor1: prev.gradientColor1 || DEFAULT_STATE_APPEARANCE.gradientColor1,
-                          gradientColor2: prev.gradientColor2 || DEFAULT_STATE_APPEARANCE.gradientColor2,
-                          gradientColor3: prev.gradientColor3 || DEFAULT_STATE_APPEARANCE.gradientColor3,
-                          gradientColor3Enabled: prev.gradientColor3Enabled ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled,
-                          gradientOpacity: prev.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
-                        }));
-                      }
-                      // Also clear base config backgroundColor so it doesn't output in base styles
-                      update('backgroundColor', '');
+                      updateAppearance('gradientEnabled', true);
+                      updateAppearance('backgroundColor', '');
+                      updateAppearance('backgroundColorOpacity', 100);
                     } else {
                       updateAppearance('gradientEnabled', false);
                     }
@@ -966,8 +953,6 @@ export const ConfigPanel: React.FC<Props> = ({
                       <ControlInput label="Color 2" type="color" value={getAppearanceValue('gradientColor2')} onChange={(v) => updateAppearance('gradientColor2', v)} />
                     </div>
                     
-                    <ControlInput label="Gradient Opacity" type="slider" value={getAppearanceValue('gradientOpacity')} min={0} max={100} onChange={(v) => updateAppearance('gradientOpacity', v)} />
-                    
                     <div className="flex items-center gap-3">
                       <ControlInput type="checkbox" label="3rd Color" value={getAppearanceValue('gradientColor3Enabled')} onChange={(v) => updateAppearance('gradientColor3Enabled', v)} />
                       {getAppearanceValue('gradientColor3Enabled') && (
@@ -1004,8 +989,8 @@ export const ConfigPanel: React.FC<Props> = ({
 
                 <ColorPairInput 
                   label="State Color"
-                  colorValue={getAppearanceValue('stateColor')}
-                  setColor={(v: string) => updateAppearance('stateColor', v)}
+                  colorValue={config.stateColor}
+                  setColor={(v: string) => update('stateColor', v)}
                   autoValue={config.stateColorAuto}
                   setAuto={(v: boolean) => update('stateColorAuto', v)}
                 />
@@ -1018,11 +1003,143 @@ export const ConfigPanel: React.FC<Props> = ({
                   setAuto={(v: boolean) => update('labelColorAuto', v)}
                 />
              </div>
-             
+           </div>
+            </>
+          )}
+        
+          {/* ===== APPEARANCE > GLASS ===== */}
+          {showSection('glass') && (
+            <>
+           <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                 <ControlInput label="Backdrop Blur" type="select" value={getAppearanceValue('backdropBlur')} options={BLUR_OPTIONS} onChange={(v) => updateAppearance('backdropBlur', v)} />
+                 <ControlInput label="Shadow Size" type="select" value={getAppearanceValue('shadowSize')} options={SHADOW_SIZE_OPTIONS} onChange={(v) => updateAppearance('shadowSize', v)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <ControlInput label="Shadow Color" type="color" value={getAppearanceValue('shadowColor')} onChange={(v) => updateAppearance('shadowColor', v)} />
+                  <ControlInput label="Shadow Opacity" type="slider" value={getAppearanceValue('shadowOpacity')} min={0} max={100} onChange={(v) => updateAppearance('shadowOpacity', v)} />
+              </div>
+           </div>
+            </>
+          )}
+
+          {/* ===== APPEARANCE > BORDERS ===== */}
+          {showSection('borders') && (
+            <>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
+               <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
+            </div>
+
+            <ColorPairInput 
+               label="Border Color"
+               colorValue={getAppearanceValue('borderColor')}
+               setColor={(v: string) => updateAppearance('borderColor', v)}
+               autoValue={config.borderColorAuto}
+               setAuto={(v: boolean) => update('borderColorAuto', v)}
+            />
+          </div>
+            </>
+          )}
+
+          {/* ===== APPEARANCE > ANIMATIONS ===== */}
+          {showSection('animations') && (
+            <>
+          <div className="space-y-6">
+             {/* Card Animation */}
+             <div className="space-y-3">
+                <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
+                  <ControlInput label="Condition" type="select" value={config.cardAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('cardAnimationTrigger', v)} />
+                </div>
+                <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
+             </div>
+
              <div className="h-px bg-gray-700/50" />
 
-             {/* Conditionals (State-Based Styling) - Moved from State Styles section */}
-             <div>
+             {/* Icon Animation - NOT locked by extraStyles since it only affects card */}
+             <div className="space-y-3">
+                <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
+                  <ControlInput label="Condition" type="select" value={config.iconAnimationTrigger} options={TRIGGER_OPTIONS} onChange={(v) => update('iconAnimationTrigger', v)} />
+                </div>
+                <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
+                <ControlInput type="checkbox" label="Rotate Icon" value={config.rotate} onChange={(v) => update('rotate', v)} />
+             </div>
+          </div>
+            </>
+          )}
+
+          {/* ===== APPEARANCE > TYPOGRAPHY ===== */}
+          {showSection('typography') && (
+            <>
+           <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
+           
+           {/* Custom Font */}
+           <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+             <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Custom Font (Optional)</p>
+             <div className="space-y-2">
+               <ControlInput 
+                 label="Font Name" 
+                 value={config.customFontName} 
+                 onChange={(v) => update('customFontName', v)} 
+                 placeholder="My Custom Font" 
+               />
+               <ControlInput 
+                 label="Google Fonts URL or @import" 
+                 value={config.customFontUrl} 
+                 onChange={(v) => update('customFontUrl', v)} 
+                 placeholder="https://fonts.googleapis.com/css2?family=..." 
+               />
+               <p className="text-[9px] text-gray-500">
+                 Get fonts from <a href="https://fonts.google.com" target="_blank" rel="noopener" className="text-blue-400 hover:underline">fonts.google.com</a> → 
+                 Select font → Copy the embed URL. The font name must match exactly.
+               </p>
+               {config.customFontName && config.customFontUrl && (
+                 <div className="mt-2 p-2 bg-green-900/20 border border-green-800/50 rounded text-[10px] text-green-400">
+                   ✓ Using custom font: {config.customFontName}
+                 </div>
+               )}
+             </div>
+           </div>
+           
+           <div className="grid grid-cols-2 gap-4 mt-3">
+              <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} suffix="px" />
+              <ControlInput label="Transform" type="select" value={config.textTransform} options={TRANSFORM_OPTIONS} onChange={(v) => update('textTransform', v)} />
+           </div>
+           <div className="grid grid-cols-2 gap-4 mt-3">
+             <ControlInput label="Font Weight" type="select" value={config.fontWeight} options={WEIGHT_OPTIONS} onChange={(v) => update('fontWeight', v)} />
+             <ControlInput label="Letter Spacing" type="select" value={config.letterSpacing} options={LETTER_SPACING_OPTIONS} onChange={(v) => update('letterSpacing', v)} />
+           </div>
+           <div className="grid grid-cols-2 gap-4 mt-3">
+             <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
+             <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
+           </div>
+            </>
+          )}
+
+          {/* ===== EFFECTS > STATE STYLES ===== */}
+          {showSection('stateStyles') && (
+            <>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                 <ControlInput label="ON: Color" type="color" value={config.stateOnColor} onChange={(v) => update('stateOnColor', v)} />
+                 <ControlInput label="Opacity" type="slider" value={config.stateOnOpacity} min={0} max={100} onChange={(v) => update('stateOnOpacity', v)} />
+              </div>
+              <div className="space-y-2">
+                 <ControlInput label="OFF: Color" type="color" value={config.stateOffColor} onChange={(v) => update('stateOffColor', v)} />
+                 <ControlInput label="Opacity" type="slider" value={config.stateOffOpacity} min={0} max={100} onChange={(v) => update('stateOffOpacity', v)} />
+              </div>
+            </div>
+            
+            <div className="h-px bg-gray-700/50" />
+            
+            {/* State Styles / Conditionals */}
+            <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-gray-400 uppercase">Conditionals (State-Based Styling)</p>
                 <button
@@ -1041,7 +1158,6 @@ export const ConfigPanel: React.FC<Props> = ({
                     backgroundColor: '',
                     iconColor: '',
                     nameColor: '',
-                    stateColor: '',
                     labelColor: '',
                     borderColor: '',
                     cardAnimation: 'none',
@@ -1147,13 +1263,6 @@ export const ConfigPanel: React.FC<Props> = ({
                               updated[idx] = { ...style, nameColor: v };
                               update('stateStyles', updated);
                             }} />
-                            <ControlInput label="State Color" type="color" value={style.stateColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, stateColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 mt-2">
                             <ControlInput label="Label Color" type="color" value={style.labelColor || ''} onChange={(v) => {
                               const updated = [...config.stateStyles];
                               updated[idx] = { ...style, labelColor: v };
@@ -1189,6 +1298,22 @@ export const ConfigPanel: React.FC<Props> = ({
                               update('stateStyles', updated);
                             }} suffix="s" />
                           </div>
+                          <div className="mt-2">
+                            <ControlInput type="checkbox" label="Spin Icon (Legacy)" value={style.spin} onChange={(v) => {
+                              const updated = [...config.stateStyles];
+                              updated[idx] = { ...style, spin: v };
+                              update('stateStyles', updated);
+                            }} />
+                          </div>
+                        </div>
+                        
+                        {/* Raw Styles */}
+                        <div className="pt-2 border-t border-gray-700">
+                          <ControlInput label="Additional Styles (YAML)" value={style.styles} onChange={(v) => {
+                            const updated = [...config.stateStyles];
+                            updated[idx] = { ...style, styles: v };
+                            update('stateStyles', updated);
+                          }} placeholder="card:\n  - opacity: 0.5" />
                         </div>
                       </div>
                     </div>
@@ -1196,135 +1321,9 @@ export const ConfigPanel: React.FC<Props> = ({
                 </div>
               )}
             </div>
-           </div>
-            </>
-          )}
-        
-          {/* ===== APPEARANCE > GLASS ===== */}
-          {showSection('glass') && (
-            <>
-           <div className="space-y-4">
-              <p className="text-xs text-gray-500 italic">Glass & depth effects apply to all states</p>
-              <div className="grid grid-cols-2 gap-4">
-                 <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
-                 <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
-              </div>
-           </div>
-            </>
-          )}
-
-          {/* ===== APPEARANCE > BORDERS ===== */}
-          {showSection('borders') && (
-            <>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
-               <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
-            </div>
-
-            <ColorPairInput 
-               label="Border Color"
-               colorValue={getAppearanceValue('borderColor')}
-               setColor={(v: string) => updateAppearance('borderColor', v)}
-               autoValue={config.borderColorAuto}
-               setAuto={(v: boolean) => update('borderColorAuto', v)}
-            />
           </div>
             </>
           )}
-
-          {/* ===== APPEARANCE > ANIMATIONS ===== */}
-          {showSection('animations') && (
-            <>
-          <div className="space-y-6">
-             {/* Card Animation */}
-             <div className="space-y-3">
-                <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
-                  <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
-                </div>
-                <ControlInput 
-                  type="checkbox" 
-                  label="Always Animate Card (Bypass State Toggle)" 
-                  value={config.alwaysAnimateCard} 
-                  onChange={(v) => update('alwaysAnimateCard', v)} 
-                />
-             </div>
-
-             <div className="h-px bg-gray-700/50" />
-
-             {/* Icon Animation - NOT locked by extraStyles since it only affects card */}
-             <div className="space-y-3">
-                <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
-                  <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
-                </div>
-                <ControlInput 
-                  type="checkbox" 
-                  label="Always Animate Icon (Bypass State Toggle)" 
-                  value={config.alwaysAnimateIcon} 
-                  onChange={(v) => update('alwaysAnimateIcon', v)} 
-                />
-             </div>
-          </div>
-            </>
-          )}
-
-          {/* ===== APPEARANCE > TYPOGRAPHY ===== */}
-          {showSection('typography') && (
-            <>
-           <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
-           
-           {/* Custom Font */}
-           <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-             <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Custom Font (Optional)</p>
-             <div className="space-y-2">
-               <ControlInput 
-                 label="Font Name" 
-                 value={config.customFontName} 
-                 onChange={(v) => update('customFontName', v)} 
-                 placeholder="My Custom Font" 
-               />
-               <ControlInput 
-                 label="Google Fonts URL or @import" 
-                 value={config.customFontUrl} 
-                 onChange={(v) => update('customFontUrl', v)} 
-                 placeholder="https://fonts.googleapis.com/css2?family=..." 
-               />
-               <p className="text-[9px] text-gray-500">
-                 Get fonts from <a href="https://fonts.google.com" target="_blank" rel="noopener" className="text-blue-400 hover:underline">fonts.google.com</a> → 
-                 Select font → Copy the embed URL. The font name must match exactly.
-               </p>
-               {config.customFontName && config.customFontUrl && (
-                 <div className="mt-2 p-2 bg-green-900/20 border border-green-800/50 rounded text-[10px] text-green-400">
-                   ✓ Using custom font: {config.customFontName}
-                 </div>
-               )}
-             </div>
-           </div>
-           
-           <div className="grid grid-cols-2 gap-4 mt-3">
-              <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} suffix="px" />
-              <ControlInput label="Transform" type="select" value={config.textTransform} options={TRANSFORM_OPTIONS} onChange={(v) => update('textTransform', v)} />
-           </div>
-           <div className="grid grid-cols-2 gap-4 mt-3">
-             <ControlInput label="Font Weight" type="select" value={config.fontWeight} options={WEIGHT_OPTIONS} onChange={(v) => update('fontWeight', v)} />
-             <ControlInput label="Letter Spacing" type="select" value={config.letterSpacing} options={LETTER_SPACING_OPTIONS} onChange={(v) => update('letterSpacing', v)} />
-           </div>
-           <div className="grid grid-cols-2 gap-4 mt-3">
-             <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
-             <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
-           </div>
-            </>
-          )}
-
-          {/* State Styles section has been moved to Colors section */}
 
           {/* ===== APPEARANCE > THRESHOLD ALERTS ===== */}
           {showSection('thresholdColors') && (
@@ -1756,11 +1755,6 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput label="Service Data (JSON)" value={config.pressActionData} onChange={(v) => update('pressActionData', v)} placeholder='{"service": "switch.turn_on"}' />
                 </div>
               )}
-              {(config.pressAction === 'navigate' || config.pressAction === 'url') && (
-                <div className="mt-2">
-                  <ControlInput label={config.pressAction === 'url' ? 'URL' : 'Navigation Path'} value={config.pressActionNavigation} onChange={(v) => update('pressActionNavigation', v)} placeholder={config.pressAction === 'url' ? 'https://...' : '/lovelace/dashboard'} />
-                </div>
-              )}
               {(config.pressAction === 'javascript') && (
                 <div className="mt-2">
                   <ControlInput label="JavaScript Code" value={config.pressActionJavascript} onChange={(v) => update('pressActionJavascript', v)} />
@@ -1773,11 +1767,6 @@ export const ConfigPanel: React.FC<Props> = ({
               {(config.releaseAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.releaseActionData} onChange={(v) => update('releaseActionData', v)} placeholder='{"service": "switch.turn_off"}' />
-                </div>
-              )}
-              {(config.releaseAction === 'navigate' || config.releaseAction === 'url') && (
-                <div className="mt-2">
-                  <ControlInput label={config.releaseAction === 'url' ? 'URL' : 'Navigation Path'} value={config.releaseActionNavigation} onChange={(v) => update('releaseActionNavigation', v)} placeholder={config.releaseAction === 'url' ? 'https://...' : '/lovelace/dashboard'} />
                 </div>
               )}
               {(config.releaseAction === 'javascript') && (
@@ -1863,11 +1852,6 @@ export const ConfigPanel: React.FC<Props> = ({
                     <ControlInput label="Service Data (JSON)" value={config.iconPressActionData} onChange={(v) => update('iconPressActionData', v)} />
                   </div>
                 )}
-                {(config.iconPressAction === 'navigate' || config.iconPressAction === 'url') && (
-                  <div className="mt-2">
-                    <ControlInput label={config.iconPressAction === 'url' ? 'URL' : 'Navigation Path'} value={config.iconPressActionNavigation} onChange={(v) => update('iconPressActionNavigation', v)} placeholder={config.iconPressAction === 'url' ? 'https://...' : '/lovelace/dashboard'} />
-                  </div>
-                )}
               </div>
               
               <div>
@@ -1875,11 +1859,6 @@ export const ConfigPanel: React.FC<Props> = ({
                 {(config.iconReleaseAction === 'call-service') && (
                   <div className="mt-2">
                     <ControlInput label="Service Data (JSON)" value={config.iconReleaseActionData} onChange={(v) => update('iconReleaseActionData', v)} />
-                  </div>
-                )}
-                {(config.iconReleaseAction === 'navigate' || config.iconReleaseAction === 'url') && (
-                  <div className="mt-2">
-                    <ControlInput label={config.iconReleaseAction === 'url' ? 'URL' : 'Navigation Path'} value={config.iconReleaseActionNavigation} onChange={(v) => update('iconReleaseActionNavigation', v)} placeholder={config.iconReleaseAction === 'url' ? 'https://...' : '/lovelace/dashboard'} />
                   </div>
                 )}
               </div>
@@ -1916,46 +1895,6 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput label="Unlock Icon" value={config.lock.unlockIcon} onChange={(v) => update('lock', { ...config.lock, unlockIcon: v })} placeholder="mdi:lock-open-outline" />
                 </div>
                 <ControlInput type="checkbox" label="Keep Unlock Icon" value={config.lock.keepUnlockIcon} onChange={(v) => update('lock', { ...config.lock, keepUnlockIcon: v })} />
-                
-                {/* Lock Exemptions */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-gray-400">Exempt Users (won't see lock)</label>
-                    <button
-                      onClick={() => update('lock', { ...config.lock, exemptions: [...config.lock.exemptions, ''] })}
-                      className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white"
-                    >
-                      <Plus size={12} /> Add
-                    </button>
-                  </div>
-                  {config.lock.exemptions.length === 0 ? (
-                    <p className="text-xs text-gray-500 italic">No exemptions (all users see lock)</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {config.lock.exemptions.map((userId, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={userId}
-                            onChange={(e) => {
-                              const updated = [...config.lock.exemptions];
-                              updated[idx] = e.target.value;
-                              update('lock', { ...config.lock, exemptions: updated });
-                            }}
-                            placeholder="user_id or username"
-                            className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
-                          />
-                          <button
-                            onClick={() => update('lock', { ...config.lock, exemptions: config.lock.exemptions.filter((_, i) => i !== idx) })}
-                            className="p-1 text-red-400 hover:text-red-300"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </>
             )}
           </div>
@@ -2157,7 +2096,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <ControlInput label="Haptic Feedback" type="select" value={config.hapticFeedback} options={HAPTIC_TYPE_OPTIONS} onChange={(v) => update('hapticFeedback', v)} />
+              <ControlInput type="checkbox" label="Haptic Feedback" value={config.hapticFeedback} onChange={(v) => update('hapticFeedback', v)} />
               <ControlInput type="checkbox" label="Disable Keyboard" value={config.disableKeyboard} onChange={(v) => update('disableKeyboard', v)} />
             </div>
             
@@ -2257,16 +2196,6 @@ export const ConfigPanel: React.FC<Props> = ({
                 value={config.tooltipStyles}
                 onChange={(e) => update('tooltipStyles', e.target.value)}
                 placeholder="- background: rgba(0,0,0,0.9)"
-                className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
-              />
-            </div>
-            
-            <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Img Cell Styles</label>
-              <textarea
-                value={config.imgCellStyles}
-                onChange={(e) => update('imgCellStyles', e.target.value)}
-                placeholder="- border-radius: 50%"
                 className="w-full h-16 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
               />
             </div>

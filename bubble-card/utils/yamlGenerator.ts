@@ -1,4 +1,4 @@
-﻿// Bubble Card YAML Generator
+// Bubble Card YAML Generator
 
 import {
   BubbleConfig,
@@ -11,19 +11,25 @@ import {
   BubbleSelectConfig,
   BubbleCalendarConfig,
   BubbleHorizontalButtonsStackConfig,
-  BubbleEmptyColumnConfig,
   BubbleSubButton,
   BubbleAction,
-  BubbleCardLayout,
 } from '../types';
+import { DEFAULT_BUBBLE_BUTTON_CONFIG } from '../constants';
 
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
 
+function indent(str: string, spaces: number = 2): string {
+  const pad = ' '.repeat(spaces);
+  return str.split('\n').map(line => pad + line).join('\n');
+}
+
 function formatValue(value: unknown): string {
   if (typeof value === 'string') {
+    // Check if it needs quotes (contains special chars or is empty)
     if (value === '' || value.includes(':') || value.includes('#') || value.includes("'") || value.includes('"') || value.includes('\n')) {
+      // Use single quotes, escape internal single quotes
       return `'${value.replace(/'/g, "''")}'`;
     }
     return value;
@@ -44,9 +50,9 @@ function formatValue(value: unknown): string {
 function generateActionYaml(action: BubbleAction, indentLevel: number = 0): string {
   const lines: string[] = [];
   const pad = '  '.repeat(indentLevel);
-
+  
   lines.push(`${pad}action: ${action.action}`);
-
+  
   if (action.navigation_path) {
     lines.push(`${pad}navigation_path: ${formatValue(action.navigation_path)}`);
   }
@@ -55,9 +61,6 @@ function generateActionYaml(action: BubbleAction, indentLevel: number = 0): stri
   }
   if (action.service) {
     lines.push(`${pad}service: ${action.service}`);
-  }
-  if (action.pipeline) {
-    lines.push(`${pad}pipeline: ${formatValue(action.pipeline)}`);
   }
   if (action.data && Object.keys(action.data).length > 0) {
     lines.push(`${pad}data:`);
@@ -88,7 +91,7 @@ function generateActionYaml(action: BubbleAction, indentLevel: number = 0): stri
       lines.push(`${pad}  text: ${formatValue(action.confirmation.text)}`);
     }
   }
-
+  
   return lines.join('\n');
 }
 
@@ -99,14 +102,14 @@ function generateActionYaml(action: BubbleAction, indentLevel: number = 0): stri
 function generateSubButtonYaml(subButton: BubbleSubButton, indentLevel: number = 1): string {
   const lines: string[] = [];
   const pad = '  '.repeat(indentLevel);
-
+  
+  // First property goes on the same line as - or on next line
   if (subButton.entity) lines.push(`${pad}entity: ${subButton.entity}`);
   if (subButton.name) lines.push(`${pad}name: ${formatValue(subButton.name)}`);
   if (subButton.icon) lines.push(`${pad}icon: ${subButton.icon}`);
-  if (subButton.visibility) lines.push(`${pad}visibility: ${subButton.visibility}`);
-
+  
+  // Only output non-default boolean values
   if (subButton.show_background === false) lines.push(`${pad}show_background: false`);
-  if (subButton.state_background === false) lines.push(`${pad}state_background: false`);
   if (subButton.show_state === true) lines.push(`${pad}show_state: true`);
   if (subButton.show_name === true) lines.push(`${pad}show_name: true`);
   if (subButton.show_icon === false) lines.push(`${pad}show_icon: false`);
@@ -117,13 +120,8 @@ function generateSubButtonYaml(subButton: BubbleSubButton, indentLevel: number =
     if (subButton.attribute) lines.push(`${pad}attribute: ${subButton.attribute}`);
   }
   if (subButton.select_attribute) lines.push(`${pad}select_attribute: ${subButton.select_attribute}`);
-  if (subButton.dropdown && subButton.dropdown.length > 0) {
-    lines.push(`${pad}dropdown:`);
-    subButton.dropdown.forEach(option => lines.push(`${pad}  - ${formatValue(option)}`));
-  }
-  if (subButton.footer_entity) lines.push(`${pad}footer_entity: ${subButton.footer_entity}`);
-  if (subButton.show_arrow === false) lines.push(`${pad}show_arrow: false`);
-
+  
+  // Actions
   if (subButton.tap_action && subButton.tap_action.action !== 'more-info') {
     lines.push(`${pad}tap_action:`);
     lines.push(generateActionYaml(subButton.tap_action, indentLevel + 1));
@@ -136,23 +134,26 @@ function generateSubButtonYaml(subButton: BubbleSubButton, indentLevel: number =
     lines.push(`${pad}hold_action:`);
     lines.push(generateActionYaml(subButton.hold_action, indentLevel + 1));
   }
-
+  
   return lines.join('\n');
 }
 
+/**
+ * Helper to add sub-buttons to a card's YAML output
+ */
 function addSubButtonsToYaml(lines: string[], subButtons: BubbleSubButton[] | undefined): void {
   if (!subButtons || subButtons.length === 0) return;
-
+  
   lines.push('sub_button:');
   subButtons.forEach(sb => {
     const sbLines: string[] = [];
-
+    
     if (sb.entity) sbLines.push(`entity: ${sb.entity}`);
     if (sb.name) sbLines.push(`name: ${formatValue(sb.name)}`);
     if (sb.icon) sbLines.push(`icon: ${sb.icon}`);
-
+    
+    // Boolean flags (only output non-defaults)
     if (sb.show_background === false) sbLines.push('show_background: false');
-    if (sb.state_background === false) sbLines.push('state_background: false');
     if (sb.show_state === true) sbLines.push('show_state: true');
     if (sb.show_name === true) sbLines.push('show_name: true');
     if (sb.show_icon === false) sbLines.push('show_icon: false');
@@ -163,13 +164,8 @@ function addSubButtonsToYaml(lines: string[], subButtons: BubbleSubButton[] | un
       if (sb.attribute) sbLines.push(`attribute: ${sb.attribute}`);
     }
     if (sb.select_attribute) sbLines.push(`select_attribute: ${sb.select_attribute}`);
-    if (sb.dropdown && sb.dropdown.length > 0) {
-      sbLines.push('dropdown:');
-      sb.dropdown.forEach(option => sbLines.push(`  - ${formatValue(option)}`));
-    }
-    if (sb.footer_entity) sbLines.push(`footer_entity: ${sb.footer_entity}`);
-    if (sb.show_arrow === false) sbLines.push('show_arrow: false');
-
+    
+    // Actions for sub-buttons
     if (sb.tap_action && sb.tap_action.action !== 'more-info') {
       sbLines.push('tap_action:');
       const actionLines = generateActionYaml(sb.tap_action, 1).split('\n');
@@ -185,7 +181,8 @@ function addSubButtonsToYaml(lines: string[], subButtons: BubbleSubButton[] | un
       const actionLines = generateActionYaml(sb.hold_action, 1).split('\n');
       actionLines.forEach(l => sbLines.push(l));
     }
-
+    
+    // Format as YAML list item with first property on same line as -
     if (sbLines.length > 0) {
       lines.push(`  - ${sbLines[0]}`);
       for (let i = 1; i < sbLines.length; i++) {
@@ -195,31 +192,16 @@ function addSubButtonsToYaml(lines: string[], subButtons: BubbleSubButton[] | un
   });
 }
 
+/**
+ * Helper to add custom styles to a card's YAML output
+ */
 function addStylesToYaml(lines: string[], styles: string | undefined): void {
   if (!styles || !styles.trim()) return;
-
+  
   lines.push('styles: |');
   styles.split('\n').forEach(line => {
     lines.push(`  ${line}`);
   });
-}
-
-function addGridOptions(lines: string[], cardLayout: BubbleCardLayout | undefined, gridOptions?: { rows?: number; columns?: number }): void {
-  if (cardLayout === 'large-sub-buttons-grid' && gridOptions) {
-    const { rows, columns } = gridOptions;
-    if (rows !== undefined || columns !== undefined) {
-      lines.push('grid_options:');
-      if (rows !== undefined) lines.push(`  rows: ${rows}`);
-      if (columns !== undefined) lines.push(`  columns: ${columns}`);
-    }
-  }
-}
-
-function addModules(lines: string[], modules: string[] | undefined, indentLevel: number = 0): void {
-  if (!modules || modules.length === 0) return;
-  const pad = '  '.repeat(indentLevel);
-  lines.push(`${pad}modules:`);
-  modules.forEach(mod => lines.push(`${pad}  - ${mod}`));
 }
 
 // ============================================
@@ -228,23 +210,28 @@ function addModules(lines: string[], modules: string[] | undefined, indentLevel:
 
 function generateButtonYaml(config: BubbleButtonConfig): string {
   const lines: string[] = [];
-
+  const defaults = DEFAULT_BUBBLE_BUTTON_CONFIG;
+  
+  // Required fields
   lines.push('type: custom:bubble-card');
   lines.push('card_type: button');
-
+  
+  // Entity (required for most button types)
   if (config.entity) {
     lines.push(`entity: ${config.entity}`);
   }
-
+  
+  // Button type (only if not default)
   if (config.button_type && config.button_type !== 'switch') {
     lines.push(`button_type: ${config.button_type}`);
   }
-
+  
+  // Name & Icon
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
-
+  
+  // Visibility (only output non-defaults)
   if (config.show_name === false) lines.push('show_name: false');
   if (config.show_icon === false) lines.push('show_icon: false');
   if (config.show_state === true) lines.push('show_state: true');
@@ -256,25 +243,16 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
   }
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
   if (config.use_accent_color === true) lines.push('use_accent_color: true');
-  if (config.badge_text) lines.push(`badge_text: ${formatValue(config.badge_text)}`);
-  if (config.badge_color) lines.push(`badge_color: ${formatValue(config.badge_color)}`);
-  if (config.footer_text) lines.push(`footer_text: ${formatValue(config.footer_text)}`);
-  if (config.ripple_effect === true) lines.push('ripple_effect: true');
-  if (config.icon_size !== undefined) lines.push(`icon_size: ${config.icon_size}`);
-  if (config.name_weight && config.name_weight !== 'normal') lines.push(`name_weight: ${config.name_weight}`);
-  if (config.glow_effect) lines.push(`glow_effect: ${formatValue(config.glow_effect)}`);
-  if (config.background_gradient) lines.push(`background_gradient: ${formatValue(config.background_gradient)}`);
-  if (config.icon_animation) lines.push(`icon_animation: ${formatValue(config.icon_animation)}`);
   
-  // Note: card_animation and icon_animation_type are handled as CSS in styles, not as direct properties
+  // Layout
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Slider options (only when button_type is slider)
   if (config.button_type === 'slider') {
     if (config.min_value !== undefined && config.min_value !== 0) {
       lines.push(`min_value: ${config.min_value}`);
@@ -296,9 +274,9 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
         lines.push(`light_transition_time: ${config.light_transition_time}`);
       }
     }
-    if (config.show_slider_value === true) lines.push('show_slider_value: true');
   }
-
+  
+  // Button actions
   if (config.button_action) {
     lines.push('button_action:');
     if (config.button_action.tap_action) {
@@ -314,7 +292,8 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
       lines.push(generateActionYaml(config.button_action.hold_action, 2));
     }
   }
-
+  
+  // Icon actions
   if (config.tap_action && config.tap_action.action !== 'more-info') {
     lines.push('tap_action:');
     lines.push(generateActionYaml(config.tap_action, 1));
@@ -327,58 +306,14 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
     lines.push('hold_action:');
     lines.push(generateActionYaml(config.hold_action, 1));
   }
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
   
-  // Add animations to styles if configured
-  let finalStyles = config.styles || '';
-  finalStyles = addAnimationStyles(finalStyles, config);
+  // Custom styles
+  addStylesToYaml(lines, config.styles);
   
-  addStylesToYaml(lines, finalStyles);
-
   return lines.join('\n');
-}
-
-// ============================================
-// ANIMATION STYLES HELPER
-// ============================================
-
-function addAnimationStyles(existingStyles: string, config: BubbleButtonConfig): string {
-  let animationCss = '';
-  
-  // Card animation
-  if (config.card_animation && config.card_animation !== 'none') {
-    const trigger = config.card_animation_trigger || 'always';
-    const speed = config.card_animation_speed || '2s';
-    
-    if (trigger === 'always') {
-      animationCss += `.bubble-button-card-container {\n  animation: cba-${config.card_animation} ${speed} infinite;\n}\n`;
-    } else {
-      const stateSelector = trigger === 'on' ? '[data-state="on"]' : '[data-state="off"]';
-      animationCss += `.bubble-button-card-container${stateSelector} {\n  animation: cba-${config.card_animation} ${speed} infinite;\n}\n`;
-    }
-  }
-  
-  // Icon animation
-  if (config.icon_animation_type && config.icon_animation_type !== 'none') {
-    const trigger = config.icon_animation_trigger || 'always';
-    const speed = config.icon_animation_speed || '2s';
-    
-    if (trigger === 'always') {
-      animationCss += `.bubble-icon {\n  animation: cba-${config.icon_animation_type} ${speed} infinite;\n  display: inline-block;\n}\n`;
-    } else {
-      const stateSelector = trigger === 'on' ? '[data-state="on"]' : '[data-state="off"]';
-      animationCss += `.bubble-button-card-container${stateSelector} .bubble-icon {\n  animation: cba-${config.icon_animation_type} ${speed} infinite;\n  display: inline-block;\n}\n`;
-    }
-  }
-  
-  // Combine with existing styles
-  if (animationCss) {
-    return existingStyles ? `${existingStyles}\n${animationCss}` : animationCss;
-  }
-  
-  return existingStyles;
 }
 
 // ============================================
@@ -387,25 +322,26 @@ function addAnimationStyles(existingStyles: string, config: BubbleButtonConfig):
 
 function generateSeparatorYaml(config: BubbleSeparatorConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: separator');
-
+  
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-
+  
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -415,17 +351,16 @@ function generateSeparatorYaml(config: BubbleSeparatorConfig): string {
 
 function generatePopUpYaml(config: BubblePopUpConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: pop-up');
   lines.push(`hash: ${formatValue(config.hash)}`);
-
+  
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
   if (config.entity) lines.push(`entity: ${config.entity}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
-  if (config.force_icon === true) lines.push('force_icon: true');
-
+  
+  // Pop-up specific options
   if (config.auto_close) lines.push(`auto_close: ${config.auto_close}`);
   if (config.close_on_click === true) lines.push('close_on_click: true');
   if (config.close_by_clicking_outside === false) lines.push('close_by_clicking_outside: false');
@@ -440,13 +375,15 @@ function generatePopUpYaml(config: BubblePopUpConfig): string {
   if (config.hide_backdrop === true) lines.push('hide_backdrop: true');
   if (config.background_update === true) lines.push('background_update: true');
   if (config.show_header === true) lines.push('show_header: true');
-
+  
+  // Trigger
   if (config.trigger_entity) {
     lines.push(`trigger_entity: ${config.trigger_entity}`);
     if (config.trigger_state) lines.push(`trigger_state: ${formatValue(config.trigger_state)}`);
     if (config.trigger_close === true) lines.push('trigger_close: true');
   }
-
+  
+  // Actions
   if (config.open_action) {
     lines.push('open_action:');
     lines.push(generateActionYaml(config.open_action, 1));
@@ -455,10 +392,10 @@ function generatePopUpYaml(config: BubblePopUpConfig): string {
     lines.push('close_action:');
     lines.push(generateActionYaml(config.close_action, 1));
   }
-
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -468,10 +405,11 @@ function generatePopUpYaml(config: BubblePopUpConfig): string {
 
 function generateHorizontalButtonsStackYaml(config: BubbleHorizontalButtonsStackConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: horizontal-buttons-stack');
-
+  
+  // Convert buttons array to numbered format
   if (config.buttons && config.buttons.length > 0) {
     config.buttons.forEach((btn, index) => {
       const num = index + 1;
@@ -482,7 +420,7 @@ function generateHorizontalButtonsStackYaml(config: BubbleHorizontalButtonsStack
       if (btn.pir_sensor) lines.push(`${num}_pir_sensor: ${btn.pir_sensor}`);
     });
   }
-
+  
   if (config.auto_order === true) lines.push('auto_order: true');
   if (config.margin) lines.push(`margin: ${config.margin}`);
   if (config.width_desktop) lines.push(`width_desktop: ${config.width_desktop}`);
@@ -490,10 +428,10 @@ function generateHorizontalButtonsStackYaml(config: BubbleHorizontalButtonsStack
   if (config.rise_animation === false) lines.push('rise_animation: false');
   if (config.highlight_current_view === true) lines.push('highlight_current_view: true');
   if (config.hide_gradient === true) lines.push('hide_gradient: true');
-
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -503,15 +441,15 @@ function generateHorizontalButtonsStackYaml(config: BubbleHorizontalButtonsStack
 
 function generateCoverYaml(config: BubbleCoverConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: cover');
-
+  
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
-
+  
+  // Visibility
   if (config.show_name === false) lines.push('show_name: false');
   if (config.show_icon === false) lines.push('show_icon: false');
   if (config.show_state === true) lines.push('show_state: true');
@@ -522,24 +460,27 @@ function generateCoverYaml(config: BubbleCoverConfig): string {
     if (config.attribute) lines.push(`attribute: ${config.attribute}`);
   }
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
-
+  
+  // Cover-specific icons
   if (config.icon_open) lines.push(`icon_open: ${config.icon_open}`);
   if (config.icon_close) lines.push(`icon_close: ${config.icon_close}`);
   if (config.icon_up) lines.push(`icon_up: ${config.icon_up}`);
   if (config.icon_down) lines.push(`icon_down: ${config.icon_down}`);
-
+  
+  // Custom services
   if (config.open_service) lines.push(`open_service: ${config.open_service}`);
   if (config.stop_service) lines.push(`stop_service: ${config.stop_service}`);
   if (config.close_service) lines.push(`close_service: ${config.close_service}`);
-
+  
+  // Layout
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Actions
   if (config.tap_action && config.tap_action.action !== 'more-info') {
     lines.push('tap_action:');
     lines.push(generateActionYaml(config.tap_action, 1));
@@ -552,7 +493,8 @@ function generateCoverYaml(config: BubbleCoverConfig): string {
     lines.push('hold_action:');
     lines.push(generateActionYaml(config.hold_action, 1));
   }
-
+  
+  // Button actions
   if (config.button_action) {
     lines.push('button_action:');
     if (config.button_action.tap_action) {
@@ -568,11 +510,13 @@ function generateCoverYaml(config: BubbleCoverConfig): string {
       lines.push(generateActionYaml(config.button_action.hold_action, 2));
     }
   }
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -582,16 +526,16 @@ function generateCoverYaml(config: BubbleCoverConfig): string {
 
 function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: media-player');
-
+  
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
-
+  
+  // Visibility
   if (config.show_name === false) lines.push('show_name: false');
   if (config.show_icon === false) lines.push('show_icon: false');
   if (config.show_state === true) lines.push('show_state: true');
@@ -602,7 +546,8 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
     if (config.attribute) lines.push(`attribute: ${config.attribute}`);
   }
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
-
+  
+  // Media player specific
   if (config.min_volume !== undefined && config.min_volume !== 0) {
     lines.push(`min_volume: ${config.min_volume}`);
   }
@@ -610,19 +555,8 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
     lines.push(`max_volume: ${config.max_volume}`);
   }
   if (config.cover_background === true) lines.push('cover_background: true');
-  if (config.columns && config.columns !== 1) {
-    lines.push(`columns: ${config.columns}`);
-  }
-
-  if (config.source_list && config.source_list.length > 0) {
-    lines.push('source_list:');
-    config.source_list.forEach(source => lines.push(`  - ${formatValue(source)}`));
-  }
-  if (config.sound_mode_list && config.sound_mode_list.length > 0) {
-    lines.push('sound_mode_list:');
-    config.sound_mode_list.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-
+  
+  // Hide options
   if (config.hide) {
     const hideLines: string[] = [];
     if (config.hide.play_pause_button) hideLines.push('  play_pause_button: true');
@@ -635,15 +569,16 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
       lines.push(...hideLines);
     }
   }
-
+  
+  // Layout
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Actions
   if (config.tap_action && config.tap_action.action !== 'more-info') {
     lines.push('tap_action:');
     lines.push(generateActionYaml(config.tap_action, 1));
@@ -656,7 +591,8 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
     lines.push('hold_action:');
     lines.push(generateActionYaml(config.hold_action, 1));
   }
-
+  
+  // Button actions
   if (config.button_action) {
     lines.push('button_action:');
     if (config.button_action.tap_action) {
@@ -672,11 +608,13 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
       lines.push(generateActionYaml(config.button_action.hold_action, 2));
     }
   }
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -686,23 +624,23 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
 
 function generateClimateYaml(config: BubbleClimateConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: climate');
-
+  
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
-
+  
+  // Visibility
   if (config.show_name === false) lines.push('show_name: false');
   if (config.show_icon === false) lines.push('show_icon: false');
   if (config.show_state === true) lines.push('show_state: true');
-
+  
+  // Climate specific
   if (config.hide_target_temp_low === true) lines.push('hide_target_temp_low: true');
   if (config.hide_target_temp_high === true) lines.push('hide_target_temp_high: true');
-  if (config.dual_setpoint === true) lines.push('dual_setpoint: true');
   if (config.state_color === false) lines.push('state_color: false');
   if (config.step !== undefined && config.step !== 1) {
     lines.push(`step: ${config.step}`);
@@ -713,32 +651,16 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
   if (config.max_temp !== undefined) {
     lines.push(`max_temp: ${config.max_temp}`);
   }
-
-  if (config.hvac_modes && config.hvac_modes.length > 0) {
-    lines.push('hvac_modes:');
-    config.hvac_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-  if (config.preset_modes && config.preset_modes.length > 0) {
-    lines.push('preset_modes:');
-    config.preset_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-  if (config.swing_modes && config.swing_modes.length > 0) {
-    lines.push('swing_modes:');
-    config.swing_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-  if (config.fan_modes && config.fan_modes.length > 0) {
-    lines.push('fan_modes:');
-    config.fan_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-
+  
+  // Layout
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Actions
   if (config.tap_action && config.tap_action.action !== 'more-info') {
     lines.push('tap_action:');
     lines.push(generateActionYaml(config.tap_action, 1));
@@ -751,7 +673,8 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
     lines.push('hold_action:');
     lines.push(generateActionYaml(config.hold_action, 1));
   }
-
+  
+  // Button actions
   if (config.button_action) {
     lines.push('button_action:');
     if (config.button_action.tap_action) {
@@ -767,11 +690,13 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
       lines.push(generateActionYaml(config.button_action.hold_action, 2));
     }
   }
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -781,16 +706,16 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
 
 function generateSelectYaml(config: BubbleSelectConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: select');
-
+  
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
-
+  
+  // Visibility
   if (config.show_name === false) lines.push('show_name: false');
   if (config.show_icon === false) lines.push('show_icon: false');
   if (config.show_state === true) lines.push('show_state: true');
@@ -801,15 +726,16 @@ function generateSelectYaml(config: BubbleSelectConfig): string {
     if (config.attribute) lines.push(`attribute: ${config.attribute}`);
   }
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
-
+  
+  // Layout
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Actions
   if (config.tap_action && config.tap_action.action !== 'more-info') {
     lines.push('tap_action:');
     lines.push(generateActionYaml(config.tap_action, 1));
@@ -822,11 +748,13 @@ function generateSelectYaml(config: BubbleSelectConfig): string {
     lines.push('hold_action:');
     lines.push(generateActionYaml(config.hold_action, 1));
   }
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
+  
   return lines.join('\n');
 }
 
@@ -836,10 +764,11 @@ function generateSelectYaml(config: BubbleSelectConfig): string {
 
 function generateCalendarYaml(config: BubbleCalendarConfig): string {
   const lines: string[] = [];
-
+  
   lines.push('type: custom:bubble-card');
   lines.push('card_type: calendar');
-
+  
+  // Entities
   if (config.entities && config.entities.length > 0) {
     lines.push('entities:');
     config.entities.forEach(ent => {
@@ -847,7 +776,8 @@ function generateCalendarYaml(config: BubbleCalendarConfig): string {
       if (ent.color) lines.push(`    color: ${ent.color}`);
     });
   }
-
+  
+  // Calendar options
   if (config.days !== undefined && config.days !== 7) {
     lines.push(`days: ${config.days}`);
   }
@@ -857,15 +787,16 @@ function generateCalendarYaml(config: BubbleCalendarConfig): string {
   if (config.show_end === true) lines.push('show_end: true');
   if (config.show_progress === true) lines.push('show_progress: true');
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
-
+  
+  // Layout
   if (config.card_layout && config.card_layout !== 'normal') {
     lines.push(`card_layout: ${config.card_layout}`);
   }
   if (config.rows && config.rows !== 1) {
     lines.push(`rows: ${config.rows}`);
   }
-  addGridOptions(lines, config.card_layout, config.grid_options);
-
+  
+  // Event actions
   if (config.event_action) {
     lines.push('event_action:');
     if (config.event_action.tap_action) {
@@ -881,7 +812,8 @@ function generateCalendarYaml(config: BubbleCalendarConfig): string {
       lines.push(generateActionYaml(config.event_action.hold_action, 2));
     }
   }
-
+  
+  // Card-level actions
   if (config.tap_action && config.tap_action.action !== 'more-info') {
     lines.push('tap_action:');
     lines.push(generateActionYaml(config.tap_action, 1));
@@ -894,23 +826,13 @@ function generateCalendarYaml(config: BubbleCalendarConfig): string {
     lines.push('hold_action:');
     lines.push(generateActionYaml(config.hold_action, 1));
   }
-
+  
+  // Sub-buttons
   addSubButtonsToYaml(lines, config.sub_button);
-  addModules(lines, config.modules);
+  
+  // Custom styles
   addStylesToYaml(lines, config.styles);
-
-  return lines.join('\n');
-}
-
-// ============================================
-// EMPTY COLUMN GENERATOR
-// ============================================
-
-function generateEmptyColumnYaml(config: BubbleEmptyColumnConfig): string {
-  const lines: string[] = [];
-  lines.push('type: custom:bubble-card');
-  lines.push('card_type: empty-column');
-  addModules(lines, config.modules);
+  
   return lines.join('\n');
 }
 
@@ -939,7 +861,7 @@ export function generateBubbleYaml(config: BubbleConfig): string {
     case 'horizontal-buttons-stack':
       return generateHorizontalButtonsStackYaml(config as BubbleHorizontalButtonsStackConfig);
     case 'empty-column':
-      return generateEmptyColumnYaml(config as BubbleEmptyColumnConfig);
+      return 'type: custom:bubble-card\ncard_type: empty-column';
     default:
       return '# Unknown card type';
   }

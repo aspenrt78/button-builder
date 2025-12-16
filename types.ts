@@ -116,7 +116,6 @@ export interface StateStyleConfig {
   backgroundColor: string;
   iconColor: string;
   nameColor: string;
-  stateColor: string;
   labelColor: string;
   borderColor: string;
   // Conditional Animations
@@ -124,15 +123,6 @@ export interface StateStyleConfig {
   cardAnimationSpeed: string;
   iconAnimation: AnimationType;
   iconAnimationSpeed: string;
-  // Gradient properties
-  gradientEnabled?: boolean;
-  gradientType?: 'linear' | 'radial' | 'conic';
-  gradientAngle?: number;
-  gradientColor1?: string;
-  gradientColor2?: string;
-  gradientColor3?: string;
-  gradientColor3Enabled?: boolean;
-  gradientOpacity?: number;
 }
 
 // State-specific appearance configuration for ON/OFF state editing
@@ -144,7 +134,6 @@ export interface StateAppearanceConfig {
   color: string;
   iconColor: string;
   nameColor: string;
-  stateColor: string;
   labelColor: string;
   borderColor: string;
   // Gradient
@@ -155,7 +144,6 @@ export interface StateAppearanceConfig {
   gradientColor2: string;
   gradientColor3: string;
   gradientColor3Enabled: boolean;
-  gradientOpacity: number;
   // Glass / Depth
   backdropBlur: string;
   shadowSize: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner';
@@ -176,7 +164,6 @@ export const DEFAULT_STATE_APPEARANCE: StateAppearanceConfig = {
   color: '',
   iconColor: '',
   nameColor: '',
-  stateColor: '',
   labelColor: '',
   borderColor: '',
   gradientEnabled: false,
@@ -186,7 +173,6 @@ export const DEFAULT_STATE_APPEARANCE: StateAppearanceConfig = {
   gradientColor2: '#764ba2',
   gradientColor3: '#f093fb',
   gradientColor3Enabled: false,
-  gradientOpacity: 100,
   backdropBlur: 'none',
   shadowSize: 'none',
   shadowColor: '#000000',
@@ -309,8 +295,6 @@ export interface ButtonConfig {
   iconAnimationTrigger: AnimationTrigger;
   iconAnimationSpeed: string;
   rotate: boolean;
-  alwaysAnimateCard: boolean; // Bypass state toggle for card animations
-  alwaysAnimateIcon: boolean; // Bypass state toggle for icon animations
 
   // Card Actions
   tapAction: ActionType;
@@ -428,7 +412,7 @@ export interface ButtonConfig {
   holdTime: number;
   
   // Haptic
-  hapticFeedback: string;
+  hapticFeedback: boolean;
   
   // Spinner Template
   spinnerTemplate: string;
@@ -566,11 +550,9 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   cardAnimationTrigger: 'always',
   cardAnimationSpeed: '2s',
   iconAnimation: 'none',
-  iconAnimationTrigger: 'always',
+  iconAnimationTrigger: 'on',
   iconAnimationSpeed: '2s',
   rotate: false,
-  alwaysAnimateCard: false,
-  alwaysAnimateIcon: false,
 
   // Card Actions
   tapAction: 'toggle',
@@ -679,7 +661,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   holdTime: 500,
   
   // Haptic
-  hapticFeedback: '',
+  hapticFeedback: false,
   
   // Spinner Template
   spinnerTemplate: '',

@@ -14,13 +14,41 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   
   const config: Partial<ButtonConfig> = {};
   
-  // Core fields - direct mapping
+  // Core fields - direct mapping with template detection
   if (parsed.entity) config.entity = String(parsed.entity);
-  if (parsed.name !== undefined) config.name = String(parsed.name);
-  if (parsed.icon) config.icon = String(parsed.icon);
-  if (parsed.label !== undefined) config.label = String(parsed.label);
+  if (parsed.name !== undefined) {
+    const nameStr = String(parsed.name);
+    if (nameStr.includes('[[[')) {
+      config.nameTemplate = nameStr;
+    } else {
+      config.name = nameStr;
+    }
+  }
+  if (parsed.icon) {
+    const iconStr = String(parsed.icon);
+    if (iconStr.includes('[[[')) {
+      config.iconTemplate = iconStr;
+    } else {
+      config.icon = iconStr;
+    }
+  }
+  if (parsed.label !== undefined) {
+    const labelStr = String(parsed.label);
+    if (labelStr.includes('[[[')) {
+      config.labelTemplate = labelStr;
+    } else {
+      config.label = labelStr;
+    }
+  }
   if (parsed.entity_picture) config.entityPicture = String(parsed.entity_picture);
-  if (parsed.state_display) config.stateDisplay = String(parsed.state_display);
+  if (parsed.state_display) {
+    const stateStr = String(parsed.state_display);
+    if (stateStr.includes('[[[')) {
+      config.stateDisplayTemplate = stateStr;
+    } else {
+      config.stateDisplay = stateStr;
+    }
+  }
   if (parsed.size) config.size = String(parsed.size);
   if (parsed.units) config.units = String(parsed.units);
   if (parsed.template) config.template = String(parsed.template);
@@ -67,7 +95,7 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
     }
   }
   if (parsed.group_expand !== undefined) config.groupExpand = Boolean(parsed.group_expand);
-  if (parsed.haptic !== undefined) config.hapticFeedback = Boolean(parsed.haptic);
+  if (parsed.haptic !== undefined) config.hapticFeedback = String(parsed.haptic);
   if (parsed.disable_keyboard !== undefined) config.disableKeyboard = Boolean(parsed.disable_keyboard);
   
   // Section mode / Grid
@@ -393,6 +421,13 @@ function parseStyles(styles: any, config: Partial<ButtonConfig>): void {
       .filter((s: any) => typeof s === 'string')
       .join('\n');
   }
+  
+  // Img cell styles
+  if (styles.img_cell && Array.isArray(styles.img_cell)) {
+    config.imgCellStyles = styles.img_cell
+      .filter((s: any) => typeof s === 'string')
+      .join('\n');
+  }
 }
 
 /**
@@ -418,6 +453,43 @@ function mapCardStyle(
   extraStyles: string[]
 ): void {
   switch (property) {
+    case 'background':
+      // Check if it's a gradient
+      if (value.includes('gradient')) {
+        config.gradientEnabled = true;
+        
+        // Detect gradient type
+        if (value.includes('linear-gradient')) {
+          config.gradientType = 'linear';
+          // Extract angle: linear-gradient(135deg, ...)
+          const angleMatch = value.match(/linear-gradient\((\d+)deg/);
+          if (angleMatch) {
+            config.gradientAngle = parseInt(angleMatch[1]);
+          }
+        } else if (value.includes('radial-gradient')) {
+          config.gradientType = 'radial';
+        } else if (value.includes('conic-gradient')) {
+          config.gradientType = 'conic';
+          // Extract angle: conic-gradient(from 45deg, ...)
+          const angleMatch = value.match(/from (\d+)deg/);
+          if (angleMatch) {
+            config.gradientAngle = parseInt(angleMatch[1]);
+          }
+        }
+        
+        // Extract colors - match hex colors or color names
+        const colorMatches = value.match(/#[0-9a-fA-F]{6}|rgb\([^)]+\)|rgba\([^)]+\)/g);
+        if (colorMatches) {
+          if (colorMatches.length >= 1) config.gradientColor1 = colorMatches[0];
+          if (colorMatches.length >= 2) config.gradientColor2 = colorMatches[1];
+          if (colorMatches.length >= 3) {
+            config.gradientColor3Enabled = true;
+            config.gradientColor3 = colorMatches[2];
+          }
+        }
+      }
+      break;
+      
     case 'background-color':
       // Try to extract hex color from rgba or direct hex
       const hexMatch = value.match(/#[0-9a-fA-F]{6}/);
@@ -602,6 +674,7 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       backgroundColor: '',
       iconColor: '',
       nameColor: '',
+      stateColor: '',
       labelColor: '',
       borderColor: '',
       cardAnimation: 'none',
@@ -667,6 +740,17 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
             const parsed = parseStyleString(style);
             if (parsed && parsed.property === 'color') {
               customState.nameColor = parsed.value;
+            }
+          }
+        }
+      }
+      
+      if (state.styles.state) {
+        for (const style of state.styles.state) {
+          if (typeof style === 'string') {
+            const parsed = parseStyleString(style);
+            if (parsed && parsed.property === 'color') {
+              customState.stateColor = parsed.value;
             }
           }
         }

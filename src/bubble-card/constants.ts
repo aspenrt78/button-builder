@@ -27,6 +27,7 @@ export const DEFAULT_SUB_BUTTON: BubbleSubButton = {
   name: '',
   icon: '',
   show_background: true,
+  state_background: true,
   show_state: false,
   show_name: false,
   show_icon: true,
@@ -34,6 +35,7 @@ export const DEFAULT_SUB_BUTTON: BubbleSubButton = {
   show_last_updated: false,
   show_attribute: false,
   attribute: '',
+  show_arrow: true,
 };
 
 // ============================================
@@ -58,10 +60,31 @@ export const DEFAULT_BUBBLE_BUTTON_CONFIG: BubbleButtonConfig = {
   attribute: '',
   scrolling_effect: true,
   use_accent_color: false,
+  badge_text: '',
+  badge_color: '',
+  footer_text: '',
+  ripple_effect: false,
+  show_slider_value: false,
+  icon_size: 24,
+  name_weight: 'medium',
+  glow_effect: '',
+  background_gradient: '',
+  
+  // Animations
+  card_animation: 'none',
+  card_animation_trigger: 'always',
+  card_animation_speed: '2s',
+  icon_animation_type: 'none',
+  icon_animation_trigger: 'always',
+  icon_animation_speed: '2s',
   
   // Layout
   card_layout: 'normal',
   rows: 1,
+  grid_options: {
+    rows: 2,
+    columns: 3,
+  },
   
   // Actions - undefined means use defaults
   tap_action: undefined,
@@ -70,6 +93,7 @@ export const DEFAULT_BUBBLE_BUTTON_CONFIG: BubbleButtonConfig = {
   
   // Sub-buttons
   sub_button: [],
+  modules: [],
   
   // Slider options
   min_value: 0,

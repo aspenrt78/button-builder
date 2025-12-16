@@ -17,7 +17,7 @@ import {
   DEFAULT_SUB_BUTTON,
   DEFAULT_ACTION
 } from '../constants';
-import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Palette, Zap, Layout, Eye, Sliders, MousePointer, Sparkles, Search, X, Home, Thermometer, Music, Blinds, Calendar, Layers, Puzzle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Palette, Zap, Layout, Eye, Sliders, MousePointer, Sparkles, Search, X, Home, Thermometer, Music, Blinds, Calendar, Layers } from 'lucide-react';
 
 interface ConfigPanelProps {
   config: BubbleConfig;
@@ -506,27 +506,12 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
                 />
               </div>
               
-              <ControlInput
-                label="Visibility (JS template)"
-                type="text"
-                value={sb.visibility}
-                onChange={(v) => updateSubButton(index, { visibility: v })}
-                placeholder="state === 'on'"
-                hint="JavaScript condition to show/hide sub-button"
-              />
-              
               <div className="grid grid-cols-2 gap-2">
                 <ControlInput
                   label="Show Background"
                   type="checkbox"
                   value={sb.show_background !== false}
                   onChange={(v) => updateSubButton(index, { show_background: v })}
-                />
-                <ControlInput
-                  label="State Background"
-                  type="checkbox"
-                  value={sb.state_background !== false}
-                  onChange={(v) => updateSubButton(index, { state_background: v })}
                 />
                 <ControlInput
                   label="Show State"
@@ -558,12 +543,6 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
                   value={sb.show_last_changed === true}
                   onChange={(v) => updateSubButton(index, { show_last_changed: v })}
                 />
-                <ControlInput
-                  label="Show Arrow"
-                  type="checkbox"
-                  value={sb.show_arrow !== false}
-                  onChange={(v) => updateSubButton(index, { show_arrow: v })}
-                />
               </div>
               
               {sb.show_attribute && (
@@ -575,36 +554,6 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
                   placeholder="brightness"
                 />
               )}
-              
-              <ControlInput
-                label="Select Attribute"
-                type="text"
-                value={sb.select_attribute}
-                onChange={(v) => updateSubButton(index, { select_attribute: v })}
-                placeholder="source"
-                hint="For select entities - shows current value"
-              />
-              
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400 font-medium">Dropdown Options (comma-separated)</label>
-                <input
-                  type="text"
-                  className="w-full px-2 py-1.5 text-sm bg-gray-700 border border-gray-600 rounded outline-none focus:border-cyan-500"
-                  value={(sb.dropdown || []).join(', ')}
-                  onChange={(e) => updateSubButton(index, { dropdown: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                  placeholder="option1, option2, option3"
-                />
-                <span className="text-xs text-gray-500">For select entities - creates dropdown menu</span>
-              </div>
-              
-              <ControlInput
-                label="Footer Entity"
-                type="text"
-                value={sb.footer_entity}
-                onChange={(v) => updateSubButton(index, { footer_entity: v })}
-                placeholder="sensor.additional_info"
-                hint="Optional entity to display in footer"
-              />
               
               {/* Sub-button Actions */}
               <div className="pt-2 border-t border-gray-700 space-y-2">
@@ -631,200 +580,6 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
       >
         <Plus size={16} />
         Add Sub-button
-      </button>
-    </div>
-  );
-}
-
-function formatModulesInput(value: string): string[] {
-  return value
-    .split(/[\n,]/)
-    .map(v => v.trim())
-    .filter(Boolean);
-}
-
-// ============================================
-// CALENDAR ENTITIES EDITOR
-// ============================================
-
-interface CalendarEntityEditorProps {
-  entities: { entity: string; color?: string }[];
-  onChange: (entities: { entity: string; color?: string }[]) => void;
-}
-
-function CalendarEntityEditor({ entities, onChange }: CalendarEntityEditorProps) {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-
-  const addEntity = () => {
-    onChange([...entities, { entity: '', color: '' }]);
-    setExpandedIndex(entities.length);
-  };
-
-  const removeEntity = (index: number) => {
-    onChange(entities.filter((_, i) => i !== index));
-    if (expandedIndex === index) setExpandedIndex(null);
-  };
-
-  const updateEntity = (index: number, updates: Partial<{ entity: string; color?: string }>) => {
-    onChange(entities.map((ent, i) => (i === index ? { ...ent, ...updates } : ent)));
-  };
-
-  const moveEntity = (index: number, direction: 'up' | 'down') => {
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= entities.length) return;
-    const next = [...entities];
-    [next[index], next[newIndex]] = [next[newIndex], next[index]];
-    onChange(next);
-    setExpandedIndex(newIndex);
-  };
-
-  return (
-    <div className="space-y-2">
-      {entities.map((ent, index) => (
-        <div key={`${ent.entity || 'calendar'}-${index}`} className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="flex items-center justify-between p-2 bg-gray-800">
-            <button onClick={() => setExpandedIndex(expandedIndex === index ? null : index)} className="flex items-center gap-2 flex-1 text-left">
-              <GripVertical size={14} className="text-gray-500" />
-              <span className="text-sm text-gray-300 truncate">{ent.entity || `Calendar ${index + 1}`}</span>
-            </button>
-            <div className="flex gap-1">
-              <button onClick={() => moveEntity(index, 'up')} disabled={index === 0} className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400">↑</button>
-              <button onClick={() => moveEntity(index, 'down')} disabled={index === entities.length - 1} className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400">↓</button>
-              <button onClick={() => removeEntity(index)} className="p-1 text-red-400 hover:text-red-300">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-
-          {expandedIndex === index && (
-            <div className="p-3 space-y-3 border-t border-gray-700">
-              <ControlInput
-                label="Entity"
-                type="text"
-                value={ent.entity}
-                onChange={(v) => updateEntity(index, { entity: v })}
-                placeholder="calendar.home"
-              />
-              <ControlInput
-                label="Color"
-                type="color"
-                value={ent.color || ''}
-                onChange={(v) => updateEntity(index, { color: v || undefined })}
-              />
-            </div>
-          )}
-        </div>
-      ))}
-
-      <button
-        onClick={addEntity}
-        className="w-full flex items-center justify-center gap-2 py-2.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 rounded-lg border border-cyan-600/30 transition-colors"
-      >
-        <Plus size={16} />
-        Add Calendar Entity
-      </button>
-    </div>
-  );
-}
-
-// ============================================
-// HORIZONTAL BUTTONS EDITOR
-// ============================================
-
-interface HorizontalButtonsEditorProps {
-  buttons: BubbleHorizontalButton[];
-  onChange: (buttons: BubbleHorizontalButton[]) => void;
-}
-
-function HorizontalButtonsEditor({ buttons, onChange }: HorizontalButtonsEditorProps) {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-
-  const addButton = () => {
-    onChange([...buttons, { link: '', name: '', icon: '', entity: '', pir_sensor: '' }]);
-    setExpandedIndex(buttons.length);
-  };
-
-  const removeButton = (index: number) => {
-    onChange(buttons.filter((_, i) => i !== index));
-    if (expandedIndex === index) setExpandedIndex(null);
-  };
-
-  const updateButton = (index: number, updates: Partial<BubbleHorizontalButton>) => {
-    onChange(buttons.map((btn, i) => (i === index ? { ...btn, ...updates } : btn)));
-  };
-
-  const moveButton = (index: number, direction: 'up' | 'down') => {
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= buttons.length) return;
-    const next = [...buttons];
-    [next[index], next[newIndex]] = [next[newIndex], next[index]];
-    onChange(next);
-    setExpandedIndex(newIndex);
-  };
-
-  return (
-    <div className="space-y-2">
-      {buttons.map((btn, index) => (
-        <div key={`${btn.link || 'button'}-${index}`} className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="flex items-center justify-between p-2 bg-gray-800">
-            <button onClick={() => setExpandedIndex(expandedIndex === index ? null : index)} className="flex items-center gap-2 flex-1 text-left">
-              <GripVertical size={14} className="text-gray-500" />
-              <span className="text-sm text-gray-300 truncate">{btn.name || btn.link || `Button ${index + 1}`}</span>
-            </button>
-            <div className="flex gap-1">
-              <button onClick={() => moveButton(index, 'up')} disabled={index === 0} className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400">↑</button>
-              <button onClick={() => moveButton(index, 'down')} disabled={index === buttons.length - 1} className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400">↓</button>
-              <button onClick={() => removeButton(index)} className="p-1 text-red-400 hover:text-red-300">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-
-          {expandedIndex === index && (
-            <div className="p-3 space-y-3 border-t border-gray-700">
-              <ControlInput
-                label="Link (hash or path)"
-                type="text"
-                value={btn.link}
-                onChange={(v) => updateButton(index, { link: v })}
-                placeholder="#kitchen or /lovelace/room"
-              />
-              <ControlInput
-                label="Name"
-                type="text"
-                value={btn.name}
-                onChange={(v) => updateButton(index, { name: v })}
-                placeholder="Kitchen"
-              />
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400 font-medium">Icon</label>
-                <IconPicker value={btn.icon || ''} onChange={(v) => updateButton(index, { icon: v })} />
-              </div>
-              <ControlInput
-                label="Entity (for color)"
-                type="text"
-                value={btn.entity}
-                onChange={(v) => updateButton(index, { entity: v })}
-                placeholder="light.living_room"
-              />
-              <ControlInput
-                label="PIR Sensor (for auto order)"
-                type="text"
-                value={btn.pir_sensor}
-                onChange={(v) => updateButton(index, { pir_sensor: v })}
-                placeholder="binary_sensor.motion"
-              />
-            </div>
-          )}
-        </div>
-      ))}
-
-      <button
-        onClick={addButton}
-        className="w-full flex items-center justify-center gap-2 py-2.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 rounded-lg border border-cyan-600/30 transition-colors"
-      >
-        <Plus size={16} />
-        Add Navigation Button
       </button>
     </div>
   );
@@ -888,18 +643,6 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
   const handleCustomCSSChange = (value: string) => {
     setCustomCSS(value);
     updateStyles(cssVars, value);
-  };
-
-  const appendSnippet = (snippet: string) => {
-    const next = customCSS.trim() ? `${customCSS.trim()}\n\n${snippet}` : snippet;
-    setCustomCSS(next);
-    updateStyles(cssVars, next);
-  };
-
-  const resetStyles = () => {
-    setCssVars({});
-    setCustomCSS('');
-    updateStyles({}, '');
   };
 
   return (
@@ -979,145 +722,6 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
           placeholder="0 2px 8px rgba(0,0,0,0.3)"
         />
       </div>
-
-      {/* Card-specific variables */}
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Button / Slider</p>
-        <ControlInput label="Button Background" type="color" value={cssVars['--bubble-button-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-button-main-background-color', v)} />
-        <ControlInput label="Button Border Radius" type="text" value={cssVars['--bubble-button-border-radius'] || ''} onChange={(v) => updateVar('--bubble-button-border-radius', v)} placeholder="24px" />
-        <ControlInput label="Icon Background" type="color" value={cssVars['--bubble-button-icon-background-color'] || ''} onChange={(v) => updateVar('--bubble-button-icon-background-color', v)} />
-        <ControlInput label="Light Color" type="color" value={cssVars['--bubble-light-color'] || ''} onChange={(v) => updateVar('--bubble-light-color', v)} />
-        <ControlInput label="Light White Color" type="color" value={cssVars['--bubble-light-white-color'] || ''} onChange={(v) => updateVar('--bubble-light-white-color', v)} />
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Pop-up</p>
-        <ControlInput label="Pop-up Background" type="color" value={cssVars['--bubble-pop-up-background-color'] || ''} onChange={(v) => updateVar('--bubble-pop-up-background-color', v)} />
-        <ControlInput label="Pop-up Main Background" type="color" value={cssVars['--bubble-pop-up-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-pop-up-main-background-color', v)} />
-        <ControlInput label="Backdrop Background" type="color" value={cssVars['--bubble-backdrop-background-color'] || ''} onChange={(v) => updateVar('--bubble-backdrop-background-color', v)} />
-        <ControlInput label="Pop-up Border Radius" type="text" value={cssVars['--bubble-pop-up-border-radius'] || ''} onChange={(v) => updateVar('--bubble-pop-up-border-radius', v)} placeholder="24px" />
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Media Player</p>
-        <ControlInput label="Media Background" type="color" value={cssVars['--bubble-media-player-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-media-player-main-background-color', v)} />
-        <ControlInput label="Media Border Radius" type="text" value={cssVars['--bubble-media-player-border-radius'] || ''} onChange={(v) => updateVar('--bubble-media-player-border-radius', v)} placeholder="24px" />
-        <ControlInput label="Media Buttons Radius" type="text" value={cssVars['--bubble-media-player-buttons-border-radius'] || ''} onChange={(v) => updateVar('--bubble-media-player-buttons-border-radius', v)} placeholder="14px" />
-        <ControlInput label="Slider Background" type="color" value={cssVars['--bubble-media-player-slider-background-color'] || ''} onChange={(v) => updateVar('--bubble-media-player-slider-background-color', v)} />
-        <ControlInput label="Media Icon Background" type="color" value={cssVars['--bubble-media-player-icon-background-color'] || ''} onChange={(v) => updateVar('--bubble-media-player-icon-background-color', v)} />
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Select</p>
-        <ControlInput label="Select Background" type="color" value={cssVars['--bubble-select-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-select-main-background-color', v)} />
-        <ControlInput label="Dropdown Background" type="color" value={cssVars['--bubble-select-list-background-color'] || ''} onChange={(v) => updateVar('--bubble-select-list-background-color', v)} />
-        <ControlInput label="Dropdown Width" type="text" value={cssVars['--bubble-select-list-width'] || ''} onChange={(v) => updateVar('--bubble-select-list-width', v)} placeholder="220px" />
-        <ControlInput label="Item Accent Color" type="color" value={cssVars['--bubble-select-list-item-accent-color'] || ''} onChange={(v) => updateVar('--bubble-select-list-item-accent-color', v)} />
-        <ControlInput label="Select Border Radius" type="text" value={cssVars['--bubble-select-border-radius'] || ''} onChange={(v) => updateVar('--bubble-select-border-radius', v)} placeholder="24px" />
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              updateVar('--bubble-select-main-background-color', '#0f172a');
-              updateVar('--bubble-select-list-background-color', '#0b1220');
-              updateVar('--bubble-select-list-width', '200px');
-              updateVar('--bubble-select-border-radius', '20px');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Compact Dropdown
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-select-main-background-color', '#111827');
-              updateVar('--bubble-select-list-background-color', '#1f2937');
-              updateVar('--bubble-select-list-width', '280px');
-              updateVar('--bubble-select-border-radius', '28px');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Wide Dropdown
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-select-main-background-color', 'rgba(255,255,255,0.06)');
-              updateVar('--bubble-select-list-background-color', 'rgba(0,0,0,0.6)');
-              updateVar('--bubble-select-list-width', '240px');
-              updateVar('--bubble-select-border-radius', '24px');
-              setCustomCSS((prev) => `${prev}\n.bubble-select-list { backdrop-filter: blur(10px); }`.trim());
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Glass Dropdown
-          </button>
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Climate</p>
-        <ControlInput label="Climate Background" type="color" value={cssVars['--bubble-climate-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-climate-main-background-color', v)} />
-        <ControlInput label="Climate Border Radius" type="text" value={cssVars['--bubble-climate-border-radius'] || ''} onChange={(v) => updateVar('--bubble-climate-border-radius', v)} placeholder="24px" />
-        <ControlInput label="Climate Button Background" type="color" value={cssVars['--bubble-climate-button-background-color'] || ''} onChange={(v) => updateVar('--bubble-climate-button-background-color', v)} />
-        <ControlInput label="Climate Accent" type="color" value={cssVars['--bubble-climate-accent-color'] || ''} onChange={(v) => updateVar('--bubble-climate-accent-color', v)} />
-        <div className="grid grid-cols-2 gap-2">
-          <ControlInput label="Heat Color" type="color" value={cssVars['--bubble-state-climate-heat-color'] || ''} onChange={(v) => updateVar('--bubble-state-climate-heat-color', v)} />
-          <ControlInput label="Cool Color" type="color" value={cssVars['--bubble-state-climate-cool-color'] || ''} onChange={(v) => updateVar('--bubble-state-climate-cool-color', v)} />
-          <ControlInput label="Auto Color" type="color" value={cssVars['--bubble-state-climate-auto-color'] || ''} onChange={(v) => updateVar('--bubble-state-climate-auto-color', v)} />
-          <ControlInput label="Fan-only Color" type="color" value={cssVars['--bubble-state-climate-fan-only-color'] || ''} onChange={(v) => updateVar('--bubble-state-climate-fan-only-color', v)} />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              updateVar('--bubble-state-climate-heat-color', '#ff7043');
-              updateVar('--bubble-state-climate-cool-color', '#4fc3f7');
-              updateVar('--bubble-state-climate-auto-color', '#26c6da');
-              updateVar('--bubble-state-climate-fan-only-color', '#9ccc65');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Warm/Cool Palette
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-state-climate-heat-color', '#ff5252');
-              updateVar('--bubble-state-climate-cool-color', '#40c4ff');
-              updateVar('--bubble-state-climate-auto-color', '#64ffda');
-              updateVar('--bubble-state-climate-fan-only-color', '#cddc39');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            High Contrast
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-state-climate-heat-color', '');
-              updateVar('--bubble-state-climate-cool-color', '');
-              updateVar('--bubble-state-climate-auto-color', '');
-              updateVar('--bubble-state-climate-fan-only-color', '');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Reset Colors
-          </button>
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Cover</p>
-        <ControlInput label="Cover Background" type="color" value={cssVars['--bubble-cover-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-cover-main-background-color', v)} />
-        <ControlInput label="Cover Border Radius" type="text" value={cssVars['--bubble-cover-border-radius'] || ''} onChange={(v) => updateVar('--bubble-cover-border-radius', v)} placeholder="24px" />
-        <ControlInput label="Cover Icon Background" type="color" value={cssVars['--bubble-cover-icon-background-color'] || ''} onChange={(v) => updateVar('--bubble-cover-icon-background-color', v)} />
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Horizontal Buttons Stack</p>
-        <ControlInput label="Stack Background" type="color" value={cssVars['--bubble-horizontal-buttons-stack-background-color'] || ''} onChange={(v) => updateVar('--bubble-horizontal-buttons-stack-background-color', v)} />
-        <ControlInput label="Stack Border Radius" type="text" value={cssVars['--bubble-horizontal-buttons-stack-border-radius'] || ''} onChange={(v) => updateVar('--bubble-horizontal-buttons-stack-border-radius', v)} placeholder="24px" />
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Separator</p>
-        <ControlInput label="Line Background" type="color" value={cssVars['--bubble-line-background-color'] || ''} onChange={(v) => updateVar('--bubble-line-background-color', v)} />
-      </div>
       
       {/* Custom CSS */}
       <div className="pt-3 border-t border-gray-700">
@@ -1188,122 +792,6 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
           >
             Coral
           </button>
-          <button
-            onClick={() => appendSnippet('ha-card {\n  --bubble-main-background-color: rgba(12,120,50,0.5) !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Card Background
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-icon {\n  color: white !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            White Icons
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-range-fill {\n  background: rgba(79,69,87,1) !important;\n  opacity: 1 !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Slider Fill
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-line {\n  background: var(--primary-text-color);\n  opacity: 0.1;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Separator Subtle
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-sub-button {\n  height: 48px !important;\n  min-width: 48px !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Larger Sub-buttons
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  background: linear-gradient(135deg, #1e1e2f, #0f172a) !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Gradient BG
-          </button>
-          <button
-            onClick={resetStyles}
-            className="px-2 py-1 text-xs bg-red-800/40 hover:bg-red-800/60 text-red-200 rounded border border-red-900/60"
-          >
-            Reset Styles
-          </button>
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-2">
-        <p className="text-xs text-gray-400 font-medium">Template snippets (JS in styles)</p>
-        <p className="text-[11px] text-gray-500">These insert JS templates into the styles block. Adjust entity ids/icons as needed.</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => appendSnippet('${icon.setAttribute("icon", state === "on" ? "mdi:lightbulb" : "mdi:lightbulb-off")}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Toggle Icon on State
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-icon {\n  animation: ${state === "on" ? "slow-rotate 2s linear infinite" : ""};\n}\n@keyframes slow-rotate {\n  0% { transform: rotate(0deg); }\n  100% { transform: rotate(360deg); }\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Spin Fan When On
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-sub-button-1 {\n  display: ${hass.states["vacuum.downstairs"].state === "error" ? "" : "none"} !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Show Sub-button on Error
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  box-shadow: ${state === "on" ? "0 0 18px rgba(0,200,255,0.6)" : ""} !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Glow When On
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-line {\n  background: ${hass.formatEntityState(hass.states["weather.home"]) === "Rain" ? "#4fc3f7" : "#888"};\n  opacity: 1;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Weather-Based Separator
-          </button>
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-2">
-        <p className="text-xs text-gray-400 font-medium">State-based styling presets</p>
-        <p className="text-[11px] text-gray-500">Quick drop-ins for common on/off/attribute styling. Edit entity ids as needed.</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => appendSnippet('.bubble-button-background {\n  opacity: 1 !important;\n  background: ${state === "on" ? "var(--bubble-accent-color)" : ""} !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Accent When On
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  filter: ${state === "off" ? "grayscale(0.55) brightness(0.85)" : "none"};\n  transition: filter 160ms ease;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Dim When Off
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-icon {\n  animation: ${hass.states[entity]?.state === "on" ? "slow-pulse 1.4s ease-in-out infinite" : ""};\n}\n@keyframes slow-pulse {\n  0% { transform: scale(1); opacity: 1; }\n  50% { transform: scale(1.08); opacity: 0.8; }\n  100% { transform: scale(1); opacity: 1; }\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Pulse When Active
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  box-shadow: ${Number(hass.states[entity]?.attributes?.battery ?? 100) < 25 ? "0 0 16px rgba(239,68,68,0.65)" : ""} !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Low Battery Glow
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-sub-button-1 {\n  display: ${hass.states["binary_sensor.front_door"]?.state === "on" ? "" : "none"} !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Show on Motion
-          </button>
         </div>
       </div>
     </div>
@@ -1316,7 +804,6 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
 
 export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPanelProps) {
   const cardType = config.card_type;
-  const [moduleDraft, setModuleDraft] = useState('');
   
   // Type guards for conditional rendering
   const isButton = cardType === 'button';
@@ -1338,36 +825,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
   const hasVisibility = isButton || isCover || isMediaPlayer || isClimate || isSelect;
   const hasActions = isButton || isCover || isMediaPlayer || isClimate || isSelect;
   const hasStyles = !isEmptyColumn;
-
-  const modules = (config as any).modules || [];
-
-  const addModule = () => {
-    const value = moduleDraft.trim();
-    if (!value) return;
-    updateConfig('modules', [...modules, value]);
-    setModuleDraft('');
-  };
-
-  const removeModule = (id: string) => {
-    updateConfig('modules', modules.filter((m: string) => m !== id));
-  };
-
-  const toggleExclude = (id: string) => {
-    const next = id.startsWith('!') ? id.slice(1) : `!${id}`;
-    updateConfig('modules', modules.map((m: string) => (m === id ? next : m)));
-  };
-
-  const mediaHidePresets: Record<string, { play_pause_button?: boolean; volume_button?: boolean; previous_button?: boolean; next_button?: boolean; power_button?: boolean }> = {
-    showAll: {},
-    transportOnly: { volume_button: true, power_button: true },
-    noTransport: { play_pause_button: true, previous_button: true, next_button: true },
-    minimal: { play_pause_button: true, previous_button: true, next_button: true, volume_button: true, power_button: true },
-    noVolume: { volume_button: true },
-  };
-
-  const applyMediaHidePreset = (key: keyof typeof mediaHidePresets) => {
-    updateConfig('hide', { ...mediaHidePresets[key] });
-  };
 
   // Empty column has no config options
   if (isEmptyColumn) {
@@ -1420,13 +877,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               />
             </div>
             <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
-            <ControlInput
               label="Force Icon (override entity picture)"
               type="checkbox"
               value={(config as any).force_icon}
@@ -1450,131 +900,9 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
             )}
           </Section>
 
-          <Section title="Badge & Footer" icon={<Palette size={14} />} defaultOpen={false}>
-            <ControlInput label="Badge Text" type="text" value={(config as any).badge_text || ''} onChange={(v) => updateConfig('badge_text', v)} placeholder="New" hint="Small pill shown on the card" />
-            <ControlInput label="Badge Color" type="color" value={(config as any).badge_color || ''} onChange={(v) => updateConfig('badge_color', v)} />
-            <ControlInput label="Footer Text" type="text" value={(config as any).footer_text || ''} onChange={(v) => updateConfig('footer_text', v)} placeholder="Secondary label under content" />
-          </Section>
-
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
-          </Section>
-
-          <Section title="Effects" icon={<Sparkles size={14} />} defaultOpen={false}>
-            <ControlInput label="Ripple Effect" type="checkbox" value={(config as any).ripple_effect} onChange={(v) => updateConfig('ripple_effect', v)} />
-            <ControlInput label="Glow Effect" type="color" value={(config as any).glow_effect || ''} onChange={(v) => updateConfig('glow_effect', v)} hint="Adds soft outer glow" />
-            <ControlInput label="Background Gradient" type="text" value={(config as any).background_gradient || ''} onChange={(v) => updateConfig('background_gradient', v)} placeholder="linear-gradient(135deg, #1e1e2f, #0f172a)" />
-            
-            <div className="mt-3 mb-2 text-xs text-gray-400 font-medium">Card Animation</div>
-            <div className="grid grid-cols-2 gap-2">
-              <ControlInput 
-                label="Type" 
-                type="select" 
-                value={(config as any).card_animation || 'none'} 
-                onChange={(v) => updateConfig('card_animation', v)}
-                options={[
-                  { value: 'none', label: 'None' },
-                  { value: 'flash', label: 'Flash' },
-                  { value: 'pulse', label: 'Pulse' },
-                  { value: 'jiggle', label: 'Jiggle' },
-                  { value: 'shake', label: 'Shake' },
-                  { value: 'bounce', label: 'Bounce' },
-                  { value: 'glow', label: 'Glow' },
-                  { value: 'float', label: 'Float' },
-                  { value: 'swing', label: 'Swing' },
-                  { value: 'rubberBand', label: 'Rubber Band' },
-                  { value: 'tada', label: 'Tada' },
-                  { value: 'heartbeat', label: 'Heartbeat' },
-                  { value: 'flip', label: 'Flip' },
-                  { value: 'wobble', label: 'Wobble' },
-                  { value: 'breathe', label: 'Breathe' },
-                  { value: 'ripple', label: 'Ripple' },
-                ]}
-              />
-              <ControlInput 
-                label="Trigger" 
-                type="select" 
-                value={(config as any).card_animation_trigger || 'always'} 
-                onChange={(v) => updateConfig('card_animation_trigger', v)}
-                options={[
-                  { value: 'always', label: 'Always' },
-                  { value: 'on', label: 'When On' },
-                  { value: 'off', label: 'When Off' },
-                ]}
-              />
-            </div>
-            <ControlInput 
-              label="Speed" 
-              type="text" 
-              value={(config as any).card_animation_speed || '2s'} 
-              onChange={(v) => updateConfig('card_animation_speed', v)} 
-              placeholder="2s"
-              hint="CSS duration (e.g., 2s, 500ms)"
-            />
-            
-            <div className="mt-3 mb-2 text-xs text-gray-400 font-medium">Icon Animation</div>
-            <div className="grid grid-cols-2 gap-2">
-              <ControlInput 
-                label="Type" 
-                type="select" 
-                value={(config as any).icon_animation_type || 'none'} 
-                onChange={(v) => updateConfig('icon_animation_type', v)}
-                options={[
-                  { value: 'none', label: 'None' },
-                  { value: 'flash', label: 'Flash' },
-                  { value: 'pulse', label: 'Pulse' },
-                  { value: 'spin', label: 'Spin' },
-                  { value: 'shake', label: 'Shake' },
-                  { value: 'bounce', label: 'Bounce' },
-                  { value: 'swing', label: 'Swing' },
-                  { value: 'wobble', label: 'Wobble' },
-                  { value: 'flip', label: 'Flip' },
-                  { value: 'heartbeat', label: 'Heartbeat' },
-                ]}
-              />
-              <ControlInput 
-                label="Trigger" 
-                type="select" 
-                value={(config as any).icon_animation_trigger || 'always'} 
-                onChange={(v) => updateConfig('icon_animation_trigger', v)}
-                options={[
-                  { value: 'always', label: 'Always' },
-                  { value: 'on', label: 'When On' },
-                  { value: 'off', label: 'When Off' },
-                ]}
-              />
-            </div>
-            <ControlInput 
-              label="Speed" 
-              type="text" 
-              value={(config as any).icon_animation_speed || '2s'} 
-              onChange={(v) => updateConfig('icon_animation_speed', v)} 
-              placeholder="2s"
-              hint="CSS duration (e.g., 2s, 500ms)"
-            />
           </Section>
 
           {(config as any).button_type === 'slider' && (
@@ -1591,19 +919,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
                 <ControlInput label="Read Only" type="checkbox" value={(config as any).read_only_slider} onChange={(v) => updateConfig('read_only_slider', v)} />
                 <ControlInput label="Allow 0 for Lights" type="checkbox" value={(config as any).allow_light_slider_to_0} onChange={(v) => updateConfig('allow_light_slider_to_0', v)} />
                 <ControlInput label="Light Transition" type="checkbox" value={(config as any).light_transition} onChange={(v) => updateConfig('light_transition', v)} />
-                <ControlInput label="Show Slider Value" type="checkbox" value={(config as any).show_slider_value} onChange={(v) => updateConfig('show_slider_value', v)} />
               </div>
               {(config as any).light_transition && (
                 <ControlInput label="Transition Time (ms)" type="range" value={(config as any).light_transition_time || 500} onChange={(v) => updateConfig('light_transition_time', v)} min={0} max={2000} step={100} />
               )}
             </Section>
           )}
-
-          <Section title="Icon & Text" icon={<Eye size={14} />} defaultOpen={false}>
-            <ControlInput label="Icon Size" type="number" value={(config as any).icon_size ?? 24} onChange={(v) => updateConfig('icon_size', v)} min={12} max={64} step={1} />
-            <ControlInput label="Name Weight" type="select" value={(config as any).name_weight || 'medium'} onChange={(v) => updateConfig('name_weight', v)} options={[{ value: 'normal', label: 'Normal' }, { value: 'medium', label: 'Medium' }, { value: 'bold', label: 'Bold' }]} />
-            <ControlInput label="Icon Animation" type="text" value={(config as any).icon_animation || ''} onChange={(v) => updateConfig('icon_animation', v)} placeholder="spin 2s linear infinite" hint="CSS animation value (e.g., spin 2s linear infinite)" />
-          </Section>
 
           <Section title="Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
             <ActionEditor label="Tap Action" action={(config as any).tap_action} onChange={(a) => updateConfig('tap_action', a)} />
@@ -1637,45 +958,10 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout || 'normal'} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            <ControlInput label="Columns" type="number" value={(config as any).columns ?? 1} onChange={(v) => updateConfig('columns', v)} min={1} max={4} step={1} />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
-          </Section>
-
-          <Section title="Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor label="Tap Action" action={(config as any).tap_action} onChange={(a) => updateConfig('tap_action', a)} />
-            <ActionEditor label="Double Tap Action" action={(config as any).double_tap_action} onChange={(a) => updateConfig('double_tap_action', a)} />
-            <ActionEditor label="Hold Action" action={(config as any).hold_action} onChange={(a) => updateConfig('hold_action', a)} />
-            <div className="pt-2 border-t border-gray-700 space-y-2">
-              <p className="text-xs text-gray-400 font-medium">Button Actions (icon area)</p>
-              <ActionEditor label="Button Tap" action={(config as any).button_action?.tap_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, tap_action: a })} />
-              <ActionEditor label="Button Double Tap" action={(config as any).button_action?.double_tap_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, double_tap_action: a })} />
-              <ActionEditor label="Button Hold" action={(config as any).button_action?.hold_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, hold_action: a })} />
-            </div>
           </Section>
 
           <Section title="Styling" icon={<Palette size={14} />} defaultOpen={false}>
@@ -1700,7 +986,7 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Behavior" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ControlInput label="Auto Close (ms)" type="number" value={(config as any).auto_close} onChange={(v) => updateConfig('auto_close', v)} placeholder="1500" hint="Milliseconds before auto-close (blank = never)" />
+            <ControlInput label="Auto Close (seconds)" type="number" value={(config as any).auto_close} onChange={(v) => updateConfig('auto_close', v)} placeholder="15" hint="Auto-close after X seconds (blank = never)" />
             <ControlInput label="Close on Click" type="checkbox" value={(config as any).close_on_click} onChange={(v) => updateConfig('close_on_click', v)} />
             <ControlInput label="Close by Clicking Outside" type="checkbox" value={(config as any).close_by_clicking_outside !== false} onChange={(v) => updateConfig('close_by_clicking_outside', v)} />
             <ControlInput label="Show Header" type="checkbox" value={(config as any).show_header} onChange={(v) => updateConfig('show_header', v)} />
@@ -1720,32 +1006,9 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Trigger" icon={<Zap size={14} />} defaultOpen={false}>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {["on", "off", "open", "closed", "detected", "playing"].map((state) => (
-                <button
-                  key={state}
-                  onClick={() => updateConfig('trigger_state', state)}
-                  className={`px-2 py-1 text-xs rounded border ${((config as any).trigger_state || '') === state ? 'bg-cyan-700 border-cyan-500 text-white' : 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-gray-200'}`}
-                >
-                  {state}
-                </button>
-              ))}
-              <button
-                onClick={() => { updateConfig('trigger_state', ''); updateConfig('trigger_entity', ''); }}
-                className="px-2 py-1 text-xs rounded border bg-gray-800 hover:bg-gray-700 border-gray-600 text-gray-300"
-              >
-                Clear
-              </button>
-            </div>
             <ControlInput label="Trigger Entity" type="text" value={(config as any).trigger_entity} onChange={(v) => updateConfig('trigger_entity', v)} placeholder="binary_sensor.motion" hint="Entity that triggers the pop-up" />
             <ControlInput label="Trigger State" type="text" value={(config as any).trigger_state} onChange={(v) => updateConfig('trigger_state', v)} placeholder="on" hint="State value that triggers opening" />
             <ControlInput label="Trigger Close" type="checkbox" value={(config as any).trigger_close} onChange={(v) => updateConfig('trigger_close', v)} />
-            <p className="text-[11px] text-gray-500">When a trigger entity is set, a trigger state is typically required by Bubble Card.</p>
-          </Section>
-
-          <Section title="Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor label="On Open" action={(config as any).open_action} onChange={(a) => updateConfig('open_action', a)} />
-            <ActionEditor label="On Close" action={(config as any).close_action} onChange={(a) => updateConfig('close_action', a)} />
           </Section>
 
           <Section title="Styling" icon={<Palette size={14} />} defaultOpen={false}>
@@ -1762,13 +1025,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           <Section title="Entity & Display" icon={<Blinds size={14} />} defaultOpen={true}>
             <ControlInput label="Entity (required)" type="text" value={(config as any).entity || ''} onChange={(v) => updateConfig('entity', v)} placeholder="cover.living_room_blinds" hint="Cover entity ID" />
             <ControlInput label="Name" type="text" value={(config as any).name || ''} onChange={(v) => updateConfig('name', v)} placeholder="Living Room Blinds" />
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
           </Section>
 
@@ -1804,52 +1060,13 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <ControlInput label="Show State" type="checkbox" value={(config as any).show_state} onChange={(v) => updateConfig('show_state', v)} />
               <ControlInput label="Scrolling Effect" type="checkbox" value={(config as any).scrolling_effect} onChange={(v) => updateConfig('scrolling_effect', v)} />
               <ControlInput label="Last Changed" type="checkbox" value={(config as any).show_last_changed} onChange={(v) => updateConfig('show_last_changed', v)} />
-              <ControlInput label="Last Updated" type="checkbox" value={(config as any).show_last_updated} onChange={(v) => updateConfig('show_last_updated', v)} />
               <ControlInput label="Show Attribute" type="checkbox" value={(config as any).show_attribute} onChange={(v) => updateConfig('show_attribute', v)} />
-              {(config as any).show_attribute && (
-                <ControlInput label="Attribute" type="text" value={(config as any).attribute || ''} onChange={(v) => updateConfig('attribute', v)} placeholder="brightness" />
-              )}
-            </div>
-          </Section>
-
-          <Section title="Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor label="Tap Action" action={(config as any).tap_action} onChange={(a) => updateConfig('tap_action', a)} />
-            <ActionEditor label="Double Tap Action" action={(config as any).double_tap_action} onChange={(a) => updateConfig('double_tap_action', a)} />
-            <ActionEditor label="Hold Action" action={(config as any).hold_action} onChange={(a) => updateConfig('hold_action', a)} />
-            <div className="pt-2 border-t border-gray-700 space-y-2">
-              <p className="text-xs text-gray-400 font-medium">Button Actions (icon area)</p>
-              <ActionEditor label="Button Tap" action={(config as any).button_action?.tap_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, tap_action: a })} />
-              <ActionEditor label="Button Double Tap" action={(config as any).button_action?.double_tap_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, double_tap_action: a })} />
-              <ActionEditor label="Button Hold" action={(config as any).button_action?.hold_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, hold_action: a })} />
             </div>
           </Section>
 
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout || 'normal'} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            <ControlInput label="Columns" type="number" value={(config as any).columns ?? 1} onChange={(v) => updateConfig('columns', v)} min={1} max={4} step={1} />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
@@ -1874,13 +1091,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <label className="text-xs text-gray-400 font-medium">Icon</label>
               <IconPicker value={(config as any).icon || ''} onChange={(v) => updateConfig('icon', v)} />
             </div>
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
             <ControlInput label="Cover Background" type="checkbox" value={(config as any).cover_background !== false} onChange={(v) => updateConfig('cover_background', v)} />
           </Section>
@@ -1893,13 +1103,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Hide Controls" icon={<Eye size={14} />} defaultOpen={false}>
-            <div className="flex flex-wrap gap-2 mb-2">
-              <button onClick={() => applyMediaHidePreset('showAll')} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">Show All</button>
-              <button onClick={() => applyMediaHidePreset('transportOnly')} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">Transport Only</button>
-              <button onClick={() => applyMediaHidePreset('noTransport')} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">Hide Transport</button>
-              <button onClick={() => applyMediaHidePreset('noVolume')} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">Hide Volume</button>
-              <button onClick={() => applyMediaHidePreset('minimal')} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">Minimal</button>
-            </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               <ControlInput label="Hide Play/Pause" type="checkbox" value={(config as any).hide?.play_pause_button} onChange={(v) => updateConfig('hide', { ...(config as any).hide, play_pause_button: v })} />
               <ControlInput label="Hide Volume" type="checkbox" value={(config as any).hide?.volume_button} onChange={(v) => updateConfig('hide', { ...(config as any).hide, volume_button: v })} />
@@ -1915,41 +1118,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <ControlInput label="Show Icon" type="checkbox" value={(config as any).show_icon} onChange={(v) => updateConfig('show_icon', v)} />
               <ControlInput label="Show State" type="checkbox" value={(config as any).show_state} onChange={(v) => updateConfig('show_state', v)} />
               <ControlInput label="Scrolling Effect" type="checkbox" value={(config as any).scrolling_effect} onChange={(v) => updateConfig('scrolling_effect', v)} />
-              <ControlInput label="Last Changed" type="checkbox" value={(config as any).show_last_changed} onChange={(v) => updateConfig('show_last_changed', v)} />
-              <ControlInput label="Last Updated" type="checkbox" value={(config as any).show_last_updated} onChange={(v) => updateConfig('show_last_updated', v)} />
-              <ControlInput label="Show Attribute" type="checkbox" value={(config as any).show_attribute} onChange={(v) => updateConfig('show_attribute', v)} />
-              {(config as any).show_attribute && (
-                <ControlInput label="Attribute" type="text" value={(config as any).attribute || ''} onChange={(v) => updateConfig('attribute', v)} placeholder="volume_level" />
-              )}
             </div>
           </Section>
 
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout || 'normal'} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            <ControlInput label="Columns" type="number" value={(config as any).columns ?? 1} onChange={(v) => updateConfig('columns', v)} min={1} max={4} step={1} hint="Number of columns for media controls" />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
@@ -1974,13 +1148,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <label className="text-xs text-gray-400 font-medium">Icon</label>
               <IconPicker value={(config as any).icon || ''} onChange={(v) => updateConfig('icon', v)} />
             </div>
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
             <ControlInput label="State Color" type="checkbox" value={(config as any).state_color !== false} onChange={(v) => updateConfig('state_color', v)} />
           </Section>
@@ -1992,7 +1159,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <ControlInput label="Step" type="number" value={(config as any).step ?? 0.5} onChange={(v) => updateConfig('step', v)} step={0.5} />
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <ControlInput label="Dual Setpoint Mode" type="checkbox" value={(config as any).dual_setpoint} onChange={(v) => updateConfig('dual_setpoint', v)} />
               <ControlInput label="Hide Target Low" type="checkbox" value={(config as any).hide_target_temp_low} onChange={(v) => updateConfig('hide_target_temp_low', v)} />
               <ControlInput label="Hide Target High" type="checkbox" value={(config as any).hide_target_temp_high} onChange={(v) => updateConfig('hide_target_temp_high', v)} />
             </div>
@@ -2006,43 +1172,9 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
             </div>
           </Section>
 
-          <Section title="Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor label="Tap Action" action={(config as any).tap_action} onChange={(a) => updateConfig('tap_action', a)} />
-            <ActionEditor label="Double Tap Action" action={(config as any).double_tap_action} onChange={(a) => updateConfig('double_tap_action', a)} />
-            <ActionEditor label="Hold Action" action={(config as any).hold_action} onChange={(a) => updateConfig('hold_action', a)} />
-            <div className="pt-2 border-t border-gray-700 space-y-2">
-              <p className="text-xs text-gray-400 font-medium">Button Actions (icon area)</p>
-              <ActionEditor label="Button Tap" action={(config as any).button_action?.tap_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, tap_action: a })} />
-              <ActionEditor label="Button Double Tap" action={(config as any).button_action?.double_tap_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, double_tap_action: a })} />
-              <ActionEditor label="Button Hold" action={(config as any).button_action?.hold_action} onChange={(a) => updateConfig('button_action', { ...(config as any).button_action || {}, hold_action: a })} />
-            </div>
-          </Section>
-
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout || 'normal'} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
@@ -2067,13 +1199,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <label className="text-xs text-gray-400 font-medium">Icon</label>
               <IconPicker value={(config as any).icon || ''} onChange={(v) => updateConfig('icon', v)} />
             </div>
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
           </Section>
 
@@ -2083,46 +1208,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <ControlInput label="Show Icon" type="checkbox" value={(config as any).show_icon} onChange={(v) => updateConfig('show_icon', v)} />
               <ControlInput label="Show State" type="checkbox" value={(config as any).show_state} onChange={(v) => updateConfig('show_state', v)} />
               <ControlInput label="Scrolling Effect" type="checkbox" value={(config as any).scrolling_effect} onChange={(v) => updateConfig('scrolling_effect', v)} />
-              <ControlInput label="Last Changed" type="checkbox" value={(config as any).show_last_changed} onChange={(v) => updateConfig('show_last_changed', v)} />
-              <ControlInput label="Last Updated" type="checkbox" value={(config as any).show_last_updated} onChange={(v) => updateConfig('show_last_updated', v)} />
-              <ControlInput label="Show Attribute" type="checkbox" value={(config as any).show_attribute} onChange={(v) => updateConfig('show_attribute', v)} />
-              {(config as any).show_attribute && (
-                <ControlInput label="Attribute" type="text" value={(config as any).attribute || ''} onChange={(v) => updateConfig('attribute', v)} placeholder="effect_list" />
-              )}
             </div>
-          </Section>
-
-          <Section title="Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor label="Tap Action" action={(config as any).tap_action} onChange={(a) => updateConfig('tap_action', a)} />
-            <ActionEditor label="Double Tap Action" action={(config as any).double_tap_action} onChange={(a) => updateConfig('double_tap_action', a)} />
-            <ActionEditor label="Hold Action" action={(config as any).hold_action} onChange={(a) => updateConfig('hold_action', a)} />
           </Section>
 
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout || 'normal'} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
@@ -2141,11 +1232,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
       {isCalendar && (
         <>
           <Section title="Calendar Settings" icon={<Calendar size={14} />} defaultOpen={true}>
-            <div className="flex flex-wrap gap-2 mb-2">
-              <button onClick={() => { updateConfig('days', 3); updateConfig('limit', 6); }} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">3 days / 6 events</button>
-              <button onClick={() => { updateConfig('days', 7); updateConfig('limit', 10); }} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">7 days / 10 events</button>
-              <button onClick={() => { updateConfig('days', 14); updateConfig('limit', 20); }} className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">14 days / 20 events</button>
-            </div>
             <ControlInput label="Days to Show" type="number" value={(config as any).days ?? 7} onChange={(v) => updateConfig('days', v)} min={1} max={30} hint="Number of days to display" />
             <ControlInput label="Event Limit" type="number" value={(config as any).limit ?? 5} onChange={(v) => updateConfig('limit', v)} min={1} max={20} hint="Maximum events to show" />
             <ControlInput label="Show End Time" type="checkbox" value={(config as any).show_end !== false} onChange={(v) => updateConfig('show_end', v)} />
@@ -2154,66 +1240,27 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Entities" icon={<Zap size={14} />} defaultOpen={true}>
-            <p className="text-xs text-gray-500 mb-2">Add calendar entities with optional chip colors.</p>
-            <CalendarEntityEditor
-              entities={(config as any).entities || []}
-              onChange={(entities) => updateConfig('entities', entities)}
-            />
-          </Section>
-
-          <Section title="Event Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor
-              label="Event Tap Action"
-              action={(config as any).event_action?.tap_action}
-              onChange={(a) => updateConfig('event_action', { ...(config as any).event_action || {}, tap_action: a })}
-            />
-            <ActionEditor
-              label="Event Double Tap Action"
-              action={(config as any).event_action?.double_tap_action}
-              onChange={(a) => updateConfig('event_action', { ...(config as any).event_action || {}, double_tap_action: a })}
-            />
-            <ActionEditor
-              label="Event Hold Action"
-              action={(config as any).event_action?.hold_action}
-              onChange={(a) => updateConfig('event_action', { ...(config as any).event_action || {}, hold_action: a })}
+            <p className="text-xs text-gray-500 mb-2">Add calendar entities to display. Each can have its own color.</p>
+            {/* TODO: Add entity list editor */}
+            <ControlInput 
+              label="Entities (JSON)" 
+              type="textarea" 
+              value={JSON.stringify((config as any).entities || [], null, 2)} 
+              onChange={(v) => {
+                try { updateConfig('entities', JSON.parse(v)); } catch {}
+              }}
+              placeholder='[{"entity": "calendar.home", "color": "#ff0000"}]'
+              hint="Array of {entity, color} objects"
             />
           </Section>
 
           <Section title="Layout" icon={<Layout size={14} />} defaultOpen={false}>
             <ControlInput label="Card Layout" type="select" value={(config as any).card_layout || 'normal'} onChange={(v) => updateConfig('card_layout', v)} options={CARD_LAYOUT_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
             <ControlInput label="Rows" type="range" value={(config as any).rows || 1} onChange={(v) => updateConfig('rows', v)} min={1} max={4} step={1} />
-            {(config as any).card_layout === 'large-sub-buttons-grid' && (
-              <div className="grid grid-cols-2 gap-2">
-                <ControlInput
-                  label="Grid Rows"
-                  type="number"
-                  value={(config as any).grid_options?.rows ?? 2}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, rows: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-                <ControlInput
-                  label="Grid Columns"
-                  type="number"
-                  value={(config as any).grid_options?.columns ?? 3}
-                  onChange={(v) => updateConfig('grid_options', { ...(config as any).grid_options, columns: v })}
-                  min={1}
-                  max={6}
-                  step={1}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
-          </Section>
-
-          <Section title="Card Actions" icon={<MousePointer size={14} />} defaultOpen={false}>
-            <ActionEditor label="Tap Action" action={(config as any).tap_action} onChange={(a) => updateConfig('tap_action', a)} />
-            <ActionEditor label="Double Tap Action" action={(config as any).double_tap_action} onChange={(a) => updateConfig('double_tap_action', a)} />
-            <ActionEditor label="Hold Action" action={(config as any).hold_action} onChange={(a) => updateConfig('hold_action', a)} />
           </Section>
 
           <Section title="Styling" icon={<Palette size={14} />} defaultOpen={false}>
@@ -2228,10 +1275,16 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
       {isHorizontalStack && (
         <>
           <Section title="Navigation Buttons" icon={<Layers size={14} />} defaultOpen={true}>
-            <p className="text-xs text-gray-500 mb-2">Add navigation buttons (hash or path, optional entity and PIR sensor for auto-order).</p>
-            <HorizontalButtonsEditor
-              buttons={(config as any).buttons || []}
-              onChange={(buttons) => updateConfig('buttons', buttons)}
+            <p className="text-xs text-gray-500 mb-2">Add navigation buttons. Each needs a link (hash or path).</p>
+            <ControlInput 
+              label="Buttons (JSON)" 
+              type="textarea" 
+              value={JSON.stringify((config as any).buttons || [], null, 2)} 
+              onChange={(v) => {
+                try { updateConfig('buttons', JSON.parse(v)); } catch {}
+              }}
+              placeholder='[{"link": "#living-room", "name": "Living Room", "icon": "mdi:sofa"}]'
+              hint="Array of {link, name, icon, entity, pir_sensor}"
             />
           </Section>
 
@@ -2253,66 +1306,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
         </>
       )}
-
-      {/* ============================================ */}
-      {/* MODULES (ALL CARDS) */}
-      {/* ============================================ */}
-      <Section title="Modules" icon={<Puzzle size={14} />} defaultOpen={false}>
-        <div className="space-y-3">
-          <ControlInput
-            label="Module IDs"
-            type="textarea"
-            value={(config as any).modules?.join('\n') || ''}
-            onChange={(text) => updateConfig('modules', formatModulesInput(String(text)))}
-            hint="One module id per line. Use !module_id to exclude a global module."
-          />
-
-          <div className="space-y-2">
-            <p className="text-xs text-gray-400">Quick add</p>
-            <div className="flex gap-2">
-              <input
-                className="flex-1 rounded bg-gray-800 border border-gray-700 px-2 py-1 text-sm"
-                value={moduleDraft}
-                onChange={(e) => setModuleDraft(e.target.value)}
-                placeholder="module_id or !module_id"
-              />
-              <button
-                onClick={addModule}
-                className="px-3 py-1 text-sm bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 rounded border border-cyan-600/30"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-
-          {modules.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-gray-400">Current modules</p>
-              <div className="flex flex-wrap gap-2">
-                {modules.map((mod: string, idx: number) => (
-                  <div key={`${mod}-${idx}`} className="flex items-center gap-2 px-2 py-1 rounded bg-gray-800 border border-gray-700 text-xs">
-                    <span className="text-gray-200">{mod}</span>
-                    <button
-                      className="text-cyan-300 hover:text-cyan-100"
-                      title={mod.startsWith('!') ? 'Include module' : 'Exclude module globally'}
-                      onClick={() => toggleExclude(mod)}
-                    >
-                      {mod.startsWith('!') ? 'Include' : 'Exclude'}
-                    </button>
-                    <button
-                      className="text-red-300 hover:text-red-100"
-                      title="Remove"
-                      onClick={() => removeModule(mod)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </Section>
     </div>
   );
 }

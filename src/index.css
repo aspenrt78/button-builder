@@ -92,6 +92,69 @@ body, html {
   50% { opacity: 0; }
 }
 
+@keyframes cba-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes cba-swing {
+  20% { transform: rotate(15deg); }
+  40% { transform: rotate(-10deg); }
+  60% { transform: rotate(5deg); }
+  80% { transform: rotate(-5deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes cba-rubberBand {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scaleX(1.25) scaleY(0.75); }
+  40% { transform: scaleX(0.75) scaleY(1.25); }
+  50% { transform: scaleX(1.15) scaleY(0.85); }
+  65% { transform: scaleX(0.95) scaleY(1.05); }
+  75% { transform: scaleX(1.05) scaleY(0.95); }
+}
+
+@keyframes cba-tada {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  10%, 20% { transform: scale(0.9) rotate(-3deg); }
+  30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
+  40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
+}
+
+@keyframes cba-heartbeat {
+  0%, 100% { transform: scale(1); }
+  10% { transform: scale(1.1); }
+  20% { transform: scale(1); }
+  30% { transform: scale(1.1); }
+  40% { transform: scale(1); }
+}
+
+@keyframes cba-flip {
+  0% { transform: perspective(400px) rotateY(0); }
+  40% { transform: perspective(400px) rotateY(180deg); }
+  100% { transform: perspective(400px) rotateY(360deg); }
+}
+
+@keyframes cba-wobble {
+  0%, 100% { transform: translateX(0%); }
+  15% { transform: translateX(-25%) rotate(-5deg); }
+  30% { transform: translateX(20%) rotate(3deg); }
+  45% { transform: translateX(-15%) rotate(-3deg); }
+  60% { transform: translateX(10%) rotate(2deg); }
+  75% { transform: translateX(-5%) rotate(-1deg); }
+}
+
+@keyframes cba-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.98); }
+}
+
+@keyframes cba-ripple {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  50% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+
 /* Gradient animation keyframes for presets */
 @keyframes holo-shift {
   0% { background-position: 0% 50%; }
@@ -119,6 +182,16 @@ body, html {
 .cba-animate-bounce { animation: cba-bounce 1s infinite; will-change: transform; }
 .cba-animate-blink { animation: cba-blink 1s infinite; }
 .cba-animate-marquee { animation: marquee-spin 2s linear infinite; will-change: transform; }
+.cba-animate-float { animation: cba-float 3s ease-in-out infinite; will-change: transform; }
+.cba-animate-swing { animation: cba-swing 2s ease-in-out infinite; will-change: transform; transform-origin: top center; display: inline-block; }
+.cba-animate-rubberBand { animation: cba-rubberBand 1s infinite; will-change: transform; }
+.cba-animate-tada { animation: cba-tada 1s infinite; will-change: transform; }
+.cba-animate-heartbeat { animation: cba-heartbeat 1.5s ease-in-out infinite; will-change: transform; }
+.cba-animate-flip { animation: cba-flip 2s infinite; will-change: transform; }
+.cba-animate-wobble { animation: cba-wobble 1s infinite; will-change: transform; }
+.cba-animate-breathe { animation: cba-breathe 3s ease-in-out infinite; will-change: opacity, transform; }
+.cba-animate-ripple { animation: cba-ripple 1.5s infinite; will-change: box-shadow; }
+.cba-animate-glow { animation: cba-pulse 2s infinite; will-change: transform; }
 
 /* Fade in animation */
 @keyframes fadeIn {

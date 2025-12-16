@@ -415,94 +415,40 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ss.operator === 'equals' && ss.value === simulatedState
   );
 
-  // Simulate value for threshold calculations (use numeric state or simulated value)
-  const getThresholdValue = (): number => {
-    if (!config.thresholdColor.enabled) return 0;
-    
-    // For preview, simulate different values based on state and entity type
-    const domain = config.entity?.split('.')[0] || '';
-    
-    // Return simulated values based on common sensor types
-    if (domain === 'sensor' || config.thresholdColor.attribute) {
-      // Simulate temperature, battery, CPU, etc.
-      if (simulatedState === 'on') {
-        // Return a value in the yellow/red range to show the feature
-        return 75; // This will typically show as yellow or red
-      } else {
-        return 25; // This will typically show as green
-      }
-    }
-    return 0;
-  };
-  
-  // Calculate threshold color based on value
-  const getThresholdColor = (currentValue: number): string | null => {
-    if (!config.thresholdColor.enabled) return null;
-    
-    const { mode, greenThreshold, yellowThreshold, greenColor, yellowColor, redColor } = config.thresholdColor;
-    
-    if (mode === 'ascending') {
-      // Green = low, Yellow = medium, Red = high
-      if (currentValue <= greenThreshold) return greenColor;
-      if (currentValue <= yellowThreshold) return yellowColor;
-      return redColor;
-    } else {
-      // Descending: Green = high, Yellow = medium, Red = low
-      if (currentValue >= greenThreshold) return greenColor;
-      if (currentValue >= yellowThreshold) return yellowColor;
-      return redColor;
-    }
-  };
-  
-  const thresholdValue = getThresholdValue();
-  const thresholdColor = getThresholdColor(thresholdValue);
-
   // 1. Resolve Card Background
-  // Use appearance backgroundColor (set via state toggle) or fall back to base config
-  let actualBgHex = matchingStateStyle?.backgroundColor || config.backgroundColor || '#1a1a1a';
-  let actualBgOpacity = matchingStateStyle?.backgroundColorOpacity ?? config.backgroundColorOpacity ?? 100;
+  // First check if there's a matching state style with a background color
+  let actualBgHex = matchingStateStyle?.backgroundColor || (isOff ? config.stateOffColor : config.stateOnColor);
+  let actualBgOpacity = isOff ? config.stateOffOpacity : config.stateOnOpacity;
   
   if (config.colorType === 'card' && config.colorAuto && isOn) {
       actualBgHex = SIMULATED_ENTITY_COLOR; 
+  } else if (!actualBgHex) {
+      actualBgHex = config.backgroundColor;
+      actualBgOpacity = config.backgroundColorOpacity;
   }
 
   const actualBg = hexToRgba(actualBgHex, actualBgOpacity);
 
   // 2. Resolve Colors - Auto flag should use simulated entity color when ON
   // Also check matchingStateStyle for state-specific colors
-  // Apply threshold color if enabled
-  const actualIconColor = thresholdColor && config.thresholdColor.applyToIcon
-    ? thresholdColor
-    : (matchingStateStyle?.iconColor || resolveColor(
-        config.iconColor, 
-        config.iconColorAuto, 
-        config.color || '#ffffff', 
-        isOn // Use simulated color when iconColorAuto is true AND state is ON
-      ));
+  const actualIconColor = matchingStateStyle?.iconColor || resolveColor(
+    config.iconColor, 
+    config.iconColorAuto, 
+    config.color || '#ffffff', 
+    isOn // Use simulated color when iconColorAuto is true AND state is ON
+  );
   
-  const actualNameColor = thresholdColor && config.thresholdColor.applyToName
-    ? thresholdColor
-    : (matchingStateStyle?.nameColor || resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn));
-  
-  const actualStateColor = thresholdColor && config.thresholdColor.applyToState
-    ? thresholdColor
-    : (matchingStateStyle?.stateColor || resolveColor(config.stateColor, config.stateColorAuto, config.color || '#ffffff', isOn));
-  
-  const actualLabelColor = thresholdColor && config.thresholdColor.applyToLabel
-    ? thresholdColor
-    : (matchingStateStyle?.labelColor || resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn));
-  
+  const actualNameColor = matchingStateStyle?.nameColor || resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn);
+  const actualStateColor = resolveColor(config.stateColor, config.stateColorAuto, config.color || '#ffffff', isOn);
+  const actualLabelColor = matchingStateStyle?.labelColor || resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn);
   const actualBorderColor = matchingStateStyle?.borderColor || resolveColor(config.borderColor, config.borderColorAuto, 'transparent', isOn);
 
   // 3. Border Logic
   const borderStyle = config.borderStyle !== 'none' ? `${config.borderWidth} ${config.borderStyle} ${actualBorderColor}` : 'none';
   
   // 4. Animation Logic Helper - Uses cba- prefix to avoid tailwind conflicts
-  const getAnimationClass = (type: AnimationType, trigger: AnimationTrigger, alwaysAnimate: boolean = false) => {
+  const getAnimationClass = (type: AnimationType, trigger: AnimationTrigger) => {
     if (type === 'none') return '';
-    // If alwaysAnimate is enabled, always show animation regardless of trigger/state
-    if (alwaysAnimate) return `cba-animate-${type}`;
-    // Otherwise use trigger conditions
     if (trigger === 'always') return `cba-animate-${type}`;
     if (trigger === 'on' && isOn) return `cba-animate-${type}`;
     if (trigger === 'off' && isOff) return `cba-animate-${type}`;
@@ -521,31 +467,15 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? simulatedState as AnimationTrigger // State animations always apply in their state
     : config.cardAnimationTrigger;
 
-  const cardAnimationClass = getAnimationClass(effectiveCardAnimation, effectiveCardAnimationTrigger, config.alwaysAnimateCard);
+  const cardAnimationClass = getAnimationClass(effectiveCardAnimation, effectiveCardAnimationTrigger);
   const cardAnimationDuration = stateCardAnimationSpeed || config.cardAnimationSpeed || '2s';
 
-  // Check for state-specific icon animations
-  const stateIconAnimation = matchingStateStyle?.iconAnimation;
-  const stateIconAnimationSpeed = matchingStateStyle?.iconAnimationSpeed;
-  
-  // Use state-specific animation if it exists and is not 'none', otherwise use config animation
-  const effectiveIconAnimation = (stateIconAnimation && stateIconAnimation !== 'none') 
-    ? stateIconAnimation 
-    : config.iconAnimation;
-  const effectiveIconAnimationTrigger = (stateIconAnimation && stateIconAnimation !== 'none')
-    ? simulatedState as AnimationTrigger
-    : config.iconAnimationTrigger;
-
-  // Icon animations: Always apply when selected (alwaysAnimateIcon checkbox overrides state logic)
-  const shouldShowIconAnimation = config.alwaysAnimateIcon || 
-    effectiveIconAnimationTrigger === 'always' ||
-    (effectiveIconAnimationTrigger === 'on' && isOn) ||
-    (effectiveIconAnimationTrigger === 'off' && isOff);
-  
-  const iconAnimationClass = (effectiveIconAnimation !== 'none' && shouldShowIconAnimation) 
-    ? `cba-animate-${effectiveIconAnimation}` 
-    : '';
-  const iconAnimationDuration = stateIconAnimationSpeed || config.iconAnimationSpeed || '2s';
+  const iconAnimationFromSelect = getAnimationClass(config.iconAnimation, config.iconAnimationTrigger);
+  // Include rotate flag (same as spin)
+  const iconAnimationClass = [(config.spin || config.rotate) ? 'cba-animate-spin' : '', iconAnimationFromSelect]
+    .filter(Boolean)
+    .join(' ');
+  const iconAnimationDuration = ((config.spin || config.rotate) ? config.spinDuration : config.iconAnimationSpeed) || '2s';
 
   // Marquee Logic: If marquee is active and valid
   const isMarquee = effectiveCardAnimation === 'marquee' && 
@@ -572,42 +502,19 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   // 7. Gradient Background
   const getGradientBackground = () => {
-    // Check if gradient is enabled in state appearance or base config
-    const gradientEnabled = matchingStateStyle?.gradientEnabled ?? config.gradientEnabled;
-    if (!gradientEnabled) return undefined;
+    if (!config.gradientEnabled) return undefined;
     
-    // Use gradient settings from state appearance or fall back to base config
-    const gradientType = matchingStateStyle?.gradientType || config.gradientType;
-    const gradientAngle = matchingStateStyle?.gradientAngle ?? config.gradientAngle;
-    const gradientColor1 = matchingStateStyle?.gradientColor1 || config.gradientColor1;
-    const gradientColor2 = matchingStateStyle?.gradientColor2 || config.gradientColor2;
-    const gradientColor3 = matchingStateStyle?.gradientColor3 || config.gradientColor3;
-    const gradientColor3Enabled = matchingStateStyle?.gradientColor3Enabled ?? config.gradientColor3Enabled;
-    const gradientOpacity = (matchingStateStyle?.gradientOpacity ?? config.gradientOpacity ?? 100) / 100;
+    const colors = config.gradientColor3Enabled 
+      ? `${config.gradientColor1}, ${config.gradientColor2}, ${config.gradientColor3}`
+      : `${config.gradientColor1}, ${config.gradientColor2}`;
     
-    // Convert hex colors to rgba with opacity
-    const toRgba = (hex: string, alpha: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-    
-    const color1 = toRgba(gradientColor1, gradientOpacity);
-    const color2 = toRgba(gradientColor2, gradientOpacity);
-    const color3 = toRgba(gradientColor3, gradientOpacity);
-    
-    const colors = gradientColor3Enabled 
-      ? `${color1}, ${color2}, ${color3}`
-      : `${color1}, ${color2}`;
-    
-    switch (gradientType) {
+    switch (config.gradientType) {
       case 'linear':
-        return `linear-gradient(${gradientAngle}deg, ${colors})`;
+        return `linear-gradient(${config.gradientAngle}deg, ${colors})`;
       case 'radial':
         return `radial-gradient(circle, ${colors})`;
       case 'conic':
-        return `conic-gradient(from ${gradientAngle}deg, ${colors}, ${color1})`;
+        return `conic-gradient(from ${config.gradientAngle}deg, ${colors}, ${config.gradientColor1})`;
       default:
         return undefined;
     }
@@ -1024,7 +931,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
           {config.showState && (
             <div style={{ gridArea: 's', color: actualStateColor, opacity: 0.8, fontSize: '0.85em' }} className="text-center flex items-center justify-center gap-1">
-              <span>{config.stateDisplay || getDomainStateDisplay(config.entity, simulatedState)}</span>
+              <span>{config.stateDisplay || simulatedState.toUpperCase()}</span>
               {config.showUnits && config.units && (
                 <span className="opacity-70">{config.units}</span>
               )}
@@ -1033,9 +940,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
           {config.showLabel && (
             <div style={{ gridArea: 'l', color: actualLabelColor, opacity: 0.7, fontSize: '0.8em' }} className="text-center px-1 truncate w-full">
-              {config.labelEntity 
-                ? getDomainStateDisplay(config.labelEntity, simulatedState, config.labelAttribute)
-                : config.label || 'Label Text'}
+              {config.label || 'Label Text'}
             </div>
           )}
 
@@ -1114,19 +1019,13 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
         {/* Simulator Toggle */}
         <div className="bg-gray-800/90 backdrop-blur p-1 rounded-full inline-flex border border-gray-700 shadow-xl pointer-events-auto">
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setSimulatedState('on');
-            }}
+            onClick={() => setSimulatedState('on')}
             className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'on' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
           >
             ON
           </button>
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setSimulatedState('off');
-            }}
+            onClick={() => setSimulatedState('off')}
             className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'off' ? 'bg-gray-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
           >
             OFF

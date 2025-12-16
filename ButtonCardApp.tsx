@@ -21,7 +21,7 @@ export interface PresetState {
   onStatePreset: Preset | null;
 }
 
-import logo from './assets/logo.png';
+import logo from './logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
 
@@ -136,7 +136,6 @@ export const ButtonCardApp: React.FC = () => {
       backgroundColor: '',
       iconColor: activePreset.config.iconColor || '',
       nameColor: activePreset.config.nameColor || '',
-      stateColor: '',
       labelColor: activePreset.config.labelColor || '',
       borderColor: activePreset.config.borderColor || '',
       cardAnimation: activePreset.config.cardAnimation || 'none',
@@ -163,7 +162,6 @@ export const ButtonCardApp: React.FC = () => {
         backgroundColor: '',
         iconColor: secondaryPreset.config.iconColor || '',
         nameColor: secondaryPreset.config.nameColor || '',
-        stateColor: '',
         labelColor: secondaryPreset.config.labelColor || '',
         borderColor: secondaryPreset.config.borderColor || '',
         cardAnimation: secondaryPreset.config.cardAnimation || 'none',
@@ -214,21 +212,12 @@ export const ButtonCardApp: React.FC = () => {
         backgroundColor: appearance.backgroundColor || '',
         iconColor: appearance.iconColor || '',
         nameColor: appearance.nameColor || '',
-        stateColor: appearance.stateColor || '',
         labelColor: appearance.labelColor || '',
         borderColor: appearance.borderColor || '',
         cardAnimation: appearance.cardAnimation || 'none',
         cardAnimationSpeed: appearance.cardAnimationSpeed || '2s',
         iconAnimation: appearance.iconAnimation || 'none',
         iconAnimationSpeed: appearance.iconAnimationSpeed || '2s',
-        gradientEnabled: appearance.gradientEnabled || false,
-        gradientType: appearance.gradientType || DEFAULT_STATE_APPEARANCE.gradientType,
-        gradientAngle: appearance.gradientAngle ?? DEFAULT_STATE_APPEARANCE.gradientAngle,
-        gradientColor1: appearance.gradientColor1 || DEFAULT_STATE_APPEARANCE.gradientColor1,
-        gradientColor2: appearance.gradientColor2 || DEFAULT_STATE_APPEARANCE.gradientColor2,
-        gradientColor3: appearance.gradientColor3 || DEFAULT_STATE_APPEARANCE.gradientColor3,
-        gradientColor3Enabled: appearance.gradientColor3Enabled || false,
-        gradientOpacity: appearance.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
       };
     };
     

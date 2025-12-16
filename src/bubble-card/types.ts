@@ -2,6 +2,13 @@
 // Based on https://github.com/Clooos/Bubble-Card
 
 // ============================================
+// ANIMATION TYPES (from custom button card)
+// ============================================
+
+export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat' | 'flip' | 'wobble' | 'breathe' | 'ripple';
+export type AnimationTrigger = 'always' | 'on' | 'off';
+
+// ============================================
 // CARD TYPES
 // ============================================
 
@@ -41,6 +48,7 @@ export interface BubbleAction {
   service?: string;
   data?: Record<string, unknown>;
   service_data?: Record<string, unknown>;
+  pipeline?: string;
   target?: {
     entity_id?: string | string[];
     device_id?: string | string[];
@@ -61,7 +69,9 @@ export interface BubbleSubButton {
   entity?: string;
   name?: string;
   icon?: string;
+  visibility?: string; // JS template for conditional visibility
   show_background?: boolean;
+  state_background?: boolean;
   show_state?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -70,6 +80,9 @@ export interface BubbleSubButton {
   show_attribute?: boolean;
   attribute?: string;
   select_attribute?: string;
+  dropdown?: string[]; // Dropdown options for select entities
+  footer_entity?: string; // Optional footer entity for sub-button
+  show_arrow?: boolean;
   tap_action?: BubbleAction;
   double_tap_action?: BubbleAction;
   hold_action?: BubbleAction;
@@ -82,12 +95,14 @@ export interface BubbleSubButton {
 export interface BubbleButtonConfig {
   // Required
   card_type: 'button';
+  modules?: string[];
   
   // Entity & Display
   entity?: string;
   button_type: BubbleButtonType;
   name?: string;
   icon?: string;
+  entity_picture?: string;
   force_icon?: boolean;
   
   // Visibility
@@ -100,10 +115,32 @@ export interface BubbleButtonConfig {
   attribute?: string;
   scrolling_effect?: boolean;
   use_accent_color?: boolean;
+  badge_text?: string;
+  badge_color?: string;
+  footer_text?: string;
+  ripple_effect?: boolean;
+  show_slider_value?: boolean;
+  icon_size?: number;
+  name_weight?: 'normal' | 'medium' | 'bold';
+  glow_effect?: string;
+  background_gradient?: string;
+  icon_animation?: string; // Legacy CSS animation string
+  
+  // Animations (from custom button card)
+  card_animation?: AnimationType;
+  card_animation_trigger?: AnimationTrigger;
+  card_animation_speed?: string;
+  icon_animation_type?: AnimationType;
+  icon_animation_trigger?: AnimationTrigger;
+  icon_animation_speed?: string;
   
   // Layout
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: {
+    rows?: number;
+    columns?: number;
+  };
   
   // Actions
   tap_action?: BubbleAction;
@@ -134,16 +171,26 @@ export interface BubbleButtonConfig {
   styles?: string;
 }
 
+interface BubbleGridLayout {
+  card_layout?: BubbleCardLayout;
+  grid_options?: {
+    rows?: number;
+    columns?: number;
+  };
+}
+
 // ============================================
 // MAIN CONFIG - SEPARATOR
 // ============================================
 
 export interface BubbleSeparatorConfig {
   card_type: 'separator';
+  modules?: string[];
   name?: string;
   icon?: string;
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
   styles?: string;
 }
@@ -154,12 +201,15 @@ export interface BubbleSeparatorConfig {
 
 export interface BubblePopUpConfig {
   card_type: 'pop-up';
+  modules?: string[];
   hash: string; // Required - e.g., '#kitchen'
   
   // Header (uses button options)
   entity?: string;
   name?: string;
   icon?: string;
+  entity_picture?: string;
+  force_icon?: boolean;
   
   // Pop-up specific
   auto_close?: number;
@@ -195,8 +245,10 @@ export interface BubblePopUpConfig {
 
 export interface BubbleCoverConfig {
   card_type: 'cover';
+  modules?: string[];
   entity: string;
   name?: string;
+  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -230,6 +282,7 @@ export interface BubbleCoverConfig {
   
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
   styles?: string;
 }
@@ -240,9 +293,11 @@ export interface BubbleCoverConfig {
 
 export interface BubbleMediaPlayerConfig {
   card_type: 'media-player';
+  modules?: string[];
   entity: string;
   name?: string;
   icon?: string;
+  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -257,6 +312,11 @@ export interface BubbleMediaPlayerConfig {
   min_volume?: number;
   max_volume?: number;
   cover_background?: boolean;
+  columns?: number;
+  
+  // Media player source options
+  source_list?: string[];
+  sound_mode_list?: string[];
   
   // Hide options
   hide?: {
@@ -279,6 +339,7 @@ export interface BubbleMediaPlayerConfig {
   
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
   styles?: string;
 }
@@ -289,9 +350,11 @@ export interface BubbleMediaPlayerConfig {
 
 export interface BubbleClimateConfig {
   card_type: 'climate';
+  modules?: string[];
   entity: string;
   name?: string;
   icon?: string;
+  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -300,10 +363,17 @@ export interface BubbleClimateConfig {
   // Climate specific
   hide_target_temp_low?: boolean;
   hide_target_temp_high?: boolean;
+  dual_setpoint?: boolean;
   state_color?: boolean;
   step?: number;
   min_temp?: number;
   max_temp?: number;
+  
+  // Climate mode options
+  hvac_modes?: string[];
+  preset_modes?: string[];
+  swing_modes?: string[];
+  fan_modes?: string[];
   
   // Actions
   tap_action?: BubbleAction;
@@ -317,6 +387,7 @@ export interface BubbleClimateConfig {
   
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
   styles?: string;
 }
@@ -327,9 +398,11 @@ export interface BubbleClimateConfig {
 
 export interface BubbleSelectConfig {
   card_type: 'select';
+  modules?: string[];
   entity: string;
   name?: string;
   icon?: string;
+  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -347,6 +420,7 @@ export interface BubbleSelectConfig {
   
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
   styles?: string;
 }
@@ -357,6 +431,7 @@ export interface BubbleSelectConfig {
 
 export interface BubbleCalendarConfig {
   card_type: 'calendar';
+  modules?: string[];
   entities: Array<{
     entity: string;
     color?: string;
@@ -379,6 +454,7 @@ export interface BubbleCalendarConfig {
   
   card_layout?: BubbleCardLayout;
   rows?: number;
+  grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
   styles?: string;
 }
@@ -397,6 +473,7 @@ export interface BubbleHorizontalButton {
 
 export interface BubbleHorizontalButtonsStackConfig {
   card_type: 'horizontal-buttons-stack';
+  modules?: string[];
   buttons: BubbleHorizontalButton[]; // We'll convert to 1_link, 1_name, etc.
   auto_order?: boolean;
   margin?: string;
@@ -414,6 +491,7 @@ export interface BubbleHorizontalButtonsStackConfig {
 
 export interface BubbleEmptyColumnConfig {
   card_type: 'empty-column';
+  modules?: string[];
 }
 
 // ============================================
