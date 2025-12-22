@@ -1,5 +1,6 @@
 <div align="center">
-<img width="1920" height="500" alt="Button Builder Banner" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg" />
+<img width="200" alt="Button Builder" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/bbthumb.png" />
+<img width="600" alt="Button Builder Banner" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg" />
 </div>
 
 # 🎨 Button Builder for Home Assistant
