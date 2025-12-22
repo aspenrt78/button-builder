@@ -1,7 +1,63 @@
 // Bubble Card Preview Component
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { BubbleButtonConfig, BubbleSubButton, BubbleConfig } from '../types';
+import { Palette, Upload, X, Image, AlertTriangle } from 'lucide-react';
+
+// ============================================
+// ERROR BOUNDARY
+// ============================================
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class PreviewErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Preview rendering error:', error, errorInfo);
+  }
+
+  resetError = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render(): React.ReactNode {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[200px] p-4 bg-red-900/20 rounded-xl border border-red-500/30">
+          <AlertTriangle className="w-12 h-12 text-red-400 mb-3" />
+          <p className="text-red-400 font-medium mb-2">Preview Error</p>
+          <p className="text-red-300/70 text-sm text-center max-w-md">
+            {this.state.error?.message || 'An error occurred while rendering the preview.'}
+          </p>
+          <button 
+            onClick={this.resetError}
+            className="mt-4 px-4 py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg text-sm transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // ============================================
 // HELPER FUNCTIONS
@@ -46,6 +102,24 @@ interface PreviewProps {
   simulatedState?: 'on' | 'off';
   onSimulatedStateChange?: (state: 'on' | 'off') => void;
 }
+
+// Helper to parse background string to CSS
+const parseBackgroundToCss = (bg: string): React.CSSProperties => {
+  if (!bg) return {};
+  
+  // Check if it's a URL pattern
+  if (bg.startsWith('url(')) {
+    return {
+      backgroundImage: bg,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    };
+  }
+  
+  // Otherwise treat as color
+  return { backgroundColor: bg };
+};
 
 // ============================================
 // ICON COMPONENT (simplified MDI rendering)
@@ -104,7 +178,16 @@ function BubbleIcon({ icon, size = 24, color = 'currentColor' }: { icon?: string
 // ============================================
 
 const SubButtonPreview: React.FC<{ subButton: BubbleSubButton }> = ({ subButton }) => {
+  // Defensive check for undefined subButton
+  if (!subButton) {
+    return null;
+  }
+  
   const showBackground = subButton.show_background !== false;
+  const showIcon = subButton.show_icon !== false && !!subButton.icon;
+  const showState = subButton.show_state === true;
+  const showName = subButton.show_name === true && !!subButton.name;
+  const showAttribute = subButton.show_attribute === true;
   
   return (
     <div 
@@ -113,20 +196,20 @@ const SubButtonPreview: React.FC<{ subButton: BubbleSubButton }> = ({ subButton 
         ${showBackground ? 'bg-white/10' : 'bg-transparent'}
       `}
     >
-      {subButton.show_icon !== false && subButton.icon && (
+      {showIcon && (
         <BubbleIcon icon={subButton.icon} size={16} />
       )}
-      {subButton.show_state && (
+      {showState && (
         <span className="text-white/80">75%</span>
       )}
-      {subButton.show_name && subButton.name && (
+      {showName && (
         <span className="text-white/80">{subButton.name}</span>
       )}
-      {subButton.show_attribute && (
+      {showAttribute && (
         <span className="text-white/70">{subButton.attribute || 'attr'}</span>
       )}
       {/* Fallback if nothing is shown */}
-      {!subButton.icon && !subButton.show_state && !subButton.show_name && !subButton.show_attribute && (
+      {!showIcon && !showState && !showName && !showAttribute && (
         <span className="text-white/50">•</span>
       )}
     </div>
@@ -137,8 +220,88 @@ const SubButtonPreview: React.FC<{ subButton: BubbleSubButton }> = ({ subButton 
 // MAIN PREVIEW COMPONENT
 // ============================================
 
-export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateChange }: PreviewProps) {
+function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateChange }: PreviewProps) {
   const cardType = config.card_type;
+  
+  // Debug: Log config changes
+  React.useEffect(() => {
+    console.log('[BubblePreview] Config updated:', {
+      cardType: config.card_type,
+      hasSubButtons: (config as any).sub_button?.length || 0,
+      subButtons: (config as any).sub_button?.map((sb: any) => ({
+        show_state: sb.show_state,
+        show_icon: sb.show_icon,
+        show_name: sb.show_name,
+      })),
+    });
+  }, [config]);
+  
+  // Canvas background and layout state (ported from PreviewCard)
+  const [canvasColor, setCanvasColor] = useState('#0a0a0a');
+  const [canvasBackground, setCanvasBackground] = useState<string | null>(null);
+  const [showCanvasPicker, setShowCanvasPicker] = useState(false);
+  const [customBackgroundName, setCustomBackgroundName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Dashboard layout/grid controls
+  const [showLayoutSettings, setShowLayoutSettings] = useState(false);
+  const [cardWidth, setCardWidth] = useState(180);
+  const [cardHeight, setCardHeight] = useState(180);
+  const [gridGap, setGridGap] = useState(8);
+  const [showGrid, setShowGrid] = useState(false);
+  // Dashboard backgrounds (HA integration)
+  const [dashboardConfigs, setDashboardConfigs] = useState<any[]>([]);
+  const [selectedDashboard, setSelectedDashboard] = useState<string | null>(null);
+  const [loadingDashboards, setLoadingDashboards] = useState(false);
+  const [dashboardsLoaded, setDashboardsLoaded] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState(0);
+
+  // Dummy dashboard presets for parity (replace with real if needed)
+  const DASHBOARD_PRESETS = [
+    { name: 'Default', width: 180, height: 180, gap: 8 },
+    { name: 'Wide', width: 250, height: 120, gap: 12 },
+    { name: 'Tall', width: 120, height: 250, gap: 12 },
+    { name: 'Custom', width: cardWidth, height: cardHeight, gap: gridGap },
+  ];
+
+  // Handlers for dashboard logic (stubbed for now)
+  const loadDashboardConfigs = () => {
+    setLoadingDashboards(true);
+    setTimeout(() => {
+      setDashboardConfigs([
+        { dashboardId: '1', title: 'Living Room', background: 'url(https://placekitten.com/400/200)', grid: { type: 'grid', columns: 3 } },
+        { dashboardId: '2', title: 'Kitchen', background: '#1e3a5f', grid: { type: 'grid', columns: 2 } },
+      ]);
+      setLoadingDashboards(false);
+      setDashboardsLoaded(true);
+    }, 800);
+  };
+  const applyDashboardConfig = (db: any) => {
+    setSelectedDashboard(db.dashboardId);
+    setCanvasBackground(db.background || null);
+    setCardWidth(db.grid.columns * 80 || 180);
+    setCardHeight(180);
+    setGridGap(8);
+    setShowLayoutSettings(false);
+    setShowCanvasPicker(false);
+  };
+  const clearDashboardSelection = () => {
+    setSelectedDashboard(null);
+    setCanvasBackground(null);
+    setCardWidth(180);
+    setCardHeight(180);
+    setGridGap(8);
+  };
+  const refreshDashboards = () => {
+    loadDashboardConfigs();
+  };
+  const applyPreset = (idx: number) => {
+    setSelectedPreset(idx);
+    const preset = DASHBOARD_PRESETS[idx];
+    setCardWidth(preset.width);
+    setCardHeight(preset.height);
+    setGridGap(preset.gap);
+    setSelectedDashboard(null);
+  };
   
   // Type-safe access helper
   const cfg = config as any;
@@ -158,6 +321,37 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   const handleClick = () => {
     if (onSimulatedStateChange) {
       onSimulatedStateChange(simulatedState === 'on' ? 'off' : 'on');
+    }
+  };
+  
+  // Background upload handler
+  const handleBackgroundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be less than 5MB');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setCanvasBackground(`url(${dataUrl})`);
+        setCustomBackgroundName(file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const clearCustomBackground = () => {
+    setCanvasBackground(null);
+    setCustomBackgroundName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
   
@@ -267,6 +461,9 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // Resolve icon background color from CSS variable VALUE
   const actualIconBg = parsedStyles['--bubble-icon-background-color'] || (isOn ? defaultOnIconBg : defaultOffIconBg);
   
+  // Alias for iconBgColor used in card type previews
+  const iconBgColor = actualIconBg;
+  
   // Resolve border radius from CSS variable VALUE
   const actualBorderRadius = parsedStyles['--bubble-border-radius'] || '32px';
   
@@ -282,30 +479,195 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // ============================================
   const getAnimationClass = (type: string | undefined, trigger: string | undefined) => {
     if (!type || type === 'none') return '';
-    const effectiveTrigger = trigger || 'always';
-    if (effectiveTrigger === 'always') return `cba-animate-${type}`;
-    if (effectiveTrigger === 'on' && isOn) return `cba-animate-${type}`;
-    if (effectiveTrigger === 'off' && isOff) return `cba-animate-${type}`;
+    if (trigger === 'always') return `bubble-animate-${type}`;
+    if (trigger === 'on' && isOn) return `bubble-animate-${type}`;
+    if (trigger === 'off' && isOff) return `bubble-animate-${type}`;
     return '';
   };
-  
+
+  // Animation classes for card and icon
   const cardAnimationClass = getAnimationClass(cfg.card_animation, cfg.card_animation_trigger);
   const cardAnimationDuration = cfg.card_animation_speed || '2s';
-  
-  const iconAnimationClass = getAnimationClass(cfg.icon_animation_type, cfg.icon_animation_trigger);
+  const iconAnimationClass = getAnimationClass(cfg.icon_animation, cfg.icon_animation_trigger);
   const iconAnimationDuration = cfg.icon_animation_speed || '2s';
+
+  // ============================================
+  // CANVAS WRAPPER COMPONENT (reusable for all card types)
+  // ============================================
+  const CanvasWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div 
+      className="relative w-full max-w-full rounded-xl overflow-visible"
+      style={{
+        backgroundColor: canvasColor || '#0a0a0a',
+        ...parseBackgroundToCss(canvasBackground || ''),
+      }}
+    >
+      {/* Grid overlay */}
+      {showGrid && (
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
+            `,
+            backgroundSize: `${cardWidth + gridGap}px ${cardHeight + gridGap}px`,
+          }}
+        />
+      )}
+
+      {/* Canvas Controls - positioned upper right */}
+      <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+        {/* Layout Settings */}
+        <div className="relative">
+          <button 
+            onClick={() => { setShowLayoutSettings(!showLayoutSettings); setShowCanvasPicker(false); }}
+            className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors ${showLayoutSettings ? 'bg-gray-700 text-white' : ''}`}
+            title="Layout Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+          </button>
+          {showLayoutSettings && (
+            <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-64 animate-in slide-in-from-top-2 z-40">
+              <p className="text-xs font-bold text-gray-300 mb-3">Dashboard Layout</p>
+              {/* Dashboard Presets */}
+              <div className="flex flex-wrap gap-1 mb-3">
+                {DASHBOARD_PRESETS.map((preset, idx) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => applyPreset(idx)}
+                    className={`px-2 py-1 text-[10px] rounded ${selectedPreset === idx ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              {/* Custom Size Controls */}
+              <div className={`space-y-2 ${selectedDashboard ? 'opacity-50' : ''}`}> 
+                {selectedDashboard && (
+                  <p className="text-[9px] text-amber-500/80 mb-1">Locked by dashboard preset</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-gray-400 w-16">Width</label>
+                  <input
+                    type="range"
+                    min="60"
+                    max="250"
+                    value={cardWidth}
+                    disabled={!!selectedDashboard}
+                    onChange={(e) => { setCardWidth(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
+                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                  />
+                  <span className="text-[10px] text-gray-300 w-10 text-right">{cardWidth}px</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-gray-400 w-16">Height</label>
+                  <input
+                    type="range"
+                    min="60"
+                    max="250"
+                    value={cardHeight}
+                    disabled={!!selectedDashboard}
+                    onChange={(e) => { setCardHeight(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
+                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                  />
+                  <span className="text-[10px] text-gray-300 w-10 text-right">{cardHeight}px</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-gray-400 w-16">Gap</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="24"
+                    value={gridGap}
+                    disabled={!!selectedDashboard}
+                    onChange={(e) => { setGridGap(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
+                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                  />
+                  <span className="text-[10px] text-gray-300 w-10 text-right">{gridGap}px</span>
+                </div>
+              </div>
+              {/* Show Grid Toggle */}
+              <label className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showGrid}
+                  onChange={(e) => setShowGrid(e.target.checked)}
+                  className="w-3 h-3 rounded bg-gray-700 border-gray-600"
+                />
+                <span className="text-[10px] text-gray-400">Show grid overlay</span>
+              </label>
+            </div>
+          )}
+        </div>
+        {/* Canvas Color Picker & Backgrounds */}
+        <div className="relative">
+          <button 
+            onClick={() => { 
+              setShowCanvasPicker(!showCanvasPicker); 
+              setShowLayoutSettings(false);
+              if (!showCanvasPicker) {
+                loadDashboardConfigs();
+              }
+            }}
+            className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors ${showCanvasPicker ? 'bg-gray-700 text-white' : ''}`}
+            title="Change Canvas Backdrop"
+          >
+            <Palette size={16} />
+          </button>
+          {showCanvasPicker && (
+            <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-64 animate-in slide-in-from-top-2 max-h-[70vh] overflow-y-auto custom-scrollbar z-40">
+              <p className="text-xs font-bold text-gray-300 mb-3">Canvas Background</p>
+              {/* Color picker */}
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="color"
+                  value={canvasColor}
+                  onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); setCustomBackgroundName(null); }}
+                  className="w-8 h-8 rounded cursor-pointer border border-gray-700"
+                />
+                <input
+                  type="text"
+                  value={canvasColor}
+                  onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); }}
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white font-mono"
+                />
+              </div>
+              {/* Reset button */}
+              <button 
+                onClick={() => { setCanvasColor('#0a0a0a'); setCanvasBackground(null); setCustomBackgroundName(null); }}
+                className="w-full mb-3 px-2 py-1 text-[10px] bg-gray-800 text-gray-400 rounded hover:bg-gray-700"
+              >
+                Reset to Default
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Preview Content */}
+      <div className="flex items-center justify-center p-8 relative bg-transparent">
+        {children}
+      </div>
+    </div>
+  );
 
   // ============================================
   // EMPTY COLUMN PREVIEW
   // ============================================
   if (cardType === 'empty-column') {
     return (
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-16 h-24 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center">
-          <span className="text-gray-600 text-xs">Empty</span>
+      <CanvasWrapper>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-24 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center">
+            <span className="text-gray-600 text-xs">Empty</span>
+          </div>
+          <div className="text-xs text-gray-500">empty-column • spacer</div>
         </div>
-        <div className="text-xs text-gray-500">empty-column • spacer</div>
-      </div>
+      </CanvasWrapper>
     );
   }
 
@@ -314,6 +676,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // ============================================
   if (cardType === 'separator') {
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="w-80 overflow-hidden transition-all duration-300"
@@ -351,6 +714,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
           {hasSubButtons && ` • ${cfg.sub_button.length} sub-button${cfg.sub_button.length > 1 ? 's' : ''}`}
         </div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -372,6 +736,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
     const popupShadow = actualBoxShadow || (shadowOpacity ? `0 20px 50px rgba(0,0,0,${shadowOpacity / 100})` : undefined);
 
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="relative w-80 rounded-3xl overflow-hidden border border-white/10"
@@ -419,6 +784,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
           {cfg.auto_close && ` • auto-close: ${cfg.auto_close}ms`}
         </div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -427,6 +793,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // ============================================
   if (cardType === 'cover') {
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="relative w-72 overflow-hidden p-4"
@@ -480,6 +847,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
         </div>
         <div className="text-xs text-gray-500">cover • blinds/shades control</div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -488,6 +856,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // ============================================
   if (cardType === 'media-player') {
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="relative w-80 overflow-hidden"
@@ -554,6 +923,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
         </div>
         <div className="text-xs text-gray-500">media-player • streaming controls</div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -565,6 +935,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
     const targetTemp = cfg.min_temp && cfg.max_temp ? ((cfg.min_temp + cfg.max_temp) / 2).toFixed(1) : '21';
     
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="relative w-72 overflow-hidden p-4"
@@ -616,6 +987,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
           climate • {cfg.min_temp ?? 16}° - {cfg.max_temp ?? 30}° range
         </div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -624,6 +996,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // ============================================
   if (cardType === 'select') {
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="w-64 overflow-hidden p-4"
@@ -662,6 +1035,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
           {cfg.scrolling_effect && ' • scrolling effect enabled'}
         </div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -670,6 +1044,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   // ============================================
   if (cardType === 'calendar') {
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div 
           className="w-80 overflow-hidden p-4"
@@ -710,6 +1085,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
           calendar • {cfg.days ?? 7} days • max {cfg.limit ?? 5} events
         </div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -724,6 +1100,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
     ];
     
     return (
+      <CanvasWrapper>
       <div className="flex flex-col items-center gap-4">
         <div className="w-full max-w-md overflow-x-auto">
           <div className="flex gap-2 p-2">
@@ -742,6 +1119,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
           horizontal-buttons-stack • {buttons.length} buttons
         </div>
       </div>
+      </CanvasWrapper>
     );
   }
 
@@ -751,6 +1129,7 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
   const isSlider = cfg.button_type === 'slider';
   
   return (
+    <CanvasWrapper>
     <div className="flex flex-col items-center gap-4">
       <div 
         className={`
@@ -867,6 +1246,16 @@ export function BubblePreview({ config, simulatedState = 'on', onSimulatedStateC
         <span className="text-xs text-gray-400">Preview shows simulated "on" state</span>
       </div>
     </div>
+    </CanvasWrapper>
+  );
+}
+
+// Wrapped export with error boundary
+export function BubblePreview(props: PreviewProps) {
+  return (
+    <PreviewErrorBoundary>
+      <BubblePreviewInner {...props} />
+    </PreviewErrorBoundary>
   );
 }
 

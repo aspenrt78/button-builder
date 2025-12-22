@@ -135,6 +135,14 @@ const getTokenFromUrl = (): string | null => {
   }
 };
 
+const ENTITY_CACHE_KEY = 'button-builder-entity-cache';
+const ENTITY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface EntityCache {
+  entities: EntityInfo[];
+  timestamp: number;
+}
+
 class HomeAssistantService {
   private readonly isDevEnv: boolean;
   private entities: EntityInfo[] = [];
@@ -144,6 +152,37 @@ class HomeAssistantService {
   constructor() {
     this.isDevEnv = Boolean(IS_DEV_ENV);
     this.initAuth();
+    // Load cached entities on init
+    this.loadCachedEntities();
+  }
+
+  private loadCachedEntities(): void {
+    try {
+      const cached = localStorage.getItem(ENTITY_CACHE_KEY);
+      if (cached) {
+        const data: EntityCache = JSON.parse(cached);
+        // Check if cache is still valid
+        if (Date.now() - data.timestamp < ENTITY_CACHE_TTL && data.entities.length > 0) {
+          this.entities = data.entities;
+          console.log(`[ButtonBuilder] Loaded ${this.entities.length} cached entities`);
+        }
+      }
+    } catch (e) {
+      console.debug('[ButtonBuilder] Failed to load cached entities:', e);
+    }
+  }
+
+  private cacheEntities(entities: EntityInfo[]): void {
+    try {
+      const cache: EntityCache = {
+        entities,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(ENTITY_CACHE_KEY, JSON.stringify(cache));
+      console.log(`[ButtonBuilder] Cached ${entities.length} entities`);
+    } catch (e) {
+      console.debug('[ButtonBuilder] Failed to cache entities:', e);
+    }
   }
 
   private async initAuth(): Promise<void> {
@@ -159,6 +198,13 @@ class HomeAssistantService {
   }
 
   async getEntities(): Promise<EntityInfo[]> {
+    // Return cached entities immediately if available
+    if (this.entities.length > 0 && !this.fetchAttempted) {
+      // Start a background refresh
+      this.refreshEntitiesInBackground();
+      return this.entities;
+    }
+
     // Always try to fetch if we haven't yet
     if (!this.fetchAttempted) {
       this.fetchAttempted = true;
@@ -171,6 +217,7 @@ class HomeAssistantService {
       
       const fetched = await this.fetchEntitiesFromHA();
       if (fetched.length > 0) {
+        this.cacheEntities(fetched);
         return fetched;
       }
     } else if (this.entities.length > 0) {
@@ -184,6 +231,20 @@ class HomeAssistantService {
     }
 
     return [];
+  }
+
+  private async refreshEntitiesInBackground(): Promise<void> {
+    // Don't block the UI, just refresh in background
+    this.fetchAttempted = true;
+    try {
+      const fetched = await this.fetchEntitiesFromHA();
+      if (fetched.length > 0) {
+        this.entities = fetched;
+        this.cacheEntities(fetched);
+      }
+    } catch (e) {
+      console.debug('[ButtonBuilder] Background refresh failed:', e);
+    }
   }
 
   private async fetchEntitiesFromHA(): Promise<EntityInfo[]> {
@@ -391,6 +452,61 @@ class HomeAssistantService {
       e.id.toLowerCase().includes(lowerQuery) ||
       e.name.toLowerCase().includes(lowerQuery) ||
       e.domain.toLowerCase().includes(lowerQuery)
+    );
+  }
+
+  /**
+   * Get full entity data including state and attributes
+   */
+  async getEntityData(entityId: string): Promise<HAEntity | null> {
+    try {
+      const hass = getHass();
+      if (hass?.states?.[entityId]) {
+        return hass.states[entityId] as HAEntity;
+      }
+
+      // Fallback: try API endpoint
+      if (!this.authToken) {
+        await this.initAuth();
+      }
+      
+      // Get hassUrl from hass object or derive from parent
+      const hassUrl = hass?.hassUrl || (canAccessParent() ? window.parent.location.origin : null);
+      
+      if (!this.authToken || !hassUrl) {
+        return null;
+      }
+
+      const response = await fetch(`${hassUrl}/api/states/${entityId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`[ButtonBuilder] Error fetching entity ${entityId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get attribute keys from an entity
+   */
+  async getEntityAttributes(entityId: string): Promise<string[]> {
+    const entity = await this.getEntityData(entityId);
+    if (!entity?.attributes) {
+      return [];
+    }
+
+    // Return attribute keys, excluding common internal ones
+    return Object.keys(entity.attributes).filter(attr => 
+      !['friendly_name', 'icon', 'entity_picture', 'supported_features', 'device_class'].includes(attr)
     );
   }
 

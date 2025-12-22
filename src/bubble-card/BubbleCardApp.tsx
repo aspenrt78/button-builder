@@ -1,7 +1,7 @@
 // Bubble Card Builder - Main App Component
 // Modeled after ButtonCardApp.tsx structure
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   BubbleButtonConfig, 
   BubbleConfig, 
@@ -28,7 +28,7 @@ import { BUBBLE_PRESETS } from './presets';
 import { BubbleConfigPanel } from './components/ConfigPanel';
 import { BubblePreview } from './components/Preview';
 import { BubbleYamlViewer } from './components/YamlViewer';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Check, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Check, AlertCircle, AlertTriangle, Info, Undo2, Redo2 } from 'lucide-react';
 
 // ============================================
 // DEFAULT CONFIGS FOR EACH CARD TYPE
@@ -290,6 +290,60 @@ export function BubbleCardApp() {
   const [selectedCardType, setSelectedCardType] = useState<BubbleCardType | 'all'>('all');
   const [presetSearch, setPresetSearch] = useState('');
   
+  // Undo/Redo history
+  const [historyPast, setHistoryPast] = useState<BubbleConfig[]>([]);
+  const [historyFuture, setHistoryFuture] = useState<BubbleConfig[]>([]);
+  const historyDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedConfigRef = useRef<BubbleConfig>(loadSavedConfig());
+  const isUndoRedoRef = useRef(false);
+  const MAX_HISTORY = 50;
+
+  const canUndo = historyPast.length > 0;
+  const canRedo = historyFuture.length > 0;
+
+  const handleUndo = useCallback(() => {
+    if (historyPast.length === 0) return;
+    
+    isUndoRedoRef.current = true;
+    const previous = historyPast[historyPast.length - 1];
+    setHistoryPast(prev => prev.slice(0, -1));
+    setHistoryFuture(prev => [config, ...prev].slice(0, MAX_HISTORY));
+    setConfigInternal(previous);
+    lastSavedConfigRef.current = previous;
+    
+    setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+  }, [historyPast, config]);
+
+  const handleRedo = useCallback(() => {
+    if (historyFuture.length === 0) return;
+    
+    isUndoRedoRef.current = true;
+    const next = historyFuture[0];
+    setHistoryFuture(prev => prev.slice(1));
+    setHistoryPast(prev => [...prev, config].slice(-MAX_HISTORY));
+    setConfigInternal(next);
+    lastSavedConfigRef.current = next;
+    
+    setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+  }, [historyFuture, config]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          handleUndo();
+        } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+          e.preventDefault();
+          handleRedo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+  
   // Ref to track preset application
   const isApplyingPresetRef = useRef(false);
   
@@ -298,7 +352,24 @@ export function BubbleCardApp() {
     if (!isApplyingPresetRef.current && activePreset) {
       setActivePreset(null);
     }
-    setConfigInternal(action);
+    
+    setConfigInternal(prev => {
+      const result = typeof action === 'function' ? action(prev) : action;
+      
+      // History tracking (debounced)
+      if (!isUndoRedoRef.current) {
+        if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+        historyDebounceRef.current = setTimeout(() => {
+          if (JSON.stringify(result) !== JSON.stringify(lastSavedConfigRef.current)) {
+            setHistoryPast(p => [...p, lastSavedConfigRef.current].slice(-MAX_HISTORY));
+            setHistoryFuture([]);
+            lastSavedConfigRef.current = result;
+          }
+        }, 500);
+      }
+      
+      return result;
+    });
   };
 
   // Generate YAML output
@@ -426,6 +497,26 @@ export function BubbleCardApp() {
         
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-2">
+          {/* Undo/Redo Buttons */}
+          <div className="flex items-center border border-gray-700 rounded-full overflow-hidden">
+            <button 
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={14} />
+            </button>
+            <div className="w-px h-5 bg-gray-700" />
+            <button 
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 size={14} />
+            </button>
+          </div>
           <button 
             onClick={() => setShowPresets(!showPresets)}
             className={`flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm font-medium transition-all ${
@@ -502,7 +593,7 @@ export function BubbleCardApp() {
       {/* Main Content - Desktop */}
       <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Configuration */}
-        <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden">
+        <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden" style={{ contain: 'strict' }}>
           {/* Card Type Selector */}
           <div className="p-4 border-b border-gray-800 shrink-0">
             <label className="text-xs text-gray-400 font-medium mb-2 block">Card Type</label>
@@ -521,7 +612,7 @@ export function BubbleCardApp() {
           </div>
           
           {/* Config Panel */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" style={{ contain: 'layout paint' }}>
             <BubbleConfigPanel 
               config={config as BubbleButtonConfig} 
               updateConfig={updateConfig}
@@ -543,7 +634,7 @@ export function BubbleCardApp() {
                   {currentCardType}
                 </span>
               </div>
-              <div className="flex-1 relative overflow-hidden z-0 w-full h-full min-h-0 min-w-0 flex items-center justify-center p-8">
+              <div className="flex-1 relative overflow-auto z-0 w-full min-h-0 min-w-0 flex items-center justify-center p-8">
                 <BubblePreview 
                   config={config} 
                   simulatedState={simulatedState}

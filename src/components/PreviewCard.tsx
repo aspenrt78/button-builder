@@ -4,6 +4,7 @@ import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDas
 import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
 import { getIconComponent } from '../services/iconMapper';
 import { isInHomeAssistant, fetchAllDashboardConfigs, DashboardConfig, DashboardGridConfig, parseBackgroundToCss } from '../services/dashboardService';
+import { haService, type HAEntity } from '../services/homeAssistantService';
 
 interface Props {
   config: ButtonConfig;
@@ -231,6 +232,39 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   // Custom background image upload
   const [customBackgroundName, setCustomBackgroundName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Label entity data
+  const [labelEntityData, setLabelEntityData] = useState<HAEntity | null>(null);
+  
+  // Custom field entity data (indexed by field index)
+  const [customFieldEntityData, setCustomFieldEntityData] = useState<Record<number, HAEntity | null>>({});
+  
+  // Fetch label entity data when labelEntity changes
+  useEffect(() => {
+    if (config.labelEntity) {
+      haService.getEntityData(config.labelEntity).then(data => {
+        setLabelEntityData(data);
+      });
+    } else {
+      setLabelEntityData(null);
+    }
+  }, [config.labelEntity]);
+
+  // Fetch custom field entity data when entities change
+  useEffect(() => {
+    const fetchAllEntityData = async () => {
+      const newData: Record<number, HAEntity | null> = {};
+      for (let i = 0; i < config.customFields.length; i++) {
+        const field = config.customFields[i];
+        if (field.type === 'entity' && field.entity) {
+          const data = await haService.getEntityData(field.entity);
+          newData[i] = data;
+        }
+      }
+      setCustomFieldEntityData(newData);
+    };
+    fetchAllEntityData();
+  }, [config.customFields.map(f => f.entity).join(',')]);
   
   // Handle file upload for custom background
   const handleBackgroundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -457,28 +491,45 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   const thresholdValue = getThresholdValue();
   const thresholdColor = getThresholdColor(thresholdValue);
 
-  // 1. Resolve Card Background
-  // Use appearance backgroundColor (set via state toggle) or fall back to base config
+  // 1. Resolve Card Background based on colorType
+  // colorType determines how entity color is applied:
+  // - 'card': Entity color fills the card background when auto + on
+  // - 'icon': Entity color only affects icon, not background
+  // - 'blank-card': No background (transparent)
+  // - 'label-card': Similar to card, entity color fills background
   let actualBgHex = matchingStateStyle?.backgroundColor || config.backgroundColor || '#1a1a1a';
   let actualBgOpacity = matchingStateStyle?.backgroundColorOpacity ?? config.backgroundColorOpacity ?? 100;
   
-  if (config.colorType === 'card' && config.colorAuto && isOn) {
-      actualBgHex = SIMULATED_ENTITY_COLOR; 
+  // Handle colorType for background
+  if (config.colorType === 'blank-card') {
+    // Blank card = transparent background
+    actualBgOpacity = 0;
+  } else if ((config.colorType === 'card' || config.colorType === 'label-card') && config.colorAuto && isOn) {
+    // Card and label-card: fill background with entity color when auto + on
+    actualBgHex = SIMULATED_ENTITY_COLOR; 
   }
+  // For 'icon' colorType, background stays as user-set (entity color goes to icon only)
 
   const actualBg = hexToRgba(actualBgHex, actualBgOpacity);
 
   // 2. Resolve Colors - Auto flag should use simulated entity color when ON
+  // For colorType 'icon', the icon gets entity color when colorAuto is true (takes precedence)
   // Also check matchingStateStyle for state-specific colors
   // Apply threshold color if enabled
+  
+  // colorType 'icon' with colorAuto should force icon to entity color, overriding other settings
+  const iconEntityColorOverride = config.colorType === 'icon' && config.colorAuto && isOn;
+  
   const actualIconColor = thresholdColor && config.thresholdColor.applyToIcon
     ? thresholdColor
-    : (matchingStateStyle?.iconColor || resolveColor(
-        config.iconColor, 
-        config.iconColorAuto, 
-        config.color || '#ffffff', 
-        isOn // Use simulated color when iconColorAuto is true AND state is ON
-      ));
+    : (iconEntityColorOverride 
+        ? SIMULATED_ENTITY_COLOR  // colorType 'icon' + colorAuto takes highest precedence
+        : (matchingStateStyle?.iconColor || resolveColor(
+            config.iconColor, 
+            config.iconColorAuto, 
+            config.color || '#ffffff', 
+            isOn // Use simulated color when iconColorAuto is true AND state is ON
+          )));
   
   const actualNameColor = thresholdColor && config.thresholdColor.applyToName
     ? thresholdColor
@@ -570,6 +621,10 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? stateExtraStylesParsed 
     : extraStylesParsed;
 
+  // Create a unique key for the card based on animation to force remount when animation changes
+  // This ensures CSS animations restart properly when switching between animated presets
+  const animationKey = effectiveExtraStyles.animation || config.extraStyles || '';
+
   // 7. Gradient Background
   const getGradientBackground = () => {
     // Check if gradient is enabled in state appearance or base config
@@ -617,10 +672,23 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   
   // Check if extraStyles has a background property to avoid React warning about conflicting styles
   const hasExtraBackground = 'background' in effectiveExtraStyles || 'backgroundImage' in effectiveExtraStyles;
+  
+  // Check if user explicitly set a backgroundColor via state appearance (should override preset background)
+  const userSetBackgroundColor = matchingStateStyle?.backgroundColor && matchingStateStyle.backgroundColor !== '';
+  
+  // Filter out background/backgroundImage from extraStyles if user explicitly set a backgroundColor
+  // This allows user's backgroundColor to take precedence over preset animations/gradients
+  const filteredExtraStyles: React.CSSProperties = userSetBackgroundColor && hasExtraBackground
+    ? Object.fromEntries(
+        Object.entries(effectiveExtraStyles).filter(([key]) => 
+          key !== 'background' && key !== 'backgroundImage' && key !== 'backgroundColor'
+        )
+      )
+    : effectiveExtraStyles;
 
   const containerStyle: React.CSSProperties = {
-    // Only set backgroundColor if no gradient and no extraStyles background
-    ...((!gradientBg && !hasExtraBackground) ? { backgroundColor: actualBg } : {}),
+    // Set backgroundColor if: no gradient AND (no extraStyles background OR user explicitly set one)
+    ...((!gradientBg && (!hasExtraBackground || userSetBackgroundColor)) ? { backgroundColor: actualBg } : {}),
     // Only set background if gradient is enabled
     ...(gradientBg ? { background: gradientBg } : {}),
     color: config.color || '#ffffff',  // Default text color, overridden by individual element colors
@@ -657,8 +725,8 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     // Only set animationDuration if we have a cardAnimationClass (avoid overriding extraStyles animation)
     ...(cardAnimationClass ? { animationDuration: cardAnimationDuration } : {}),
     // Apply extra styles LAST so they can override defaults
-    // Use effectiveExtraStyles which respects state-specific styles from preset conditions
-    ...effectiveExtraStyles,
+    // Use filteredExtraStyles which removes background if user explicitly set backgroundColor
+    ...filteredExtraStyles,
   };
 
   // Calculate canvas style - support both color and background image
@@ -969,9 +1037,10 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
         {/* Main Card */}
         <div 
+          key={animationKey}
           style={containerStyle}
           className={`hover:brightness-110 ${config.aspectRatio ? '' : 'w-full'} ${cardAnimationClass} group`}
-          onClick={() => setSimulatedState(s => s === 'on' ? 'off' : 'on')}
+          onClick={() => setSimulatedState(simulatedState === 'on' ? 'off' : 'on')}
           title={config.tooltip.enabled ? config.tooltip.content : undefined}
         >
            {/* Tooltip */}
@@ -1034,7 +1103,11 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
           {config.showLabel && (
             <div style={{ gridArea: 'l', color: actualLabelColor, opacity: 0.7, fontSize: '0.8em' }} className="text-center px-1 truncate w-full">
               {config.labelEntity 
-                ? getDomainStateDisplay(config.labelEntity, simulatedState, config.labelAttribute)
+                ? (labelEntityData 
+                    ? (config.labelAttribute 
+                        ? (labelEntityData.attributes?.[config.labelAttribute] || config.labelAttribute)
+                        : labelEntityData.state)
+                    : getDomainStateDisplay(config.labelEntity, simulatedState, config.labelAttribute))
                 : config.label || 'Label Text'}
             </div>
           )}
@@ -1062,7 +1135,15 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
                   />
                 )}
                 <span className="ml-1">
-                  {field.prefix}{field.type === 'entity' ? getDomainStateDisplay(field.entity || config.entity, simulatedState, field.attribute) : field.value}{field.suffix}
+                  {field.prefix}
+                  {field.type === 'entity' 
+                    ? (customFieldEntityData[idx]
+                        ? (field.attribute 
+                            ? (customFieldEntityData[idx]?.attributes?.[field.attribute] || field.attribute)
+                            : customFieldEntityData[idx]?.state)
+                        : getDomainStateDisplay(field.entity || config.entity, simulatedState, field.attribute))
+                    : field.value}
+                  {field.suffix}
                 </span>
               </div>
             ))

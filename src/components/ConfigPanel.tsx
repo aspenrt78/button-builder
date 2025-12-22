@@ -1,14 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ButtonConfig, CustomField, Variable, StateStyleConfig, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG, DEFAULT_TOAST_CONFIG, StateAppearanceConfig, DEFAULT_STATE_APPEARANCE, ThresholdColorConfig, DEFAULT_THRESHOLD_CONFIG } from '../types';
 import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
-import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge } from 'lucide-react';
+import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge, Search, AlertCircle } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
+import { haService } from '../services/homeAssistantService';
 import { PRESETS, Preset, generateDarkModePreset } from '../presets';
+import { validateCss, formatValidationResults } from '../utils/cssValidator';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -239,16 +241,17 @@ export const ConfigPanel: React.FC<Props> = ({
   const currentAppearance = editingState === 'on' ? onStateAppearance : offStateAppearance;
   const setCurrentAppearance = editingState === 'on' ? onSetOnStateAppearance : onSetOffStateAppearance;
   
-  // Update appearance for current editing state
+  // Update appearance for current editing state - uses functional update to handle rapid successive calls
   const updateAppearance = (key: keyof StateAppearanceConfig, value: any) => {
     if (setCurrentAppearance) {
+      // Use functional update to avoid stale state when multiple updates happen in sequence
       setCurrentAppearance(prev => ({ ...prev, [key]: value }));
     }
   };
   
   // Get value from current appearance or fall back to config
   const getAppearanceValue = <K extends keyof StateAppearanceConfig>(key: K): StateAppearanceConfig[K] => {
-    const appearanceValue = currentAppearance[key];
+    const appearanceValue = (currentAppearance as StateAppearanceConfig)[key];
     if (appearanceValue !== undefined && appearanceValue !== '') {
       return appearanceValue as StateAppearanceConfig[K];
     }
@@ -263,8 +266,51 @@ export const ConfigPanel: React.FC<Props> = ({
   const { nav, goBack, selectCategory, selectSection } = useNavigation();
   const showSection = (sectionId: SectionId) => nav.level === 'content' && nav.sectionId === sectionId;
   
+  // Preset search state
+  const [presetSearch, setPresetSearch] = useState('');
+  
+  // CSS validation for extraStyles
+  const cssValidation = useMemo(() => {
+    if (!config.extraStyles) return null;
+    const result = validateCss(config.extraStyles);
+    return (result.errors.length > 0 || result.warnings.length > 0) ? result : null;
+  }, [config.extraStyles]);
+  
   // Grid designer modal state
   const [showGridDesigner, setShowGridDesigner] = useState(false);
+
+  // Label entity attributes
+  const [labelEntityAttributes, setLabelEntityAttributes] = useState<string[]>([]);
+  
+  // Custom field entity attributes (indexed by field index)
+  const [customFieldAttributes, setCustomFieldAttributes] = useState<Record<number, string[]>>({});
+
+  // Fetch label entity attributes when labelEntity changes
+  useEffect(() => {
+    if (config.labelEntity) {
+      haService.getEntityAttributes(config.labelEntity).then(attrs => {
+        setLabelEntityAttributes(attrs);
+      });
+    } else {
+      setLabelEntityAttributes([]);
+    }
+  }, [config.labelEntity]);
+
+  // Fetch custom field entity attributes when entities change
+  useEffect(() => {
+    const fetchAllAttributes = async () => {
+      const newAttributes: Record<number, string[]> = {};
+      for (let i = 0; i < config.customFields.length; i++) {
+        const field = config.customFields[i];
+        if (field.type === 'entity' && field.entity) {
+          const attrs = await haService.getEntityAttributes(field.entity);
+          newAttributes[i] = attrs;
+        }
+      }
+      setCustomFieldAttributes(newAttributes);
+    };
+    fetchAllAttributes();
+  }, [config.customFields.map(f => f.entity).join(',')]);
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
@@ -281,7 +327,7 @@ export const ConfigPanel: React.FC<Props> = ({
         <div className="flex-1 p-4 space-y-4 overflow-y-auto">
           
           {/* State Editing Toggle - Shows for appearance-related sections */}
-          {(showSection('colors') || showSection('glass') || showSection('borders') || showSection('animations') || showSection('typography') || showSection('stateStyles')) && (
+          {(showSection('colors') || showSection('glass') || showSection('borders') || showSection('animations') || showSection('typography')) && (
             <div className="mb-4 p-3 bg-gradient-to-r from-blue-900/30 to-gray-900/30 border border-blue-500/30 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
@@ -319,6 +365,26 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== PRESETS > GALLERY ===== */}
           {showSection('presetGallery') && (
             <>
+              {/* Preset Search */}
+              <div className="relative mb-4">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  value={presetSearch}
+                  onChange={(e) => setPresetSearch(e.target.value)}
+                  placeholder="Search presets..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-8 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                />
+                {presetSearch && (
+                  <button
+                    onClick={() => setPresetSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              
               {/* Current Preset Info */}
               {activePreset && (
                 <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg mb-4">
@@ -332,29 +398,50 @@ export const ConfigPanel: React.FC<Props> = ({
               )}
               
               {/* Preset Gallery */}
-              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => (
-                <div key={category} className="mb-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2 sticky top-0 bg-gray-900 py-1">
-                    {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category.charAt(0).toUpperCase() + category.slice(1)}
-                  </p>
-                  <div className="grid grid-cols-1 gap-1">
-                    {PRESETS.filter(p => p.category === category).map(preset => (
-                      <button
-                        key={preset.name}
-                        onClick={() => onApplyPreset?.(preset)}
-                        className={`w-full px-3 py-2 text-left rounded transition-colors ${
-                          activePreset?.name === preset.name
-                            ? 'bg-purple-500/20 border border-purple-500/50'
-                            : 'hover:bg-gray-800 border border-transparent'
-                        }`}
-                      >
-                        <div className="text-sm text-white font-medium">{preset.name}</div>
-                        <div className="text-[10px] text-gray-500">{preset.description}</div>
-                      </button>
-                    ))}
+              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => {
+                const filteredPresets = PRESETS.filter(p => {
+                  if (p.category !== category) return false;
+                  if (!presetSearch) return true;
+                  const query = presetSearch.toLowerCase();
+                  return p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query);
+                });
+                if (filteredPresets.length === 0) return null;
+                
+                return (
+                  <div key={category} className="mb-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2 sticky top-0 bg-gray-900 py-1">
+                      {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category.charAt(0).toUpperCase() + category.slice(1)}
+                    </p>
+                    <div className="grid grid-cols-1 gap-1">
+                      {filteredPresets.map(preset => (
+                        <button
+                          key={preset.name}
+                          onClick={() => onApplyPreset?.(preset)}
+                          className={`w-full px-3 py-2 text-left rounded transition-colors ${
+                            activePreset?.name === preset.name
+                              ? 'bg-purple-500/20 border border-purple-500/50'
+                              : 'hover:bg-gray-800 border border-transparent'
+                          }`}
+                        >
+                          <div className="text-sm text-white font-medium">{preset.name}</div>
+                          <div className="text-[10px] text-gray-500">{preset.description}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                );
+              })}
+              
+              {/* No results message */}
+              {presetSearch && PRESETS.filter(p => {
+                const query = presetSearch.toLowerCase();
+                return p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query);
+              }).length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-sm">No presets found</p>
+                  <p className="text-gray-500 text-xs mt-1">Try a different search term</p>
                 </div>
-              ))}
+              )}
             </>
           )}
 
@@ -587,10 +674,32 @@ export const ConfigPanel: React.FC<Props> = ({
                   if (v && !config.showLabel) {
                     update('showLabel', true);
                   }
+                  // Clear attribute when entity changes
+                  if (config.labelAttribute) {
+                    update('labelAttribute', '');
+                  }
                 }}
                 allowAll={true}
               />
-              <ControlInput label="Attribute (optional)" value={config.labelAttribute} onChange={(v) => update('labelAttribute', v)} placeholder="temperature, brightness, etc." />
+              {labelEntityAttributes.length > 0 ? (
+                <ControlInput 
+                  type="select" 
+                  label="Attribute (optional)" 
+                  value={config.labelAttribute} 
+                  options={[
+                    { value: '', label: '-- Entity State --' },
+                    ...labelEntityAttributes.map(attr => ({ value: attr, label: attr }))
+                  ]}
+                  onChange={(v) => update('labelAttribute', v)} 
+                />
+              ) : (
+                <ControlInput 
+                  label="Attribute (optional)" 
+                  value={config.labelAttribute} 
+                  onChange={(v) => update('labelAttribute', v)} 
+                  placeholder="temperature, brightness, etc." 
+                />
+              )}
               <p className="text-[10px] text-gray-500 -mt-1">Leave attribute empty to show entity state. Examples: temperature, brightness, battery</p>
             </div>
           </div>
@@ -900,20 +1009,20 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput type="checkbox" label="" value={!!getAppearanceValue('gradientEnabled')} onChange={(v) => {
                     // When enabling gradient, clear solid background color and set defaults
                     if (v) {
-                      if (setCurrentAppearance) {
-                        setCurrentAppearance(prev => ({ 
-                          ...prev, 
+                      if (setCurrentAppearance && currentAppearance) {
+                        setCurrentAppearance({ 
+                          ...currentAppearance, 
                           gradientEnabled: true,
                           backgroundColor: '',
                           backgroundColorOpacity: 100,
-                          gradientType: prev.gradientType || DEFAULT_STATE_APPEARANCE.gradientType,
-                          gradientAngle: prev.gradientAngle ?? DEFAULT_STATE_APPEARANCE.gradientAngle,
-                          gradientColor1: prev.gradientColor1 || DEFAULT_STATE_APPEARANCE.gradientColor1,
-                          gradientColor2: prev.gradientColor2 || DEFAULT_STATE_APPEARANCE.gradientColor2,
-                          gradientColor3: prev.gradientColor3 || DEFAULT_STATE_APPEARANCE.gradientColor3,
-                          gradientColor3Enabled: prev.gradientColor3Enabled ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled,
-                          gradientOpacity: prev.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
-                        }));
+                          gradientType: currentAppearance.gradientType || DEFAULT_STATE_APPEARANCE.gradientType,
+                          gradientAngle: currentAppearance.gradientAngle ?? DEFAULT_STATE_APPEARANCE.gradientAngle,
+                          gradientColor1: currentAppearance.gradientColor1 || DEFAULT_STATE_APPEARANCE.gradientColor1,
+                          gradientColor2: currentAppearance.gradientColor2 || DEFAULT_STATE_APPEARANCE.gradientColor2,
+                          gradientColor3: currentAppearance.gradientColor3 || DEFAULT_STATE_APPEARANCE.gradientColor3,
+                          gradientColor3Enabled: currentAppearance.gradientColor3Enabled ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled,
+                          gradientOpacity: currentAppearance.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
+                        });
                       }
                       // Also clear base config backgroundColor so it doesn't output in base styles
                       update('backgroundColor', '');
@@ -1323,8 +1432,6 @@ export const ConfigPanel: React.FC<Props> = ({
            </div>
             </>
           )}
-
-          {/* State Styles section has been moved to Colors section */}
 
           {/* ===== APPEARANCE > THRESHOLD ALERTS ===== */}
           {showSection('thresholdColors') && (
@@ -2073,17 +2180,39 @@ export const ConfigPanel: React.FC<Props> = ({
                               value={field.entity || ''} 
                               onChange={(v) => {
                                 const updated = [...config.customFields];
-                                updated[idx] = { ...field, entity: v };
+                                updated[idx] = { ...field, entity: v, attribute: '' };
                                 update('customFields', updated);
                               }}
                               allowAll={true}
                             />
                             <div className="grid grid-cols-2 gap-2">
-                              <ControlInput label="Attribute (optional)" value={field.attribute || ''} onChange={(v) => {
-                                const updated = [...config.customFields];
-                                updated[idx] = { ...field, attribute: v };
-                                update('customFields', updated);
-                              }} placeholder="temperature, battery..." />
+                              {customFieldAttributes[idx]?.length > 0 ? (
+                                <ControlInput 
+                                  type="select"
+                                  label="Attribute (optional)" 
+                                  value={field.attribute || ''} 
+                                  options={[
+                                    { value: '', label: '-- Entity State --' },
+                                    ...customFieldAttributes[idx].map(attr => ({ value: attr, label: attr }))
+                                  ]}
+                                  onChange={(v) => {
+                                    const updated = [...config.customFields];
+                                    updated[idx] = { ...field, attribute: v };
+                                    update('customFields', updated);
+                                  }}
+                                />
+                              ) : (
+                                <ControlInput 
+                                  label="Attribute (optional)" 
+                                  value={field.attribute || ''} 
+                                  onChange={(v) => {
+                                    const updated = [...config.customFields];
+                                    updated[idx] = { ...field, attribute: v };
+                                    update('customFields', updated);
+                                  }} 
+                                  placeholder="temperature, battery..." 
+                                />
+                              )}
                               <ControlInput label="Icon (optional)" value={field.icon || ''} onChange={(v) => {
                                 const updated = [...config.customFields];
                                 updated[idx] = { ...field, icon: v };
@@ -2217,8 +2346,30 @@ export const ConfigPanel: React.FC<Props> = ({
                 value={config.extraStyles}
                 onChange={(e) => update('extraStyles', e.target.value)}
                 placeholder="card:\n  - background: linear-gradient(...)\nicon:\n  - transform: rotate(45deg)"
-                className="w-full h-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-none"
+                className={`w-full h-24 bg-gray-800 border rounded px-3 py-2 text-xs text-white font-mono focus:outline-none resize-none ${
+                  cssValidation?.errors.length ? 'border-red-500/50 focus:border-red-500' : 
+                  cssValidation?.warnings.length ? 'border-yellow-500/50 focus:border-yellow-500' : 
+                  'border-gray-700 focus:border-blue-500'
+                }`}
               />
+              {cssValidation && (
+                <div className={`mt-2 p-2 rounded text-[10px] ${
+                  cssValidation.errors.length ? 'bg-red-900/20 border border-red-800 text-red-400' : 
+                  'bg-yellow-900/20 border border-yellow-800 text-yellow-400'
+                }`}>
+                  <div className="flex items-start gap-1.5">
+                    <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      {cssValidation.errors.map((err, i) => (
+                        <div key={`err-${i}`}>Line {err.line}: {err.message}</div>
+                      ))}
+                      {cssValidation.warnings.map((warn, i) => (
+                        <div key={`warn-${i}`}>Line {warn.line}: {warn.message}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div>

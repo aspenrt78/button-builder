@@ -1,10 +1,65 @@
 // Main App - Card Type Selector Wrapper
 // Allows switching between Button Card Builder and Bubble Card Builder
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { ButtonCardApp } from './ButtonCardApp';
 import { BubbleCardApp } from './bubble-card/BubbleCardApp';
-import { Layers } from 'lucide-react';
+import { Layers, AlertTriangle, RefreshCw } from 'lucide-react';
+
+// Global Error Boundary to catch any rendering errors
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+}
+
+class GlobalErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('App Error:', error);
+    console.error('Component Stack:', errorInfo.componentStack);
+    this.setState({ errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-white p-8">
+          <div className="max-w-lg text-center">
+            <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-red-400 mb-2">Something went wrong</h1>
+            <p className="text-gray-300 mb-4 text-sm">
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            <pre className="text-left text-xs bg-gray-800 p-3 rounded mb-4 overflow-auto max-h-40 text-gray-400">
+              {this.state.errorInfo?.componentStack || 'No stack trace available'}
+            </pre>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null, errorInfo: null });
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 mx-auto"
+            >
+              <RefreshCw size={16} />
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 type CardType = 'button-card' | 'bubble-card';
 
@@ -68,11 +123,13 @@ const App: React.FC = () => {
 
       {/* Selected Card Builder */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {cardType === 'button-card' ? (
-          <ButtonCardApp />
-        ) : (
-          <BubbleCardApp />
-        )}
+        <GlobalErrorBoundary>
+          {cardType === 'button-card' ? (
+            <ButtonCardApp />
+          ) : (
+            <BubbleCardApp />
+          )}
+        </GlobalErrorBoundary>
       </div>
     </div>
   );

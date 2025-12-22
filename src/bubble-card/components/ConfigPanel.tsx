@@ -1,6 +1,6 @@
 // Bubble Card Config Panel - Enhanced with full customization
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BubbleButtonConfig, 
   BubbleSubButton, 
@@ -8,6 +8,7 @@ import {
   BubbleActionType,
   BubbleConfig,
   BubbleCardType,
+  BubbleHorizontalButton,
 } from '../types';
 import { 
   BUTTON_TYPE_OPTIONS, 
@@ -18,6 +19,8 @@ import {
   DEFAULT_ACTION
 } from '../constants';
 import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Palette, Zap, Layout, Eye, Sliders, MousePointer, Sparkles, Search, X, Home, Thermometer, Music, Blinds, Calendar, Layers, Puzzle } from 'lucide-react';
+import { EntitySelector } from '../../components/EntitySelector';
+import { haService } from '../../services/homeAssistantService';
 
 interface ConfigPanelProps {
   config: BubbleConfig;
@@ -238,7 +241,7 @@ function ControlInput({ label, type, value, onChange, options, placeholder, min,
       <input
         type={type}
         id={id}
-        value={value ?? ''}
+        value={typeof value === 'boolean' ? String(value) : (value ?? '')}
         onChange={(e) => onChange(type === 'number' ? (e.target.value === '' ? undefined : Number(e.target.value)) : e.target.value)}
         placeholder={placeholder}
         min={min}
@@ -286,7 +289,7 @@ function Section({ title, icon, children, defaultOpen = true, badge }: SectionPr
         </span>
       </button>
       {isOpen && (
-        <div className="px-4 pb-4 space-y-3 animate-in slide-in-from-top-1 duration-200">
+        <div className="px-4 pb-4 space-y-3">
           {children}
         </div>
       )}
@@ -831,15 +834,642 @@ function HorizontalButtonsEditor({ buttons, onChange }: HorizontalButtonsEditorP
 }
 
 // ============================================
+// STATE APPEARANCE BUILDER
+// ============================================
+
+interface StateAppearanceBuilderProps {
+  entityId: string;
+  appendSnippet: (snippet: string) => void;
+}
+
+interface StateConfig {
+  color?: string;
+  icon?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+}
+
+function StateAppearanceBuilder({ entityId, appendSnippet }: StateAppearanceBuilderProps) {
+  const [states, setStates] = useState<Record<string, StateConfig>>({});
+  const [currentState, setCurrentState] = useState('on');
+  const [showConfig, setShowConfig] = useState(false);
+
+  const commonStates = ['on', 'off', 'unavailable', 'unknown', 'idle', 'playing', 'paused', 'locked', 'unlocked', 'open', 'closed', 'home', 'away'];
+
+  const applyStateStyles = () => {
+    const stateEntries = Object.entries(states).filter(([_, config]: [string, StateConfig]) => 
+      config.color || config.icon || config.backgroundColor || config.borderColor
+    );
+
+    if (stateEntries.length === 0) return;
+
+    let snippet = '';
+    
+    // Generate icon color conditions
+    const colorStates = stateEntries.filter(([_, c]: [string, StateConfig]) => c.color);
+    if (colorStates.length > 0) {
+      snippet += '.bubble-icon {\n  color:';
+      colorStates.forEach(([state, config]: [string, StateConfig], idx) => {
+        const condition = `hass.states["${entityId}"]?.state === "${state}"`;
+        snippet += ` \${${condition} ? "${config.color}"`;
+      });
+      snippet += ' : ""}';
+      for (let i = 0; i < colorStates.length; i++) snippet += '}';
+      snippet += ' !important;\n}\n\n';
+    }
+
+    // Generate background color conditions
+    const bgStates = stateEntries.filter(([_, c]: [string, StateConfig]) => c.backgroundColor);
+    if (bgStates.length > 0) {
+      snippet += '.bubble-button-background {\n  background:';
+      bgStates.forEach(([state, config]: [string, StateConfig], idx) => {
+        const condition = `hass.states["${entityId}"]?.state === "${state}"`;
+        snippet += ` \${${condition} ? "${config.backgroundColor}"`;
+      });
+      snippet += ' : ""}';
+      for (let i = 0; i < bgStates.length; i++) snippet += '}';
+      snippet += ' !important;\n}\n\n';
+    }
+
+    // Generate border color conditions
+    const borderStates = stateEntries.filter(([_, c]: [string, StateConfig]) => c.borderColor);
+    if (borderStates.length > 0) {
+      snippet += '.bubble-button-card-container {\n  border:';
+      borderStates.forEach(([state, config]: [string, StateConfig], idx) => {
+        const condition = `hass.states["${entityId}"]?.state === "${state}"`;
+        snippet += ` \${${condition} ? "2px solid ${config.borderColor}"`;
+      });
+      snippet += ' : "2px solid transparent"}';
+      for (let i = 0; i < borderStates.length; i++) snippet += '}';
+      snippet += ' !important;\n}';
+    }
+
+    if (snippet) {
+      appendSnippet(snippet.trim());
+    }
+  };
+
+  const updateStateConfig = (state: string, key: string, value: string) => {
+    setStates({
+      ...states,
+      [state]: {
+        ...states[state],
+        [key]: value || undefined,
+      }
+    });
+  };
+
+  const removeState = (state: string) => {
+    const newStates = { ...states };
+    delete newStates[state];
+    setStates(newStates);
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-gray-500">
+        {entityId ? `Configure appearance for different states of ${entityId}` : 'Set an entity to configure state-based appearance'}
+      </p>
+
+      {!entityId && (
+        <div className="p-3 bg-yellow-900/20 border border-yellow-700/50 rounded-lg text-xs text-yellow-200">
+          Please set an entity on the card to use state-based appearance
+        </div>
+      )}
+
+      {entityId && (
+        <>
+          {/* State Selector */}
+          <div className="flex gap-2">
+            <select
+              value={currentState}
+              onChange={(e) => setCurrentState(e.target.value)}
+              className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            >
+              <optgroup label="Common States">
+                {commonStates.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </optgroup>
+              <option value="custom">Custom State...</option>
+            </select>
+            <button
+              onClick={() => setShowConfig(!showConfig)}
+              className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium"
+            >
+              {showConfig ? 'Hide' : 'Configure'}
+            </button>
+          </div>
+
+          {/* State Configuration */}
+          {showConfig && (
+            <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-3">
+              {currentState === 'custom' ? (
+                <input
+                  type="text"
+                  placeholder="Enter custom state (e.g., playing, heating)"
+                  onBlur={(e) => {
+                    if (e.target.value) {
+                      setCurrentState(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                />
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-gray-300">Styling for "{currentState}" state</p>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Icon Color</label>
+                      <input
+                        type="text"
+                        value={states[currentState]?.color || ''}
+                        onChange={(e) => updateStateConfig(currentState, 'color', e.target.value)}
+                        placeholder="red, #ff0000"
+                        className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Background</label>
+                      <input
+                        type="text"
+                        value={states[currentState]?.backgroundColor || ''}
+                        onChange={(e) => updateStateConfig(currentState, 'backgroundColor', e.target.value)}
+                        placeholder="rgba(255,0,0,0.2)"
+                        className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="text-xs text-gray-400 mb-1 block">Border Color</label>
+                      <input
+                        type="text"
+                        value={states[currentState]?.borderColor || ''}
+                        onChange={(e) => updateStateConfig(currentState, 'borderColor', e.target.value)}
+                        placeholder="red, #ff0000"
+                        className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {states[currentState] && Object.values(states[currentState]).some(v => v) && (
+                    <button
+                      onClick={() => removeState(currentState)}
+                      className="w-full px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-300 rounded"
+                    >
+                      Clear "{currentState}" Styles
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Configured States */}
+          {Object.keys(states).length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-400 font-medium">Configured States ({Object.keys(states).length})</p>
+                <button
+                  onClick={applyStateStyles}
+                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium"
+                >
+                  Generate Styles
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(states).map(([state, config]: [string, StateConfig]) => (
+                  <div key={state} className="p-2 bg-gray-800/50 rounded border border-gray-700">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-cyan-400">{state}</span>
+                      <button
+                        onClick={() => removeState(state)}
+                        className="p-0.5 hover:bg-red-900/30 rounded text-red-400"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    <div className="space-y-0.5 text-[10px] text-gray-400">
+                      {config.color && <div>Icon: <span className="text-gray-300">{config.color}</span></div>}
+                      {config.backgroundColor && <div>BG: <span className="text-gray-300">{config.backgroundColor}</span></div>}
+                      {config.borderColor && <div>Border: <span className="text-gray-300">{config.borderColor}</span></div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Presets */}
+          <div className="pt-2 border-t border-gray-700">
+            <p className="text-xs text-gray-400 font-medium mb-2">Quick Presets</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setStates({
+                    on: { color: 'var(--bubble-accent-color)', backgroundColor: 'var(--bubble-accent-color)' },
+                    off: { color: 'var(--primary-text-color)', backgroundColor: '' }
+                  });
+                }}
+                className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+              >
+                On/Off Basic
+              </button>
+              <button
+                onClick={() => {
+                  setStates({
+                    on: { borderColor: 'green' },
+                    off: { borderColor: 'gray' },
+                    unavailable: { borderColor: 'red' }
+                  });
+                }}
+                className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+              >
+                Status Borders
+              </button>
+              <button
+                onClick={() => {
+                  setStates({
+                    home: { color: 'green', borderColor: 'green' },
+                    away: { color: 'orange', borderColor: 'orange' },
+                    unknown: { color: 'gray', borderColor: 'gray' }
+                  });
+                }}
+                className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+              >
+                Presence
+              </button>
+              <button
+                onClick={() => setStates({})}
+                className="px-2 py-1 text-xs bg-red-800/40 hover:bg-red-800/60 text-red-200 rounded"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// CONDITIONAL STYLING BUILDER
+// ============================================
+
+interface ConditionalRule {
+  id: string;
+  entity: string;
+  attribute?: string;
+  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains';
+  value: string;
+  cssTarget: string;
+  cssProperty: string;
+  cssValue: string;
+  elseValue?: string;
+}
+
+interface ConditionalStylingBuilderProps {
+  appendSnippet: (snippet: string) => void;
+}
+
+function ConditionalStylingBuilder({ appendSnippet }: ConditionalStylingBuilderProps) {
+  const [rules, setRules] = useState<ConditionalRule[]>([]);
+  const [currentRule, setCurrentRule] = useState<Partial<ConditionalRule>>({
+    entity: '',
+    operator: 'equals',
+    value: '',
+    cssTarget: '.bubble-button-card-container',
+    cssProperty: 'background',
+    cssValue: '',
+  });
+  const [entityAttributes, setEntityAttributes] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (currentRule.entity) {
+      loadEntityAttributes(currentRule.entity);
+    }
+  }, [currentRule.entity]);
+
+  const loadEntityAttributes = async (entityId: string) => {
+    try {
+      const attrs = await haService.getEntityAttributes(entityId);
+      setEntityAttributes(attrs);
+    } catch (error) {
+      setEntityAttributes([]);
+    }
+  };
+
+  const generateCondition = (rule: ConditionalRule): string => {
+    const entityRef = `hass.states["${rule.entity}"]`;
+    const valueRef = rule.attribute ? `${entityRef}?.attributes?.${rule.attribute}` : `${entityRef}?.state`;
+    
+    let condition = '';
+    switch (rule.operator) {
+      case 'equals':
+        condition = `${valueRef} === "${rule.value}"`;
+        break;
+      case 'not_equals':
+        condition = `${valueRef} !== "${rule.value}"`;
+        break;
+      case 'greater_than':
+        condition = `Number(${valueRef}) > ${rule.value}`;
+        break;
+      case 'less_than':
+        condition = `Number(${valueRef}) < ${rule.value}`;
+        break;
+      case 'contains':
+        condition = `String(${valueRef}).includes("${rule.value}")`;
+        break;
+    }
+    
+    return condition;
+  };
+
+  const generateSnippet = (rule: ConditionalRule): string => {
+    const condition = generateCondition(rule);
+    const elseVal = rule.elseValue || '""';
+    return `${rule.cssTarget} {\n  ${rule.cssProperty}: \${${condition} ? "${rule.cssValue}" : ${elseVal}} !important;\n}`;
+  };
+
+  const addRule = () => {
+    if (!currentRule.entity || !currentRule.value || !currentRule.cssProperty || !currentRule.cssValue) {
+      return;
+    }
+
+    const rule: ConditionalRule = {
+      id: Date.now().toString(),
+      entity: currentRule.entity,
+      attribute: currentRule.attribute,
+      operator: currentRule.operator || 'equals',
+      value: currentRule.value,
+      cssTarget: currentRule.cssTarget || '.bubble-button-card-container',
+      cssProperty: currentRule.cssProperty,
+      cssValue: currentRule.cssValue,
+      elseValue: currentRule.elseValue,
+    };
+
+    const snippet = generateSnippet(rule);
+    appendSnippet(snippet);
+    setRules([...rules, rule]);
+    
+    // Reset form
+    setCurrentRule({
+      entity: '',
+      operator: 'equals',
+      value: '',
+      cssTarget: '.bubble-button-card-container',
+      cssProperty: 'background',
+      cssValue: '',
+    });
+    setEntityAttributes([]);
+  };
+
+  const removeRule = (id: string) => {
+    setRules(rules.filter(r => r.id !== id));
+  };
+
+  const cssTargets = [
+    { value: '.bubble-button-card-container', label: 'Card Container' },
+    { value: '.bubble-icon', label: 'Icon' },
+    { value: '.bubble-name', label: 'Name' },
+    { value: '.bubble-state', label: 'State' },
+    { value: '.bubble-button-background', label: 'Background' },
+    { value: '.bubble-sub-button', label: 'All Sub-buttons' },
+    { value: '.bubble-sub-button-1', label: 'Sub-button 1' },
+    { value: '.bubble-sub-button-2', label: 'Sub-button 2' },
+    { value: '.bubble-sub-button-3', label: 'Sub-button 3' },
+    { value: '.bubble-sub-button-4', label: 'Sub-button 4' },
+  ];
+
+  const cssProperties = [
+    { value: 'background', label: 'Background' },
+    { value: 'color', label: 'Color' },
+    { value: 'border', label: 'Border' },
+    { value: 'box-shadow', label: 'Shadow' },
+    { value: 'opacity', label: 'Opacity' },
+    { value: 'display', label: 'Display' },
+    { value: 'filter', label: 'Filter' },
+    { value: 'transform', label: 'Transform' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-gray-500">Style the card based on other entity states and attributes</p>
+      
+      {/* Rule Builder */}
+      <div className="p-3 bg-gray-800/50 rounded-lg space-y-3 border border-gray-700">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="col-span-2">
+            <label className="text-xs text-gray-400 mb-1 block">Condition Entity</label>
+            <EntitySelector
+              value={currentRule.entity || ''}
+              onChange={(v) => setCurrentRule({ ...currentRule, entity: v })}
+              placeholder="sensor.temperature"
+              allowAll={true}
+            />
+          </div>
+
+          {entityAttributes.length > 0 && (
+            <div className="col-span-2">
+              <label className="text-xs text-gray-400 mb-1 block">Attribute (optional - leave empty for state)</label>
+              <select
+                value={currentRule.attribute || ''}
+                onChange={(e) => setCurrentRule({ ...currentRule, attribute: e.target.value || undefined })}
+                className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+              >
+                <option value="">Use entity state</option>
+                {entityAttributes.map(attr => (
+                  <option key={attr} value={attr}>{attr}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Operator</label>
+            <select
+              value={currentRule.operator || 'equals'}
+              onChange={(e) => setCurrentRule({ ...currentRule, operator: e.target.value as any })}
+              className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            >
+              <option value="equals">Equals</option>
+              <option value="not_equals">Not Equals</option>
+              <option value="greater_than">Greater Than</option>
+              <option value="less_than">Less Than</option>
+              <option value="contains">Contains</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Value</label>
+            <input
+              type="text"
+              value={currentRule.value || ''}
+              onChange={(e) => setCurrentRule({ ...currentRule, value: e.target.value })}
+              placeholder="on, 25, etc"
+              className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Target Element</label>
+            <select
+              value={currentRule.cssTarget || '.bubble-button-card-container'}
+              onChange={(e) => setCurrentRule({ ...currentRule, cssTarget: e.target.value })}
+              className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            >
+              {cssTargets.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">CSS Property</label>
+            <select
+              value={currentRule.cssProperty || 'background'}
+              onChange={(e) => setCurrentRule({ ...currentRule, cssProperty: e.target.value })}
+              className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            >
+              {cssProperties.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Value When True</label>
+            <input
+              type="text"
+              value={currentRule.cssValue || ''}
+              onChange={(e) => setCurrentRule({ ...currentRule, cssValue: e.target.value })}
+              placeholder="red, none, 1, etc"
+              className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Value When False (optional)</label>
+            <input
+              type="text"
+              value={currentRule.elseValue || ''}
+              onChange={(e) => setCurrentRule({ ...currentRule, elseValue: e.target.value })}
+              placeholder="Leave empty or specify"
+              className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={addRule}
+          disabled={!currentRule.entity || !currentRule.value || !currentRule.cssProperty || !currentRule.cssValue}
+          className="w-full px-3 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+        >
+          <Plus size={14} />
+          Add Conditional Style
+        </button>
+      </div>
+
+      {/* Active Rules */}
+      {rules.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400 font-medium">Active Conditionals ({rules.length})</p>
+          {rules.map(rule => (
+            <div key={rule.id} className="flex items-center gap-2 p-2 bg-gray-800/50 rounded border border-gray-700">
+              <div className="flex-1 text-xs text-gray-300">
+                <span className="text-cyan-400">{rule.entity}</span>
+                {rule.attribute && <span className="text-gray-500">.{rule.attribute}</span>}
+                {' '}<span className="text-gray-500">{rule.operator}</span>{' '}
+                <span className="text-yellow-400">"{rule.value}"</span>
+                {' → '}
+                <span className="text-purple-400">{rule.cssProperty}</span>
+                {': '}
+                <span className="text-green-400">{rule.cssValue}</span>
+              </div>
+              <button
+                onClick={() => removeRule(rule.id)}
+                className="p-1 hover:bg-red-900/30 rounded text-red-400"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Quick Examples */}
+      <div className="pt-2 border-t border-gray-700">
+        <p className="text-xs text-gray-400 font-medium mb-2">Quick Examples</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setCurrentRule({
+                entity: 'binary_sensor.front_door',
+                operator: 'equals',
+                value: 'on',
+                cssTarget: '.bubble-button-card-container',
+                cssProperty: 'border',
+                cssValue: '2px solid red',
+              });
+            }}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+          >
+            Red Border When Door Open
+          </button>
+          <button
+            onClick={() => {
+              setCurrentRule({
+                entity: 'sensor.temperature',
+                attribute: '',
+                operator: 'greater_than',
+                value: '25',
+                cssTarget: '.bubble-icon',
+                cssProperty: 'color',
+                cssValue: 'orange',
+              });
+            }}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+          >
+            Orange Icon When Hot
+          </button>
+          <button
+            onClick={() => {
+              setCurrentRule({
+                entity: 'person.home',
+                operator: 'equals',
+                value: 'home',
+                cssTarget: '.bubble-button-card-container',
+                cssProperty: 'display',
+                cssValue: 'block',
+                elseValue: 'none',
+              });
+            }}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+          >
+            Show Only When Home
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // STYLES EDITOR WITH CSS VARIABLES
 // ============================================
 
 interface StylesEditorProps {
-  config: { styles?: string };
+  config: BubbleConfig;
   updateConfig: (key: string, value: any) => void;
 }
 
 function StylesEditor({ config, updateConfig }: StylesEditorProps) {
+  // Get the entity ID from config
+  const entityId = (config as any).entity || '';
+  
   // Parse existing styles to extract CSS variables
   const parseStyles = (styles: string = '') => {
     const vars: Record<string, string> = {};
@@ -851,10 +1481,15 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
     return vars;
   };
   
-  const [cssVars, setCssVars] = useState<Record<string, string>>(parseStyles(config.styles));
+  const [cssVars, setCssVars] = useState<Record<string, string>>(() => {
+    if ('styles' in config && config.styles) {
+      return parseStyles(config.styles);
+    }
+    return {};
+  });
   const [customCSS, setCustomCSS] = useState(() => {
     // Extract non-variable CSS
-    const styles = config.styles || '';
+    const styles = 'styles' in config ? (config.styles || '') : '';
     return styles.replace(/:host\s*\{[^}]*\}/g, '').trim();
   });
   
@@ -891,6 +1526,10 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
   };
 
   const appendSnippet = (snippet: string) => {
+    // Check if snippet already exists to prevent duplicates
+    if (customCSS.includes(snippet.trim())) {
+      return; // Snippet already exists, don't add it again
+    }
     const next = customCSS.trim() ? `${customCSS.trim()}\n\n${snippet}` : snippet;
     setCustomCSS(next);
     updateStyles(cssVars, next);
@@ -903,22 +1542,18 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Quick Style Variables */}
-      <div className="space-y-3">
-        <p className="text-xs text-gray-400 font-medium flex items-center gap-2">
-          <Palette size={12} />
-          CSS Variables
-        </p>
-        
-        <ControlInput
-          label="Border Radius"
-          type="text"
-          value={cssVars['--bubble-border-radius'] || ''}
-          onChange={(v) => updateVar('--bubble-border-radius', v)}
-          placeholder="32px"
-          hint="Main card border radius"
-        />
+    <div className="space-y-2">
+      {/* Global Styles */}
+      <Section title="Global Styles" icon={<Palette size={12} />} defaultOpen={true}>
+        <div className="space-y-3">
+          <ControlInput
+            label="Border Radius"
+            type="text"
+            value={cssVars['--bubble-border-radius'] || ''}
+            onChange={(v) => updateVar('--bubble-border-radius', v)}
+            placeholder="32px"
+            hint="Main card border radius"
+          />
         
         <ControlInput
           label="Background Color"
@@ -978,37 +1613,41 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
           onChange={(v) => updateVar('--bubble-box-shadow', v)}
           placeholder="0 2px 8px rgba(0,0,0,0.3)"
         />
-      </div>
+        </div>
+      </Section>
 
       {/* Card-specific variables */}
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Button / Slider</p>
+      <Section title="Button / Slider" icon={<MousePointer size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
         <ControlInput label="Button Background" type="color" value={cssVars['--bubble-button-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-button-main-background-color', v)} />
         <ControlInput label="Button Border Radius" type="text" value={cssVars['--bubble-button-border-radius'] || ''} onChange={(v) => updateVar('--bubble-button-border-radius', v)} placeholder="24px" />
         <ControlInput label="Icon Background" type="color" value={cssVars['--bubble-button-icon-background-color'] || ''} onChange={(v) => updateVar('--bubble-button-icon-background-color', v)} />
         <ControlInput label="Light Color" type="color" value={cssVars['--bubble-light-color'] || ''} onChange={(v) => updateVar('--bubble-light-color', v)} />
         <ControlInput label="Light White Color" type="color" value={cssVars['--bubble-light-white-color'] || ''} onChange={(v) => updateVar('--bubble-light-white-color', v)} />
-      </div>
+        </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Pop-up</p>
+      <Section title="Pop-up" icon={<Layers size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
         <ControlInput label="Pop-up Background" type="color" value={cssVars['--bubble-pop-up-background-color'] || ''} onChange={(v) => updateVar('--bubble-pop-up-background-color', v)} />
         <ControlInput label="Pop-up Main Background" type="color" value={cssVars['--bubble-pop-up-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-pop-up-main-background-color', v)} />
         <ControlInput label="Backdrop Background" type="color" value={cssVars['--bubble-backdrop-background-color'] || ''} onChange={(v) => updateVar('--bubble-backdrop-background-color', v)} />
         <ControlInput label="Pop-up Border Radius" type="text" value={cssVars['--bubble-pop-up-border-radius'] || ''} onChange={(v) => updateVar('--bubble-pop-up-border-radius', v)} placeholder="24px" />
-      </div>
+        </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Media Player</p>
+      <Section title="Media Player" icon={<Music size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
         <ControlInput label="Media Background" type="color" value={cssVars['--bubble-media-player-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-media-player-main-background-color', v)} />
         <ControlInput label="Media Border Radius" type="text" value={cssVars['--bubble-media-player-border-radius'] || ''} onChange={(v) => updateVar('--bubble-media-player-border-radius', v)} placeholder="24px" />
         <ControlInput label="Media Buttons Radius" type="text" value={cssVars['--bubble-media-player-buttons-border-radius'] || ''} onChange={(v) => updateVar('--bubble-media-player-buttons-border-radius', v)} placeholder="14px" />
         <ControlInput label="Slider Background" type="color" value={cssVars['--bubble-media-player-slider-background-color'] || ''} onChange={(v) => updateVar('--bubble-media-player-slider-background-color', v)} />
         <ControlInput label="Media Icon Background" type="color" value={cssVars['--bubble-media-player-icon-background-color'] || ''} onChange={(v) => updateVar('--bubble-media-player-icon-background-color', v)} />
-      </div>
+        </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Select</p>
+      <Section title="Select" icon={<ChevronDown size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
         <ControlInput label="Select Background" type="color" value={cssVars['--bubble-select-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-select-main-background-color', v)} />
         <ControlInput label="Dropdown Background" type="color" value={cssVars['--bubble-select-list-background-color'] || ''} onChange={(v) => updateVar('--bubble-select-list-background-color', v)} />
         <ControlInput label="Dropdown Width" type="text" value={cssVars['--bubble-select-list-width'] || ''} onChange={(v) => updateVar('--bubble-select-list-width', v)} placeholder="220px" />
@@ -1050,10 +1689,11 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
             Glass Dropdown
           </button>
         </div>
-      </div>
+        </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Climate</p>
+      <Section title="Climate" icon={<Thermometer size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
         <ControlInput label="Climate Background" type="color" value={cssVars['--bubble-climate-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-climate-main-background-color', v)} />
         <ControlInput label="Climate Border Radius" type="text" value={cssVars['--bubble-climate-border-radius'] || ''} onChange={(v) => updateVar('--bubble-climate-border-radius', v)} placeholder="24px" />
         <ControlInput label="Climate Button Background" type="color" value={cssVars['--bubble-climate-button-background-color'] || ''} onChange={(v) => updateVar('--bubble-climate-button-background-color', v)} />
@@ -1099,28 +1739,30 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
             Reset Colors
           </button>
         </div>
-      </div>
+        </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Cover</p>
+      <Section title="Cover" icon={<Blinds size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
         <ControlInput label="Cover Background" type="color" value={cssVars['--bubble-cover-main-background-color'] || ''} onChange={(v) => updateVar('--bubble-cover-main-background-color', v)} />
         <ControlInput label="Cover Border Radius" type="text" value={cssVars['--bubble-cover-border-radius'] || ''} onChange={(v) => updateVar('--bubble-cover-border-radius', v)} placeholder="24px" />
         <ControlInput label="Cover Icon Background" type="color" value={cssVars['--bubble-cover-icon-background-color'] || ''} onChange={(v) => updateVar('--bubble-cover-icon-background-color', v)} />
-      </div>
+        </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Horizontal Buttons Stack</p>
+      <Section title="Other Card Types" icon={<Layers size={12} />} defaultOpen={false}>
+        <div className="space-y-3">
+          <p className="text-xs text-gray-400 font-medium">Horizontal Stack</p>
         <ControlInput label="Stack Background" type="color" value={cssVars['--bubble-horizontal-buttons-stack-background-color'] || ''} onChange={(v) => updateVar('--bubble-horizontal-buttons-stack-background-color', v)} />
         <ControlInput label="Stack Border Radius" type="text" value={cssVars['--bubble-horizontal-buttons-stack-border-radius'] || ''} onChange={(v) => updateVar('--bubble-horizontal-buttons-stack-border-radius', v)} placeholder="24px" />
-      </div>
-
-      <div className="pt-3 border-t border-gray-700 space-y-3">
-        <p className="text-xs text-gray-400 font-medium">Separator</p>
+          
+          <p className="text-xs text-gray-400 font-medium pt-2">Separator</p>
         <ControlInput label="Line Background" type="color" value={cssVars['--bubble-line-background-color'] || ''} onChange={(v) => updateVar('--bubble-line-background-color', v)} />
-      </div>
+        </div>
+      </Section>
       
       {/* Custom CSS */}
-      <div className="pt-3 border-t border-gray-700">
+      <Section title="Custom CSS" icon={<Puzzle size={12} />} defaultOpen={false}>
         <ControlInput
           label="Custom CSS"
           type="textarea"
@@ -1129,113 +1771,10 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
           placeholder={`.bubble-button-card-container {\n  /* Your custom styles */\n}`}
           hint="Advanced: Add custom CSS rules for fine-grained control"
         />
-      </div>
-      
-      {/* Prebuilt Style Snippets */}
-      <div className="pt-3 border-t border-gray-700">
-        <p className="text-xs text-gray-400 font-medium mb-2">Quick Styles</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              updateVar('--bubble-border-radius', '16px');
-              updateVar('--bubble-icon-border-radius', '12px');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Rounded
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-border-radius', '0px');
-              updateVar('--bubble-icon-border-radius', '0px');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Square
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-box-shadow', '0 4px 20px rgba(0,0,0,0.5)');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Deep Shadow
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-main-background-color', 'rgba(0,0,0,0.6)');
-              updateVar('--bubble-secondary-background-color', 'rgba(255,255,255,0.1)');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Glass Effect
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-accent-color', '#00d4ff');
-              updateVar('--bubble-icon-background-color', 'rgba(0,212,255,0.2)');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Neon Cyan
-          </button>
-          <button
-            onClick={() => {
-              updateVar('--bubble-accent-color', '#ff6b6b');
-              updateVar('--bubble-icon-background-color', 'rgba(255,107,107,0.2)');
-            }}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Coral
-          </button>
-          <button
-            onClick={() => appendSnippet('ha-card {\n  --bubble-main-background-color: rgba(12,120,50,0.5) !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Card Background
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-icon {\n  color: white !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            White Icons
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-range-fill {\n  background: rgba(79,69,87,1) !important;\n  opacity: 1 !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Slider Fill
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-line {\n  background: var(--primary-text-color);\n  opacity: 0.1;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Separator Subtle
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-sub-button {\n  height: 48px !important;\n  min-width: 48px !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Larger Sub-buttons
-          </button>
-          <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  background: linear-gradient(135deg, #1e1e2f, #0f172a) !important;\n}')}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            Gradient BG
-          </button>
-          <button
-            onClick={resetStyles}
-            className="px-2 py-1 text-xs bg-red-800/40 hover:bg-red-800/60 text-red-200 rounded border border-red-900/60"
-          >
-            Reset Styles
-          </button>
-        </div>
-      </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-2">
-        <p className="text-xs text-gray-400 font-medium">Template snippets (JS in styles)</p>
-        <p className="text-[11px] text-gray-500">These insert JS templates into the styles block. Adjust entity ids/icons as needed.</p>
+      <Section title="JS Templates" icon={<Sparkles size={12} />} defaultOpen={false}>
+        <p className="text-[11px] text-gray-500 mb-2">Insert JS templates into styles. Adjust entity ids/icons.</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => appendSnippet('${icon.setAttribute("icon", state === "on" ? "mdi:lightbulb" : "mdi:lightbulb-off")}')}
@@ -1268,44 +1807,105 @@ function StylesEditor({ config, updateConfig }: StylesEditorProps) {
             Weather-Based Separator
           </button>
         </div>
-      </div>
+      </Section>
 
-      <div className="pt-3 border-t border-gray-700 space-y-2">
-        <p className="text-xs text-gray-400 font-medium">State-based styling presets</p>
-        <p className="text-[11px] text-gray-500">Quick drop-ins for common on/off/attribute styling. Edit entity ids as needed.</p>
+      <Section title="State-based Styling" icon={<Eye size={12} />} defaultOpen={false}>
+        <p className="text-[11px] text-gray-500 mb-2">Styles based on the card's main entity state. {entityId ? `Entity: ${entityId}` : 'Set entity to use these snippets'}</p>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => appendSnippet('.bubble-button-background {\n  opacity: 1 !important;\n  background: ${state === "on" ? "var(--bubble-accent-color)" : ""} !important;\n}')}
+            onClick={() => appendSnippet(`.bubble-button-background {\n  opacity: 1 !important;\n  background: \${hass.states["${entityId}"]?.state === "on" ? "var(--bubble-accent-color)" : ""} !important;\n}`)}
             className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
           >
             Accent When On
           </button>
           <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  filter: ${state === "off" ? "grayscale(0.55) brightness(0.85)" : "none"};\n  transition: filter 160ms ease;\n}')}
+            onClick={() => appendSnippet(`.bubble-button-card-container {\n  filter: \${hass.states["${entityId}"]?.state === "off" ? "grayscale(0.55) brightness(0.85)" : "none"};\n  transition: filter 160ms ease;\n}`)}
             className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
           >
             Dim When Off
           </button>
           <button
-            onClick={() => appendSnippet('.bubble-icon {\n  animation: ${hass.states[entity]?.state === "on" ? "slow-pulse 1.4s ease-in-out infinite" : ""};\n}\n@keyframes slow-pulse {\n  0% { transform: scale(1); opacity: 1; }\n  50% { transform: scale(1.08); opacity: 0.8; }\n  100% { transform: scale(1); opacity: 1; }\n}')}
+            onClick={() => appendSnippet(`.bubble-icon {\n  animation: \${hass.states["${entityId}"]?.state === "on" ? "slow-pulse 1.4s ease-in-out infinite" : ""};\n}\n@keyframes slow-pulse {\n  0% { transform: scale(1); opacity: 1; }\n  50% { transform: scale(1.08); opacity: 0.8; }\n  100% { transform: scale(1); opacity: 1; }\n}`)}
             className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
           >
-            Pulse When Active
+            Pulse When On
           </button>
           <button
-            onClick={() => appendSnippet('.bubble-button-card-container {\n  box-shadow: ${Number(hass.states[entity]?.attributes?.battery ?? 100) < 25 ? "0 0 16px rgba(239,68,68,0.65)" : ""} !important;\n}')}
+            onClick={() => appendSnippet(`.bubble-icon {\n  animation: \${hass.states["${entityId}"]?.state === "on" ? "rotate 2s linear infinite" : ""};\n}\n@keyframes rotate {\n  from { transform: rotate(0deg); }\n  to { transform: rotate(360deg); }\n}`)}
             className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
           >
-            Low Battery Glow
+            Spin When On
           </button>
           <button
-            onClick={() => appendSnippet('.bubble-sub-button-1 {\n  display: ${hass.states["binary_sensor.front_door"]?.state === "on" ? "" : "none"} !important;\n}')}
+            onClick={() => appendSnippet(`.bubble-button-card-container {\n  box-shadow: \${hass.states["${entityId}"]?.state === "on" ? "0 0 18px var(--bubble-accent-color)" : ""} !important;\n}`)}
             className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
           >
-            Show on Motion
+            Glow When On
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-button-card-container {\n  border: \${hass.states["${entityId}"]?.state === "on" ? "2px solid var(--bubble-accent-color)" : "2px solid transparent"} !important;\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Border When On
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-icon {\n  color: \${hass.states["${entityId}"]?.state === "on" ? "var(--bubble-accent-color)" : "var(--primary-text-color)"} !important;\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Icon Color Change
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-name {\n  color: \${hass.states["${entityId}"]?.state === "on" ? "var(--bubble-accent-color)" : ""} !important;\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Name Color When On
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-button-card-container {\n  opacity: \${hass.states["${entityId}"]?.state === "unavailable" ? "0.5" : "1"};\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Fade When Unavailable
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-button-card-container {\n  box-shadow: \${Number(hass.states["${entityId}"]?.attributes?.battery ?? 100) < 25 ? "0 0 16px rgba(239,68,68,0.65)" : ""} !important;\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Low Battery Alert
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-button-card-container {\n  transform: \${hass.states["${entityId}"]?.state === "on" ? "scale(1.02)" : "scale(1)"};\n  transition: transform 200ms ease;\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Scale When On
+          </button>
+          <button
+            onClick={() => appendSnippet(`.bubble-icon {\n  filter: \${hass.states["${entityId}"]?.state === "on" ? "drop-shadow(0 0 6px var(--bubble-accent-color))" : ""};\n}`)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            disabled={!entityId}
+          >
+            Icon Glow When On
           </button>
         </div>
-      </div>
+      </Section>
+
+      <Section title="State Appearance" icon={<Eye size={12} />} defaultOpen={false}>
+        <StateAppearanceBuilder entityId={entityId} appendSnippet={appendSnippet} />
+      </Section>
+
+      <Section title="Conditional Styling" icon={<Layers size={12} />} defaultOpen={false}>
+        <ConditionalStylingBuilder appendSnippet={appendSnippet} />
+      </Section>
     </div>
   );
 }
@@ -1383,7 +1983,7 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full">
       {/* ============================================ */}
       {/* BUTTON CARD OPTIONS */}
       {/* ============================================ */}

@@ -522,7 +522,16 @@ export type BubblePresetCategory =
   | 'media'
   | 'climate'
   | 'cover'
-  | 'custom';
+  | 'custom'
+  | 'animated'
+  | 'minimal'
+  | 'glass'
+  | 'neon'
+  | '3d'
+  | 'gradient'
+  | 'cyberpunk'
+  | 'retro'
+  | 'nature';
 
 export interface BubblePreset {
   name: string;

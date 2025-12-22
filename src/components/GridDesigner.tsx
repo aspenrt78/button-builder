@@ -246,7 +246,18 @@ export const GridDesigner: React.FC<GridDesignerProps> = ({
     const templateRowsSizes = Array(rows).fill('1fr').join(' ');
     
     // Generate custom fields from entity areas
-    const customFields = areas
+    const customFields: Array<{
+      name: string;
+      type: 'entity' | 'template';
+      value: string;
+      entity: string;
+      attribute: string;
+      icon: string;
+      prefix: string;
+      suffix: string;
+      gridArea: string;
+      styles: string;
+    }> = areas
       .filter(a => a.content?.type === 'entity' && a.content.entity)
       .map(area => ({
         name: area.name,

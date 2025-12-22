@@ -4,7 +4,7 @@ interface Props {
   label: string;
   value: any;
   onChange: (val: any) => void;
-  type?: 'text' | 'color' | 'number' | 'select' | 'checkbox' | 'slider';
+  type?: 'text' | 'color' | 'number' | 'select' | 'checkbox' | 'slider' | 'password';
   options?: { value: string; label: string }[];
   className?: string;
   placeholder?: string;
@@ -150,8 +150,8 @@ export const ControlInput: React.FC<Props> = ({
           </select>
         ) : (
           <input
-            type={type === 'color' ? 'text' : type}
-            value={value}
+            type={type === 'color' ? 'text' : type === 'password' ? 'password' : type}
+            value={value ?? ''}
             placeholder={placeholder || (suffix ? `e.g. 10${suffix}` : '')}
             onChange={(e) => !disabled && onChange(e.target.value)}
             onBlur={handleBlurWithSuffix}

@@ -114,6 +114,7 @@ export interface StateStyleConfig {
   styles: string;
   // Conditional Colors
   backgroundColor: string;
+  backgroundColorOpacity?: number;
   iconColor: string;
   nameColor: string;
   stateColor: string;
@@ -266,6 +267,7 @@ export interface ButtonConfig {
   gradientColor2: string;
   gradientColor3: string;
   gradientColor3Enabled: boolean;
+  gradientOpacity: number;
   
   // Glass / Depth
   backdropBlur: string;
@@ -531,6 +533,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   gradientColor2: '#764ba2',
   gradientColor3: '#f093fb',
   gradientColor3Enabled: false,
+  gradientOpacity: 100,
   
   backdropBlur: '0px',
   shadowSize: 'none',

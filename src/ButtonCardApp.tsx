@@ -1,7 +1,7 @@
 // Button Card Builder - Extracted from original App.tsx
 // This contains all the button-card specific logic
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel';
 import { PreviewCard } from './components/PreviewCard';
 import { YamlViewer } from './components/YamlViewer';
@@ -10,7 +10,7 @@ import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateAppearanceConfig, 
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset, generateDarkModePreset } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2 } from 'lucide-react';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -56,6 +56,60 @@ export const ButtonCardApp: React.FC = () => {
   const [onStateAppearance, setOnStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
   const [offStateAppearance, setOffStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
   
+  // Undo/Redo history
+  const [historyPast, setHistoryPast] = useState<ButtonConfig[]>([]);
+  const [historyFuture, setHistoryFuture] = useState<ButtonConfig[]>([]);
+  const historyDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedConfigRef = useRef<ButtonConfig>(loadSavedConfig());
+  const isUndoRedoRef = useRef(false);
+  const MAX_HISTORY = 50;
+
+  const canUndo = historyPast.length > 0;
+  const canRedo = historyFuture.length > 0;
+
+  const handleUndo = useCallback(() => {
+    if (historyPast.length === 0) return;
+    
+    isUndoRedoRef.current = true;
+    const previous = historyPast[historyPast.length - 1];
+    setHistoryPast(prev => prev.slice(0, -1));
+    setHistoryFuture(prev => [config, ...prev].slice(0, MAX_HISTORY));
+    setConfigInternal(previous);
+    lastSavedConfigRef.current = previous;
+    
+    setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+  }, [historyPast, config]);
+
+  const handleRedo = useCallback(() => {
+    if (historyFuture.length === 0) return;
+    
+    isUndoRedoRef.current = true;
+    const next = historyFuture[0];
+    setHistoryFuture(prev => prev.slice(1));
+    setHistoryPast(prev => [...prev, config].slice(-MAX_HISTORY));
+    setConfigInternal(next);
+    lastSavedConfigRef.current = next;
+    
+    setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+  }, [historyFuture, config]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          handleUndo();
+        } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+          e.preventDefault();
+          handleRedo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+  
   const isApplyingPresetRef = useRef(false);
   
   const setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>> = (action) => {
@@ -64,12 +118,42 @@ export const ButtonCardApp: React.FC = () => {
       if (presetCondition !== 'always' && activePreset.config.extraStyles) {
         setConfigInternal(prev => {
           const result = typeof action === 'function' ? action(prev) : action;
+          
+          // History tracking (debounced)
+          if (!isUndoRedoRef.current) {
+            if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+            historyDebounceRef.current = setTimeout(() => {
+              if (JSON.stringify(result) !== JSON.stringify(lastSavedConfigRef.current)) {
+                setHistoryPast(p => [...p, lastSavedConfigRef.current].slice(-MAX_HISTORY));
+                setHistoryFuture([]);
+                lastSavedConfigRef.current = result;
+              }
+            }, 500);
+          }
+          
           return { ...result, extraStyles: '' };
         });
         return;
       }
     }
-    setConfigInternal(action);
+    
+    setConfigInternal(prev => {
+      const result = typeof action === 'function' ? action(prev) : action;
+      
+      // History tracking (debounced)
+      if (!isUndoRedoRef.current) {
+        if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+        historyDebounceRef.current = setTimeout(() => {
+          if (JSON.stringify(result) !== JSON.stringify(lastSavedConfigRef.current)) {
+            setHistoryPast(p => [...p, lastSavedConfigRef.current].slice(-MAX_HISTORY));
+            setHistoryFuture([]);
+            lastSavedConfigRef.current = result;
+          }
+        }, 500);
+      }
+      
+      return result;
+    });
   };
   
   useEffect(() => {
@@ -187,13 +271,20 @@ export const ButtonCardApp: React.FC = () => {
     // Helper to check if appearance has any non-empty values
     const hasAppearanceValues = (appearance: Partial<StateAppearanceConfig>): boolean => {
       return Object.entries(appearance).some(([key, value]) => {
-        if (key === 'backgroundColorOpacity' || key === 'shadowOpacity' || key === 'gradientAngle') {
-          return false; // These have default numeric values, don't count them
+        // Numeric opacity fields: only count if NOT the default value (100)
+        if (key === 'backgroundColorOpacity' || key === 'gradientOpacity') {
+          return value !== undefined && value !== 100;
         }
+        // Skip other numeric fields with default values - they don't indicate user intent
+        if (key === 'shadowOpacity' || key === 'gradientAngle') {
+          return false;
+        }
+        // Boolean fields only count if explicitly true (enabling something)
         if (key === 'gradientEnabled' || key === 'gradientColor3Enabled') {
           return value === true;
         }
-        return value !== '' && value !== 'none' && value !== undefined;
+        // For all other fields, check if they have a non-empty value
+        return value !== '' && value !== 'none' && value !== undefined && value !== null;
       });
     };
     
@@ -212,6 +303,7 @@ export const ButtonCardApp: React.FC = () => {
         spin: false,
         styles: appearance.extraStyles || '',
         backgroundColor: appearance.backgroundColor || '',
+        backgroundColorOpacity: appearance.backgroundColorOpacity ?? 100,
         iconColor: appearance.iconColor || '',
         nameColor: appearance.nameColor || '',
         stateColor: appearance.stateColor || '',
@@ -348,6 +440,26 @@ export const ButtonCardApp: React.FC = () => {
         
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-2">
+          {/* Undo/Redo Buttons */}
+          <div className="flex items-center border border-gray-700 rounded-full overflow-hidden">
+            <button 
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={14} />
+            </button>
+            <div className="w-px h-5 bg-gray-700" />
+            <button 
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 size={14} />
+            </button>
+          </div>
           <button 
             onClick={() => setIsImportOpen(true)}
             className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"

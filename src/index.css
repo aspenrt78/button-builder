@@ -13,6 +13,7 @@ body, html {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background-color: #000;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -23,6 +24,7 @@ body, html {
 #root {
   width: 100%;
   height: 100%;
+  background-color: #000;
 }
 
 /* Custom scrollbar */
@@ -44,11 +46,16 @@ body, html {
   background: #444;
 }
 
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+/* Smooth transitions - only on interactive elements, not structural ones */
+button, a, input, select, textarea, [role="button"] {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
+}
+
+/* Prevent transforms on structural elements */
+html, body, #root {
+  transform: none !important;
 }
 
 /* Animation classes for button-card preview */

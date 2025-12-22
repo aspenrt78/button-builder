@@ -81,8 +81,8 @@ export function validateBubbleCard(config: BubbleConfig): ValidationWarning[] {
       break;
   }
 
-  // Sub-button validation
-  if (config.sub_button && config.sub_button.length > 0) {
+  // Sub-button validation (only for button type)
+  if (config.card_type === 'button' && 'sub_button' in config && config.sub_button && config.sub_button.length > 0) {
     config.sub_button.forEach((sb, index) => {
       if (sb.select_attribute && !sb.entity) {
         warnings.push({
@@ -94,9 +94,10 @@ export function validateBubbleCard(config: BubbleConfig): ValidationWarning[] {
     });
   }
 
-  // Slider validation
-  if (config.button_type === 'slider') {
-    if (config.min_value !== undefined && config.max_value !== undefined && config.min_value >= config.max_value) {
+  // Slider validation (only for button type)
+  if (config.card_type === 'button' && 'button_type' in config && config.button_type === 'slider') {
+    const buttonConfig = config as { min_value?: number; max_value?: number };
+    if (buttonConfig.min_value !== undefined && buttonConfig.max_value !== undefined && buttonConfig.min_value >= buttonConfig.max_value) {
       warnings.push({
         field: 'max_value',
         message: 'Max value should be greater than min value',
