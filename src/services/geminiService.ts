@@ -97,9 +97,9 @@ const buttonSchema: Schema = {
     cardOpacity: { type: Type.NUMBER, description: "Overall card opacity 0-100" },
 
     // State Colors (for on/off states)
-    stateOnColor: { type: Type.STRING, description: "Background when entity is ON" },
+    stateOnColor: { type: Type.STRING, description: "Background color when entity is ON/open/active - USE THIS for state-based color changes!" },
     stateOnOpacity: { type: Type.NUMBER },
-    stateOffColor: { type: Type.STRING, description: "Background when entity is OFF" },
+    stateOffColor: { type: Type.STRING, description: "Background color when entity is OFF/closed/inactive" },
     stateOffOpacity: { type: Type.NUMBER },
     
     // Animations
@@ -153,7 +153,7 @@ const buttonSchema: Schema = {
     // Extra CSS
     extraStyles: { type: Type.STRING, description: "Custom CSS styles (one per line, format: property: value)" }
   },
-  required: ["entity", "name", "icon"]
+  required: ["entity", "name", "icon", "backgroundColor", "color", "iconColor"]
 };
 
 export const generateButtonConfig = async (prompt: string): Promise<Partial<ButtonConfig>> => {
@@ -164,18 +164,33 @@ export const generateButtonConfig = async (prompt: string): Promise<Partial<Butt
 
   const ai = new GoogleGenAI({ apiKey });
 
-  const systemPrompt = `You are a UI designer expert specializing in Home Assistant button-card configurations. Create beautiful, modern, and functional button card designs based on user descriptions.
+  const systemPrompt = `You are a UI designer expert creating Home Assistant button-card configurations. Your PRIMARY job is to generate VISUALLY STYLED buttons - always include colors, effects, and styling.
+
+CRITICAL: You MUST always include these visual properties:
+- backgroundColor: A hex color for the card background (e.g., "#1a1a2e", "#2d3436", "#1e3a5f")
+- color: Primary text color (e.g., "#ffffff", "#ffd700", "#00ffff")
+- iconColor: Icon color (e.g., "#ffd700", "#ff6b6b", "#4ecdc4")
+- shadowSize: One of "none", "sm", "md", "lg", "xl" for depth
+- borderRadius: Corner rounding (e.g., "12px", "16px", "20px")
+
+IMPORTANT COLOR INTERPRETATION:
+When users say "[COLOR] button" (e.g., "gold button", "red button", "blue button"), they mean the CARD BACKGROUND should be that color!
+- "gold button" → backgroundColor should be gold (#d4af37, #ffd700, #c9a227)
+- "red button" → backgroundColor should be red (#dc2626, #ef4444, #b91c1c)
+- "blue button" → backgroundColor should be blue (#2563eb, #3b82f6, #1d4ed8)
+- "green button" → backgroundColor should be green (#16a34a, #22c55e, #15803d)
+- Use contrasting text/icon colors (dark text on light backgrounds, light on dark)
 
 CONTEXT:
 - Generating configuration for custom:button-card in Home Assistant
-- Output controls smart home devices (lights, switches, fans, sensors, etc.)
 - Users want visually appealing buttons for modern dashboard aesthetics
+- NEVER return a button without styling - always include colors!
 
 DESIGN PRINCIPLES:
-1. **Modern Aesthetics**: Clean, contemporary designs with good contrast
-2. **Color Harmony**: Complementary colors, avoid clashing combinations
-3. **Readability**: Light text on dark backgrounds, dark on light
-4. **Subtlety**: Prefer subtle effects unless explicitly requested for dramatic looks
+1. **Always Style**: Every button MUST have backgroundColor, color, and iconColor set
+2. **Color Names = Background**: When user mentions a color for the button, apply it to backgroundColor
+3. **Modern Aesthetics**: Clean, contemporary designs with good contrast
+4. **Readability**: Dark text (#1a1a1a, #2d2d2d) on light backgrounds, light text (#ffffff, #f0f0f0) on dark backgrounds
 
 STYLE PRESETS:
 - **Glassmorphism/Glass**: Semi-transparent background (opacity 20-40), backdropBlur: "10px" or "20px", subtle border, soft shadow
@@ -197,6 +212,18 @@ ENTITY INFERENCE:
 - "media/speaker" → entity: "media_player.{name}", icon: "mdi:speaker"
 - "camera" → entity: "camera.{name}", icon: "mdi:cctv"
 - "vacuum" → entity: "vacuum.{name}", icon: "mdi:robot-vacuum"
+
+STATE-BASED COLOR CHANGES (IMPORTANT!):
+When users want different colors based on state (on/off, open/closed, etc.), USE THESE:
+- stateOnColor: Background color when ON/open/active (e.g., "#dc2626" for red when open)
+- stateOffColor: Background color when OFF/closed/inactive (e.g., "#1a1a1a" for dark when closed)
+
+EXAMPLES of state-based requests:
+- "turns red when open" → stateOnColor: "#dc2626" (red), backgroundColor: "#1a1a1a" (dark default)
+- "green when on, gray when off" → stateOnColor: "#16a34a", stateOffColor: "#4a4a4a"
+- "warning red when active" → stateOnColor: "#ef4444"
+- For garage doors/covers: ON = open, OFF = closed
+- For lights/switches: ON = on, OFF = off
 
 COLOR AUTO FEATURES:
 - colorAuto: true - Button matches entity's current color (great for RGB lights!)
@@ -229,7 +256,9 @@ COMMON ACTIONS:
 
 USER REQUEST: "${prompt}"
 
-Generate a configuration that best matches this request. Be creative but practical. Make sensible design choices for vague requests. Prefer modern, clean aesthetics.`;
+REMEMBER: You MUST include visual styling! Always set backgroundColor, color, iconColor, and relevant effects like shadowSize. A button without colors is incomplete.
+
+Generate a fully styled configuration that matches this request. Be creative with colors and effects.`;
 
   try {
     const response = await ai.models.generateContent({

@@ -1015,6 +1015,17 @@ export const generateYaml = (config: ButtonConfig): string => {
      const stateCardStyles: string[] = [];
      const stateIconStyles: string[] = [];
      
+     // Handle stateOnColor / stateOffColor for background
+     const stateColor = stateVal === 'on' ? config.stateOnColor : config.stateOffColor;
+     const stateOpacity = stateVal === 'on' ? config.stateOnOpacity : config.stateOffOpacity;
+     if (stateColor) {
+       if (stateOpacity !== undefined && stateOpacity < 100) {
+         stateCardStyles.push(`background-color: ${hexToRgba(stateColor, stateOpacity)}`);
+       } else {
+         stateCardStyles.push(`background-color: ${stateColor}`);
+       }
+     }
+     
      // Conditional Card Animation (skip if alwaysAnimateCard is enabled - handled globally)
      if (!config.alwaysAnimateCard && config.cardAnimation !== 'none' && config.cardAnimationTrigger === stateVal) {
          const anim = getAnimationCSS(config.cardAnimation, config.cardAnimationSpeed);

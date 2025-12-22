@@ -497,8 +497,13 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   // - 'icon': Entity color only affects icon, not background
   // - 'blank-card': No background (transparent)
   // - 'label-card': Similar to card, entity color fills background
-  let actualBgHex = matchingStateStyle?.backgroundColor || config.backgroundColor || '#1a1a1a';
-  let actualBgOpacity = matchingStateStyle?.backgroundColorOpacity ?? config.backgroundColorOpacity ?? 100;
+  
+  // Check for state-specific colors first (stateOnColor/stateOffColor)
+  const stateSpecificBgColor = isOn ? config.stateOnColor : config.stateOffColor;
+  const stateSpecificOpacity = isOn ? config.stateOnOpacity : config.stateOffOpacity;
+  
+  let actualBgHex = stateSpecificBgColor || matchingStateStyle?.backgroundColor || config.backgroundColor || '#1a1a1a';
+  let actualBgOpacity = stateSpecificOpacity ?? matchingStateStyle?.backgroundColorOpacity ?? config.backgroundColorOpacity ?? 100;
   
   // Handle colorType for background
   if (config.colorType === 'blank-card') {
