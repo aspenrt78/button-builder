@@ -1,13 +1,134 @@
 import { ButtonConfig, DEFAULT_CONFIG } from './types';
 
+export type PresetCategory =
+  | 'minimal'
+  | 'glass'
+  | 'neon'
+  | 'animated'
+  | 'custom'
+  | '3d'
+  | 'retro'
+  | 'gradient'
+  | 'cyberpunk'
+  | 'nature'
+  | 'icon-styles';
+
 export interface Preset {
+  id?: string;
   name: string;
   description: string;
-  category: 'minimal' | 'glass' | 'neon' | 'animated' | 'custom' | '3d' | 'retro' | 'gradient' | 'cyberpunk' | 'nature' | 'icon-styles';
+  category: PresetCategory;
   config: Partial<ButtonConfig>;
   /** If true, this preset is auto-generated as a dark mode variant */
   isAutoDark?: boolean;
+  /** If true, preset was saved by the user in this app */
+  isUserPreset?: boolean;
 }
+
+const STYLE_PRESET_KEYS: ReadonlyArray<keyof ButtonConfig> = [
+  'showName',
+  'showIcon',
+  'showState',
+  'showLabel',
+  'showLastChanged',
+  'showEntityPicture',
+  'showUnits',
+  'showRipple',
+  'size',
+  'layout',
+  'aspectRatio',
+  'height',
+  'padding',
+  'borderRadius',
+  'cardSize',
+  'sectionMode',
+  'gridRows',
+  'gridColumns',
+  'borderWidth',
+  'borderStyle',
+  'borderColor',
+  'borderColorAuto',
+  'colorType',
+  'colorAuto',
+  'backgroundColor',
+  'backgroundColorOpacity',
+  'color',
+  'gradientEnabled',
+  'gradientType',
+  'gradientAngle',
+  'gradientColor1',
+  'gradientColor2',
+  'gradientColor3',
+  'gradientColor3Enabled',
+  'gradientOpacity',
+  'backdropBlur',
+  'shadowSize',
+  'shadowColor',
+  'shadowOpacity',
+  'iconColor',
+  'iconColorAuto',
+  'nameColor',
+  'nameColorAuto',
+  'stateColor',
+  'stateColorAuto',
+  'labelColor',
+  'labelColorAuto',
+  'fontFamily',
+  'customFontName',
+  'customFontUrl',
+  'fontSize',
+  'fontWeight',
+  'textTransform',
+  'letterSpacing',
+  'lineHeight',
+  'numericPrecision',
+  'stateOnColor',
+  'stateOnOpacity',
+  'stateOffColor',
+  'stateOffOpacity',
+  'stateStyles',
+  'cardAnimation',
+  'cardAnimationTrigger',
+  'cardAnimationSpeed',
+  'iconAnimation',
+  'iconAnimationTrigger',
+  'iconAnimationSpeed',
+  'rotate',
+  'alwaysAnimateCard',
+  'alwaysAnimateIcon',
+  'spin',
+  'spinDuration',
+  'cardOpacity',
+  'customGridEnabled',
+  'customGridTemplateAreas',
+  'customGridTemplateColumns',
+  'customGridTemplateRows',
+  'extraStyles',
+  'entityPictureStyles',
+  'gridStyles',
+  'imgCellStyles',
+  'lockStyles',
+  'tooltipStyles',
+];
+
+const clonePresetValue = <T,>(value: T): T => {
+  if (value && typeof value === 'object') {
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch {
+      return value;
+    }
+  }
+  return value;
+};
+
+export const buildStylePresetConfig = (config: ButtonConfig): Partial<ButtonConfig> => {
+  const styleConfig: Partial<ButtonConfig> = {};
+  STYLE_PRESET_KEYS.forEach((key) => {
+    (styleConfig as any)[key] = clonePresetValue(config[key]);
+  });
+  return styleConfig;
+};
 
 /**
  * Helper function to darken a hex color

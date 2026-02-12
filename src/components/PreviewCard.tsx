@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDashboard, RefreshCw, Upload, X, Image } from 'lucide-react';
-import { ButtonConfig, AnimationType, AnimationTrigger } from '../types';
+import { ButtonConfig, AnimationType, AnimationTrigger, StateStyleConfig } from '../types';
 import { getIconComponent } from '../services/iconMapper';
 import { isInHomeAssistant, fetchAllDashboardConfigs, DashboardConfig, DashboardGridConfig, parseBackgroundToCss } from '../services/dashboardService';
 import { haService, type HAEntity } from '../services/homeAssistantService';
+import { getEntityCapabilities } from '../utils/entityCapabilities';
 
 interface Props {
   config: ButtonConfig;
@@ -77,6 +78,39 @@ const getDomainStateDisplay = (entityId: string, simulatedState: 'on' | 'off', a
   
   // Default: capitalize the state
   return simulatedState.charAt(0).toUpperCase() + simulatedState.slice(1);
+};
+
+const evaluateStateStyleMatch = (style: StateStyleConfig, currentState: string): boolean => {
+  const value = style.value ?? '';
+  switch (style.operator) {
+    case 'equals':
+      return currentState === value;
+    case 'not_equals':
+      return currentState !== value;
+    case 'above': {
+      const currentNum = Number.parseFloat(currentState);
+      const compareNum = Number.parseFloat(value);
+      return Number.isFinite(currentNum) && Number.isFinite(compareNum) && currentNum > compareNum;
+    }
+    case 'below': {
+      const currentNum = Number.parseFloat(currentState);
+      const compareNum = Number.parseFloat(value);
+      return Number.isFinite(currentNum) && Number.isFinite(compareNum) && currentNum < compareNum;
+    }
+    case 'regex':
+      try {
+        return new RegExp(value).test(currentState);
+      } catch {
+        return false;
+      }
+    case 'template':
+      // JS templates are not safely evaluable in preview.
+      return false;
+    case 'default':
+      return false;
+    default:
+      return false;
+  }
 };
 
 // Helper to convert Hex to RGBA
@@ -235,6 +269,8 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   // Label entity data
   const [labelEntityData, setLabelEntityData] = useState<HAEntity | null>(null);
+  const [mainEntityData, setMainEntityData] = useState<HAEntity | null>(null);
+  const [thresholdEntityData, setThresholdEntityData] = useState<HAEntity | null>(null);
   
   // Custom field entity data (indexed by field index)
   const [customFieldEntityData, setCustomFieldEntityData] = useState<Record<number, HAEntity | null>>({});
@@ -249,6 +285,35 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       setLabelEntityData(null);
     }
   }, [config.labelEntity]);
+
+  // Fetch main entity state so preview matches dashboard state logic when available
+  useEffect(() => {
+    if (config.entity) {
+      haService.getEntityData(config.entity).then(data => {
+        setMainEntityData(data);
+      });
+    } else {
+      setMainEntityData(null);
+    }
+  }, [config.entity]);
+
+  // Fetch threshold source entity data (if configured) to avoid fake preview colors.
+  useEffect(() => {
+    if (!config.thresholdColor.enabled) {
+      setThresholdEntityData(null);
+      return;
+    }
+
+    const targetEntity = config.thresholdColor.entity || config.entity;
+    if (!targetEntity) {
+      setThresholdEntityData(null);
+      return;
+    }
+
+    haService.getEntityData(targetEntity).then(data => {
+      setThresholdEntityData(data);
+    });
+  }, [config.thresholdColor.enabled, config.thresholdColor.entity, config.entity]);
 
   // Fetch custom field entity data when entities change
   useEffect(() => {
@@ -428,8 +493,14 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     }
   };
 
-  const isOff = simulatedState === 'off';
-  const isOn = simulatedState === 'on';
+  const liveEntityState = (mainEntityData?.state || '').toString().toLowerCase();
+  const entityCaps = getEntityCapabilities(config.entity, liveEntityState);
+  const canTogglePreviewState = !mainEntityData || entityCaps.hasOnOffState;
+  const effectiveEntityState = canTogglePreviewState
+    ? simulatedState
+    : (liveEntityState || simulatedState || '').toString().toLowerCase();
+  const isOff = effectiveEntityState === 'off';
+  const isOn = effectiveEntityState === 'on';
 
   // --- Helper to resolve color for an element ---
   const resolveColor = (
@@ -445,28 +516,31 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   // 0. Find matching stateStyle for current simulated state (preset conditions)
   // This allows preset conditions to apply different styles for ON vs OFF
-  const matchingStateStyle = config.stateStyles?.find(ss => 
-    ss.operator === 'equals' && ss.value === simulatedState
-  );
-
-  // Simulate value for threshold calculations (use numeric state or simulated value)
-  const getThresholdValue = (): number => {
-    if (!config.thresholdColor.enabled) return 0;
-    
-    // For preview, simulate different values based on state and entity type
-    const domain = config.entity?.split('.')[0] || '';
-    
-    // Return simulated values based on common sensor types
-    if (domain === 'sensor' || config.thresholdColor.attribute) {
-      // Simulate temperature, battery, CPU, etc.
-      if (simulatedState === 'on') {
-        // Return a value in the yellow/red range to show the feature
-        return 75; // This will typically show as yellow or red
-      } else {
-        return 25; // This will typically show as green
+  const matchingStateStyle = (() => {
+    let defaultStyle: StateStyleConfig | undefined;
+    for (const stateStyle of config.stateStyles || []) {
+      if (stateStyle.operator === 'default') {
+        defaultStyle = defaultStyle || stateStyle;
+        continue;
+      }
+      if (evaluateStateStyleMatch(stateStyle, effectiveEntityState)) {
+        return stateStyle;
       }
     }
-    return 0;
+    return defaultStyle;
+  })();
+
+  const getThresholdValue = (): number | null => {
+    if (!config.thresholdColor.enabled) return null;
+
+    const sourceEntity = thresholdEntityData || mainEntityData;
+    if (!sourceEntity) return null;
+
+    const rawValue = config.thresholdColor.attribute
+      ? sourceEntity.attributes?.[config.thresholdColor.attribute]
+      : sourceEntity.state;
+    const parsed = Number.parseFloat(String(rawValue));
+    return Number.isFinite(parsed) ? parsed : null;
   };
   
   // Calculate threshold color based on value
@@ -489,7 +563,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   };
   
   const thresholdValue = getThresholdValue();
-  const thresholdColor = getThresholdColor(thresholdValue);
+  const thresholdColor = thresholdValue !== null ? getThresholdColor(thresholdValue) : null;
 
   // 1. Resolve Card Background based on colorType
   // colorType determines how entity color is applied:
@@ -501,9 +575,17 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   // Check for state-specific colors first (stateOnColor/stateOffColor)
   const stateSpecificBgColor = isOn ? config.stateOnColor : config.stateOffColor;
   const stateSpecificOpacity = isOn ? config.stateOnOpacity : config.stateOffOpacity;
+  const stateBaseColor = matchingStateStyle?.color || '';
   
   let actualBgHex = stateSpecificBgColor || matchingStateStyle?.backgroundColor || config.backgroundColor || '#1a1a1a';
   let actualBgOpacity = stateSpecificOpacity ?? matchingStateStyle?.backgroundColorOpacity ?? config.backgroundColorOpacity ?? 100;
+
+  // Match button-card behavior where state.color can drive card background under color_type: card/label-card
+  if (!stateSpecificBgColor && !matchingStateStyle?.backgroundColor && stateBaseColor &&
+      (config.colorType === 'card' || config.colorType === 'label-card')) {
+    actualBgHex = stateBaseColor;
+    actualBgOpacity = 100;
+  }
   
   // Handle colorType for background
   if (config.colorType === 'blank-card') {
@@ -529,7 +611,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? thresholdColor
     : (iconEntityColorOverride 
         ? SIMULATED_ENTITY_COLOR  // colorType 'icon' + colorAuto takes highest precedence
-        : (matchingStateStyle?.iconColor || resolveColor(
+        : (matchingStateStyle?.iconColor || stateBaseColor || resolveColor(
             config.iconColor, 
             config.iconColorAuto, 
             config.color || '#ffffff', 
@@ -538,15 +620,15 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   
   const actualNameColor = thresholdColor && config.thresholdColor.applyToName
     ? thresholdColor
-    : (matchingStateStyle?.nameColor || resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn));
+    : (matchingStateStyle?.nameColor || stateBaseColor || resolveColor(config.nameColor, config.nameColorAuto, config.color || '#ffffff', isOn));
   
   const actualStateColor = thresholdColor && config.thresholdColor.applyToState
     ? thresholdColor
-    : (matchingStateStyle?.stateColor || resolveColor(config.stateColor, config.stateColorAuto, config.color || '#ffffff', isOn));
+    : (matchingStateStyle?.stateColor || stateBaseColor || resolveColor(config.stateColor, config.stateColorAuto, config.color || '#ffffff', isOn));
   
   const actualLabelColor = thresholdColor && config.thresholdColor.applyToLabel
     ? thresholdColor
-    : (matchingStateStyle?.labelColor || resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn));
+    : (matchingStateStyle?.labelColor || stateBaseColor || resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn));
   
   const actualBorderColor = matchingStateStyle?.borderColor || resolveColor(config.borderColor, config.borderColorAuto, 'transparent', isOn);
 
@@ -574,7 +656,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? stateCardAnimation 
     : config.cardAnimation;
   const effectiveCardAnimationTrigger = (stateCardAnimation && stateCardAnimation !== 'none')
-    ? simulatedState as AnimationTrigger // State animations always apply in their state
+    ? 'always'
     : config.cardAnimationTrigger;
 
   const cardAnimationClass = getAnimationClass(effectiveCardAnimation, effectiveCardAnimationTrigger, config.alwaysAnimateCard);
@@ -589,7 +671,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? stateIconAnimation 
     : config.iconAnimation;
   const effectiveIconAnimationTrigger = (stateIconAnimation && stateIconAnimation !== 'none')
-    ? simulatedState as AnimationTrigger
+    ? 'always'
     : config.iconAnimationTrigger;
 
   // Icon animations: Always apply when selected (alwaysAnimateIcon checkbox overrides state logic)
@@ -733,6 +815,15 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     // Use filteredExtraStyles which removes background if user explicitly set backgroundColor
     ...filteredExtraStyles,
   };
+
+  const displayIcon = matchingStateStyle?.icon || config.icon;
+  const displayName = matchingStateStyle?.name || config.name;
+  const displayState = matchingStateStyle?.stateDisplay
+    || config.stateDisplay
+    || (canTogglePreviewState
+      ? getDomainStateDisplay(config.entity, simulatedState)
+      : (mainEntityData?.state || getDomainStateDisplay(config.entity, simulatedState)));
+  const displayLabelOverride = matchingStateStyle?.label || '';
 
   // Calculate canvas style - support both color and background image
   const canvasStyle: React.CSSProperties = canvasBackground 
@@ -1045,7 +1136,11 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
           key={animationKey}
           style={containerStyle}
           className={`hover:brightness-110 ${config.aspectRatio ? '' : 'w-full'} ${cardAnimationClass} group`}
-          onClick={() => setSimulatedState(simulatedState === 'on' ? 'off' : 'on')}
+          onClick={() => {
+            if (canTogglePreviewState) {
+              setSimulatedState(simulatedState === 'on' ? 'off' : 'on');
+            }
+          }}
           title={config.tooltip.enabled ? config.tooltip.content : undefined}
         >
            {/* Tooltip */}
@@ -1078,7 +1173,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
               ) : (
                 config.showIcon && (
                   <IconMapper 
-                    name={config.icon}
+                    name={displayIcon}
                     size={config.size}
                     color={actualIconColor}
                     animationClass={iconAnimationClass}
@@ -1092,13 +1187,13 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
           
           {config.showName && (
             <div style={{ gridArea: 'n', color: actualNameColor }} className="text-center truncate w-full px-1">
-              {config.name}
+              {displayName}
             </div>
           )}
 
           {config.showState && (
             <div style={{ gridArea: 's', color: actualStateColor, opacity: 0.8, fontSize: '0.85em' }} className="text-center flex items-center justify-center gap-1">
-              <span>{config.stateDisplay || getDomainStateDisplay(config.entity, simulatedState)}</span>
+              <span>{displayState}</span>
               {config.showUnits && config.units && (
                 <span className="opacity-70">{config.units}</span>
               )}
@@ -1107,13 +1202,15 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
           {config.showLabel && (
             <div style={{ gridArea: 'l', color: actualLabelColor, opacity: 0.7, fontSize: '0.8em' }} className="text-center px-1 truncate w-full">
-              {config.labelEntity 
+              {displayLabelOverride
+                ? displayLabelOverride
+                : (config.labelEntity 
                 ? (labelEntityData 
                     ? (config.labelAttribute 
                         ? (labelEntityData.attributes?.[config.labelAttribute] || config.labelAttribute)
                         : labelEntityData.state)
                     : getDomainStateDisplay(config.labelEntity, simulatedState, config.labelAttribute))
-                : config.label || 'Label Text'}
+                : config.label || 'Label Text')}
             </div>
           )}
 
@@ -1198,26 +1295,32 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-3 pointer-events-none">
 
         {/* Simulator Toggle */}
-        <div className="bg-gray-800/90 backdrop-blur p-1 rounded-full inline-flex border border-gray-700 shadow-xl pointer-events-auto">
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setSimulatedState('on');
-            }}
-            className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'on' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
-          >
-            ON
-          </button>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setSimulatedState('off');
-            }}
-            className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'off' ? 'bg-gray-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
-          >
-            OFF
-          </button>
-        </div>
+        {canTogglePreviewState ? (
+          <div className="bg-gray-800/90 backdrop-blur p-1 rounded-full inline-flex border border-gray-700 shadow-xl pointer-events-auto">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setSimulatedState('on');
+              }}
+              className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'on' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
+            >
+              ON
+            </button>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setSimulatedState('off');
+              }}
+              className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'off' ? 'bg-gray-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
+            >
+              OFF
+            </button>
+          </div>
+        ) : (
+          <div className="bg-gray-800/90 backdrop-blur px-4 py-2 rounded-full border border-gray-700 shadow-xl pointer-events-auto text-[11px] text-gray-300">
+            Live state: <span className="text-white font-semibold">{mainEntityData?.state || 'unknown'}</span>
+          </div>
+        )}
       </div>
       
       <style>{`

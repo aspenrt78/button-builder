@@ -4,6 +4,7 @@
 import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { ButtonCardApp } from './ButtonCardApp';
 import { BubbleCardApp } from './bubble-card/BubbleCardApp';
+import { TileCardApp } from './tile-card/TileCardApp';
 import { Layers, AlertTriangle, RefreshCw } from 'lucide-react';
 
 // Global Error Boundary to catch any rendering errors
@@ -61,14 +62,14 @@ class GlobalErrorBoundary extends Component<{ children: ReactNode }, ErrorBounda
   }
 }
 
-type CardType = 'button-card' | 'bubble-card';
+type CardType = 'button-card' | 'bubble-card' | 'tile-card';
 
 const CARD_TYPE_STORAGE_KEY = 'button-builder-card-type';
 
 const loadSavedCardType = (): CardType => {
   try {
     const saved = localStorage.getItem(CARD_TYPE_STORAGE_KEY);
-    if (saved === 'button-card' || saved === 'bubble-card') {
+    if (saved === 'button-card' || saved === 'bubble-card' || saved === 'tile-card') {
       return saved;
     }
   } catch (e) {
@@ -118,6 +119,16 @@ const App: React.FC = () => {
             <span><span className="hidden sm:inline">custom:</span>bubble-card</span>
             <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/80 text-amber-950 font-bold uppercase">Beta</span>
           </button>
+          <button
+            onClick={() => setCardType('tile-card')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              cardType === 'tile-card'
+                ? 'bg-green-600 text-white shadow-lg'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            tile card
+          </button>
         </div>
       </div>
 
@@ -126,8 +137,10 @@ const App: React.FC = () => {
         <GlobalErrorBoundary>
           {cardType === 'button-card' ? (
             <ButtonCardApp />
-          ) : (
+          ) : cardType === 'bubble-card' ? (
             <BubbleCardApp />
+          ) : (
+            <TileCardApp />
           )}
         </GlobalErrorBoundary>
       </div>

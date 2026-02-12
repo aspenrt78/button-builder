@@ -1,5 +1,6 @@
 
 import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig, ThresholdColorConfig } from "../types";
+import { getToggleFallbackService, supportsToggleAction, supportsLiveStream } from "./entityCapabilities";
 
 // Helper to convert hex + opacity (0-100) to RGBA string
 const hexToRgba = (hex: string, opacity: number) => {
@@ -148,8 +149,8 @@ const generateActionYaml = (
 export const generateYaml = (config: ButtonConfig): string => {
   // Helper to generate color style line
   const getColorLine = (color: string, auto: boolean) => {
-    if (auto) return `    - color: var(--button-card-light-color)`;
-    if (color) return `    - color: ${color}`;
+    if (auto) return `    - color: var(--button-card-light-color)\n`;
+    if (color) return `    - color: ${color}\n`;
     return null;
   };
   
@@ -330,7 +331,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.showRipple === false) {
     yaml += `show_ripple: false\n`;
   }
-  if (config.showLiveStream) {
+  if (config.showLiveStream && supportsLiveStream(config.entity)) {
     yaml += `show_live_stream: true\n`;
     if (config.liveStreamAspectRatio) {
       yaml += `live_stream_aspect_ratio: ${config.liveStreamAspectRatio}\n`;
@@ -457,11 +458,46 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `disable_keyboard: true\n`;
   }
 
+  // Normalize actions for entity domains that don't support toggle.
+  const normalizeAction = (
+    actionType: string,
+    actionData: string
+  ): { actionType: string; actionData: string } => {
+    const fallbackService = getToggleFallbackService(config.entity);
+    if (actionType === 'toggle' && fallbackService && config.entity) {
+      return {
+        actionType: 'call-service',
+        actionData: JSON.stringify({
+          service: fallbackService,
+          target: { entity_id: config.entity }
+        })
+      };
+    }
+    if (actionType === 'toggle' && config.entity && !supportsToggleAction(config.entity)) {
+      return {
+        actionType: 'more-info',
+        actionData: ''
+      };
+    }
+    return { actionType, actionData };
+  };
+
+  const normalizedTap = normalizeAction(config.tapAction, config.tapActionData);
+  const normalizedHold = normalizeAction(config.holdAction, config.holdActionData);
+  const normalizedDoubleTap = normalizeAction(config.doubleTapAction, config.doubleTapActionData);
+  const normalizedPress = normalizeAction(config.pressAction, config.pressActionData);
+  const normalizedRelease = normalizeAction(config.releaseAction, config.releaseActionData);
+  const normalizedIconTap = normalizeAction(config.iconTapAction, config.iconTapActionData);
+  const normalizedIconHold = normalizeAction(config.iconHoldAction, config.iconHoldActionData);
+  const normalizedIconDoubleTap = normalizeAction(config.iconDoubleTapAction, config.iconDoubleTapActionData);
+  const normalizedIconPress = normalizeAction(config.iconPressAction, config.iconPressActionData);
+  const normalizedIconRelease = normalizeAction(config.iconReleaseAction, config.iconReleaseActionData);
+
   // Actions - Tap
   yaml += `tap_action:\n`;
   yaml += generateActionYaml(
-    config.tapAction,
-    config.tapActionData,
+    normalizedTap.actionType,
+    normalizedTap.actionData,
     config.tapActionNavigation,
     config.tapActionJavascript,
     config.tapActionToast
@@ -475,8 +511,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Actions - Hold
   yaml += `hold_action:\n`;
   yaml += generateActionYaml(
-    config.holdAction,
-    config.holdActionData,
+    normalizedHold.actionType,
+    normalizedHold.actionData,
     config.holdActionNavigation,
     config.holdActionJavascript,
     config.holdActionToast,
@@ -491,8 +527,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Actions - Double Tap
   yaml += `double_tap_action:\n`;
   yaml += generateActionYaml(
-    config.doubleTapAction,
-    config.doubleTapActionData,
+    normalizedDoubleTap.actionType,
+    normalizedDoubleTap.actionData,
     config.doubleTapActionNavigation,
     config.doubleTapActionJavascript,
     config.doubleTapActionToast
@@ -506,8 +542,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.pressAction !== 'none') {
     yaml += `press_action:\n`;
     yaml += generateActionYaml(
-      config.pressAction,
-      config.pressActionData,
+      normalizedPress.actionType,
+      normalizedPress.actionData,
       config.pressActionNavigation,
       config.pressActionJavascript
     );
@@ -517,8 +553,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.releaseAction !== 'none') {
     yaml += `release_action:\n`;
     yaml += generateActionYaml(
-      config.releaseAction,
-      config.releaseActionData,
+      normalizedRelease.actionType,
+      normalizedRelease.actionData,
       config.releaseActionNavigation,
       config.releaseActionJavascript
     );
@@ -528,8 +564,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.iconTapAction !== 'none') {
     yaml += `icon_tap_action:\n`;
     yaml += generateActionYaml(
-      config.iconTapAction,
-      config.iconTapActionData,
+      normalizedIconTap.actionType,
+      normalizedIconTap.actionData,
       config.iconTapActionNavigation,
       config.iconTapActionJavascript
     );
@@ -538,8 +574,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.iconHoldAction !== 'none') {
     yaml += `icon_hold_action:\n`;
     yaml += generateActionYaml(
-      config.iconHoldAction,
-      config.iconHoldActionData,
+      normalizedIconHold.actionType,
+      normalizedIconHold.actionData,
       config.iconHoldActionNavigation,
       config.iconHoldActionJavascript
     );
@@ -548,8 +584,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.iconDoubleTapAction !== 'none') {
     yaml += `icon_double_tap_action:\n`;
     yaml += generateActionYaml(
-      config.iconDoubleTapAction,
-      config.iconDoubleTapActionData,
+      normalizedIconDoubleTap.actionType,
+      normalizedIconDoubleTap.actionData,
       config.iconDoubleTapActionNavigation,
       config.iconDoubleTapActionJavascript
     );
@@ -559,8 +595,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.iconPressAction !== 'none') {
     yaml += `icon_press_action:\n`;
     yaml += generateActionYaml(
-      config.iconPressAction,
-      config.iconPressActionData,
+      normalizedIconPress.actionType,
+      normalizedIconPress.actionData,
       config.iconPressActionNavigation
     );
   }
@@ -568,8 +604,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.iconReleaseAction !== 'none') {
     yaml += `icon_release_action:\n`;
     yaml += generateActionYaml(
-      config.iconReleaseAction,
-      config.iconReleaseActionData,
+      normalizedIconRelease.actionType,
+      normalizedIconRelease.actionData,
       config.iconReleaseActionNavigation
     );
   }

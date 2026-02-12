@@ -9,8 +9,9 @@ import { MagicBuilder } from './components/MagicBuilder';
 import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateAppearanceConfig, DEFAULT_STATE_APPEARANCE } from './types';
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
-import { PRESETS, Preset, generateDarkModePreset } from './presets';
+import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig } from './presets';
 import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2 } from 'lucide-react';
+import { hasOnOffState } from './utils/entityCapabilities';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -24,6 +25,7 @@ export interface PresetState {
 import logo from './assets/logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
+const CUSTOM_PRESETS_STORAGE_KEY = 'button-builder-custom-presets';
 
 const loadSavedConfig = (): ButtonConfig => {
   try {
@@ -36,6 +38,43 @@ const loadSavedConfig = (): ButtonConfig => {
     console.warn('Failed to load saved config:', e);
   }
   return DEFAULT_CONFIG;
+};
+
+const loadCustomPresets = (): Preset[] => {
+  try {
+    const saved = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+    const usedNames = new Set(PRESETS.map(preset => preset.name.toLowerCase()));
+
+    const hydrated = parsed
+      .filter((preset: any) => preset && typeof preset === 'object' && typeof preset.name === 'string')
+      .map((preset: any, index: number): Preset => ({
+        id: typeof preset.id === 'string' && preset.id ? preset.id : `user-preset-${index}`,
+        name: preset.name.trim(),
+        description: typeof preset.description === 'string' ? preset.description : 'Custom saved style',
+        category: 'custom',
+        config: preset.config && typeof preset.config === 'object' ? preset.config as Partial<ButtonConfig> : {},
+        isUserPreset: true,
+      }))
+      .filter((preset: Preset) => {
+        const normalized = preset.name.toLowerCase();
+        if (!normalized || usedNames.has(normalized)) return false;
+        usedNames.add(normalized);
+        return true;
+      });
+    return hydrated;
+  } catch (e) {
+    console.warn('Failed to load custom presets:', e);
+    return [];
+  }
+};
+
+const isSamePreset = (a: Preset | null, b: Preset | null): boolean => {
+  if (!a || !b) return false;
+  if (a.id && b.id) return a.id === b.id;
+  return a.name === b.name && a.category === b.category;
 };
 
 export const ButtonCardApp: React.FC = () => {
@@ -51,6 +90,7 @@ export const ButtonCardApp: React.FC = () => {
   const [presetCondition, setPresetCondition] = useState<PresetCondition>('always');
   const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
   const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
+  const [customPresets, setCustomPresets] = useState<Preset[]>(loadCustomPresets);
   const [useAutoDarkMode, setUseAutoDarkMode] = useState<boolean>(true);
   // State-specific appearance configs
   const [onStateAppearance, setOnStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
@@ -66,6 +106,7 @@ export const ButtonCardApp: React.FC = () => {
 
   const canUndo = historyPast.length > 0;
   const canRedo = historyFuture.length > 0;
+  const availablePresets = useMemo(() => [...PRESETS, ...customPresets], [customPresets]);
 
   const handleUndo = useCallback(() => {
     if (historyPast.length === 0) return;
@@ -163,6 +204,14 @@ export const ButtonCardApp: React.FC = () => {
       console.warn('Failed to save config:', e);
     }
   }, [config]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(customPresets));
+    } catch (e) {
+      console.warn('Failed to save custom presets:', e);
+    }
+  }, [customPresets]);
 
   const configWithPresetConditions = useMemo(() => {
     if (presetCondition === 'always' || !activePreset) {
@@ -267,6 +316,7 @@ export const ButtonCardApp: React.FC = () => {
     // Start with preset conditions applied
     let result = { ...configWithPresetConditions };
     const stateStyles = [...(result.stateStyles || [])];
+    const supportsBinaryStateAppearance = hasOnOffState(configWithPresetConditions.entity);
     
     // Helper to check if appearance has any non-empty values
     const hasAppearanceValues = (appearance: Partial<StateAppearanceConfig>): boolean => {
@@ -325,7 +375,7 @@ export const ButtonCardApp: React.FC = () => {
     };
     
     // Add ON state appearance if it has values
-    if (hasAppearanceValues(onStateAppearance)) {
+    if (supportsBinaryStateAppearance && hasAppearanceValues(onStateAppearance)) {
       // Remove any existing state-appearance style for ON
       const filtered = stateStyles.filter(s => !s.id.startsWith('state-appearance-on'));
       filtered.push(createStateStyle(onStateAppearance, 'on'));
@@ -333,11 +383,17 @@ export const ButtonCardApp: React.FC = () => {
     }
     
     // Add OFF state appearance if it has values
-    if (hasAppearanceValues(offStateAppearance)) {
+    if (supportsBinaryStateAppearance && hasAppearanceValues(offStateAppearance)) {
       const currentStyles = result.stateStyles || stateStyles;
       const filtered = currentStyles.filter(s => !s.id.startsWith('state-appearance-off'));
       filtered.push(createStateStyle(offStateAppearance, 'off'));
       result.stateStyles = filtered;
+    }
+
+    if (!supportsBinaryStateAppearance) {
+      result.stateStyles = (result.stateStyles || stateStyles).filter(
+        s => !s.id.startsWith('state-appearance-on') && !s.id.startsWith('state-appearance-off')
+      );
     }
     
     return result;
@@ -403,6 +459,58 @@ export const ButtonCardApp: React.FC = () => {
       setConfigInternal(prev => ({ ...prev, ...activePreset.config }));
       isApplyingPresetRef.current = false;
     }
+  };
+
+  const handlePresetConfigChange = (updates: Partial<ButtonConfig>) => {
+    if (!activePreset) return;
+
+    isApplyingPresetRef.current = true;
+    setConfig(prev => ({ ...prev, ...updates }));
+
+    const nextPreset: Preset = {
+      ...activePreset,
+      config: { ...activePreset.config, ...updates },
+    };
+    setActivePreset(nextPreset);
+
+    if (presetCondition === 'on' && useAutoDarkMode && (offStatePreset?.isAutoDark ?? true)) {
+      setOffStatePreset(generateDarkModePreset(nextPreset));
+    }
+
+    isApplyingPresetRef.current = false;
+  };
+
+  const handleSaveCustomPreset = (name: string, description: string): { ok: boolean; error?: string } => {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      return { ok: false, error: 'Preset name is required.' };
+    }
+    const exists = availablePresets.some(p => p.name.toLowerCase() === normalizedName.toLowerCase());
+    if (exists) {
+      return { ok: false, error: `A preset named "${normalizedName}" already exists.` };
+    }
+
+    const preset: Preset = {
+      id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: normalizedName,
+      description: description.trim() || 'Custom saved style',
+      category: 'custom',
+      config: buildStylePresetConfig(config),
+      isUserPreset: true,
+    };
+
+    setCustomPresets(prev => [preset, ...prev]);
+    return { ok: true };
+  };
+
+  const handleDeleteCustomPreset = (preset: Preset) => {
+    if (!preset.isUserPreset) return;
+
+    setCustomPresets(prev => prev.filter(p => !isSamePreset(p, preset)));
+
+    if (isSamePreset(activePreset, preset)) setActivePreset(null);
+    if (isSamePreset(offStatePreset, preset)) setOffStatePreset(null);
+    if (isSamePreset(onStatePreset, preset)) setOnStatePreset(null);
   };
 
   const handleImportYaml = () => {
@@ -528,8 +636,12 @@ export const ButtonCardApp: React.FC = () => {
           <ConfigPanel 
             config={config} 
             setConfig={setConfig} 
+            presets={availablePresets}
             activePreset={activePreset}
+            onPresetConfigChange={handlePresetConfigChange}
             onApplyPreset={handleApplyPreset}
+            onSaveCustomPreset={handleSaveCustomPreset}
+            onDeleteCustomPreset={handleDeleteCustomPreset}
             onResetToPreset={handleResetToPreset}
             presetCondition={presetCondition}
             onSetPresetCondition={setPresetCondition}
@@ -590,8 +702,12 @@ export const ButtonCardApp: React.FC = () => {
               <ConfigPanel 
                 config={config} 
                 setConfig={setConfig}
+                presets={availablePresets}
                 activePreset={activePreset}
+                onPresetConfigChange={handlePresetConfigChange}
                 onApplyPreset={handleApplyPreset}
+                onSaveCustomPreset={handleSaveCustomPreset}
+                onDeleteCustomPreset={handleDeleteCustomPreset}
                 onResetToPreset={handleResetToPreset}
                 presetCondition={presetCondition}
                 onSetPresetCondition={setPresetCondition}

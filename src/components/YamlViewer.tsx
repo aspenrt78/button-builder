@@ -95,8 +95,37 @@ export const YamlViewer: React.FC<Props> = ({ yaml, className = '', config }) =>
     return generateGlobalTemplate(config, templateName);
   }, [config, templateName]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(yaml);
+  const copyText = async (text: string): Promise<boolean> => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // Fall through to execCommand fallback.
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      textarea.style.pointerEvents = 'none';
+      document.body.appendChild(textarea);
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCopy = async () => {
+    const ok = await copyText(yaml);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -111,8 +140,9 @@ export const YamlViewer: React.FC<Props> = ({ yaml, className = '', config }) =>
     URL.revokeObjectURL(url);
   };
 
-  const handleCopyTemplate = () => {
-    navigator.clipboard.writeText(globalTemplate);
+  const handleCopyTemplate = async () => {
+    const ok = await copyText(globalTemplate);
+    if (!ok) return;
     setTemplateCopied(true);
     setTimeout(() => setTemplateCopied(false), 2000);
   };

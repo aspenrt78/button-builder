@@ -11,6 +11,7 @@ import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from '
 import { haService } from '../services/homeAssistantService';
 import { PRESETS, Preset, generateDarkModePreset } from '../presets';
 import { validateCss, formatValidationResults } from '../utils/cssValidator';
+import { getEntityCapabilities } from '../utils/entityCapabilities';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -147,7 +148,11 @@ function getIconForEntity(entityId: string, domain: string): string {
 interface Props {
   config: ButtonConfig;
   setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>>;
+  presets?: Preset[];
   activePreset?: Preset | null;
+  onPresetConfigChange?: (updates: Partial<ButtonConfig>) => void;
+  onSaveCustomPreset?: (name: string, description: string) => { ok: boolean; error?: string };
+  onDeleteCustomPreset?: (preset: Preset) => void;
   // Preset management props
   onApplyPreset?: (preset: Preset, forState?: 'on' | 'off') => void;
   onResetToPreset?: () => void;
@@ -165,8 +170,8 @@ interface Props {
   // State-specific appearance props
   onStateAppearance?: Partial<StateAppearanceConfig>;
   offStateAppearance?: Partial<StateAppearanceConfig>;
-  onSetOnStateAppearance?: (appearance: Partial<StateAppearanceConfig>) => void;
-  onSetOffStateAppearance?: (appearance: Partial<StateAppearanceConfig>) => void;
+  onSetOnStateAppearance?: React.Dispatch<React.SetStateAction<Partial<StateAppearanceConfig>>>;
+  onSetOffStateAppearance?: React.Dispatch<React.SetStateAction<Partial<StateAppearanceConfig>>>;
 }
 
 // Section component removed - now using drill-down navigation via ConfigPanelNav
@@ -214,7 +219,11 @@ const ColorPairInput = ({ label, colorValue, setColor, autoValue, setAuto }: any
 export const ConfigPanel: React.FC<Props> = ({ 
   config, 
   setConfig, 
+  presets = PRESETS,
   activePreset, 
+  onPresetConfigChange,
+  onSaveCustomPreset,
+  onDeleteCustomPreset,
   onApplyPreset,
   onResetToPreset,
   presetCondition = 'always',
@@ -236,6 +245,41 @@ export const ConfigPanel: React.FC<Props> = ({
   const update = (key: keyof ButtonConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
+
+  const updatePresetField = (key: keyof ButtonConfig, value: any) => {
+    if (!onPresetConfigChange) return;
+    onPresetConfigChange({ [key]: value } as Partial<ButtonConfig>);
+  };
+
+  const formatPresetFieldLabel = (key: string) =>
+    key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      .replace(/^./, c => c.toUpperCase());
+
+  const presetSelectOptionsByKey: Record<string, { value: string; label: string }[]> = {
+    layout: LAYOUT_OPTIONS,
+    borderStyle: BORDER_STYLE_OPTIONS,
+    colorType: COLOR_TYPE_OPTIONS,
+    cardAnimation: ANIMATION_OPTIONS,
+    iconAnimation: ANIMATION_OPTIONS,
+    cardAnimationTrigger: TRIGGER_OPTIONS,
+    iconAnimationTrigger: TRIGGER_OPTIONS,
+    backdropBlur: BLUR_OPTIONS,
+    shadowSize: SHADOW_SIZE_OPTIONS,
+    textTransform: TRANSFORM_OPTIONS,
+    fontWeight: WEIGHT_OPTIONS,
+    fontFamily: FONT_FAMILY_OPTIONS,
+    letterSpacing: LETTER_SPACING_OPTIONS,
+    lineHeight: LINE_HEIGHT_OPTIONS,
+  };
+
+  const presetEditableEntries = useMemo(() => {
+    if (!activePreset) return [] as Array<[keyof ButtonConfig, any]>;
+    return Object.entries(activePreset.config)
+      .filter(([, value]) => value !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b)) as Array<[keyof ButtonConfig, any]>;
+  }, [activePreset]);
 
   // Get the current state appearance based on editing state
   const currentAppearance = editingState === 'on' ? onStateAppearance : offStateAppearance;
@@ -268,6 +312,10 @@ export const ConfigPanel: React.FC<Props> = ({
   
   // Preset search state
   const [presetSearch, setPresetSearch] = useState('');
+  const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetDescription, setNewPresetDescription] = useState('');
+  const [savePresetError, setSavePresetError] = useState('');
+  const [savePresetSuccess, setSavePresetSuccess] = useState('');
   
   // CSS validation for extraStyles
   const cssValidation = useMemo(() => {
@@ -281,9 +329,94 @@ export const ConfigPanel: React.FC<Props> = ({
 
   // Label entity attributes
   const [labelEntityAttributes, setLabelEntityAttributes] = useState<string[]>([]);
+  const [selectedEntityState, setSelectedEntityState] = useState<string>('');
   
   // Custom field entity attributes (indexed by field index)
   const [customFieldAttributes, setCustomFieldAttributes] = useState<Record<number, string[]>>({});
+  
+  const entityCapabilities = useMemo(
+    () => getEntityCapabilities(config.entity, selectedEntityState),
+    [config.entity, selectedEntityState]
+  );
+
+  const baseActionOptions = useMemo(
+    () => ACTION_OPTIONS.filter(option => !['perform-action', 'assist', 'fire-dom-event', 'multi-actions'].includes(option.value)),
+    []
+  );
+
+  const entityActionOptions = useMemo(() => {
+    if (!config.entity || entityCapabilities.supportsToggleAction) return baseActionOptions;
+    return baseActionOptions.filter(option => option.value !== 'toggle');
+  }, [baseActionOptions, config.entity, entityCapabilities.supportsToggleAction]);
+
+  const isActivePreset = (preset: Preset): boolean => {
+    if (!activePreset) return false;
+    if (preset.id && activePreset.id) return preset.id === activePreset.id;
+    return preset.name === activePreset.name && preset.category === activePreset.category;
+  };
+
+  const actionTypeSnapshot = useMemo(
+    () => [
+      config.tapAction,
+      config.holdAction,
+      config.doubleTapAction,
+      config.pressAction,
+      config.releaseAction,
+      config.iconTapAction,
+      config.iconHoldAction,
+      config.iconDoubleTapAction,
+      config.iconPressAction,
+      config.iconReleaseAction,
+    ].join('|'),
+    [
+      config.tapAction,
+      config.holdAction,
+      config.doubleTapAction,
+      config.pressAction,
+      config.releaseAction,
+      config.iconTapAction,
+      config.iconHoldAction,
+      config.iconDoubleTapAction,
+      config.iconPressAction,
+      config.iconReleaseAction,
+    ]
+  );
+
+  const presetCategoryOrder: Preset['category'][] = [
+    'minimal',
+    'glass',
+    'neon',
+    'gradient',
+    'animated',
+    '3d',
+    'cyberpunk',
+    'retro',
+    'nature',
+    'icon-styles',
+    'custom',
+  ];
+
+  const handleSaveCurrentStylePreset = () => {
+    if (!onSaveCustomPreset) return;
+    setSavePresetError('');
+    setSavePresetSuccess('');
+
+    const result = onSaveCustomPreset(newPresetName, newPresetDescription);
+    if (!result.ok) {
+      setSavePresetError(result.error || 'Failed to save preset.');
+      return;
+    }
+
+    setNewPresetName('');
+    setNewPresetDescription('');
+    setSavePresetSuccess('Preset saved in Custom styles.');
+  };
+
+  useEffect(() => {
+    if (!savePresetSuccess) return;
+    const timer = window.setTimeout(() => setSavePresetSuccess(''), 2500);
+    return () => window.clearTimeout(timer);
+  }, [savePresetSuccess]);
 
   // Fetch label entity attributes when labelEntity changes
   useEffect(() => {
@@ -295,6 +428,83 @@ export const ConfigPanel: React.FC<Props> = ({
       setLabelEntityAttributes([]);
     }
   }, [config.labelEntity]);
+
+  // Fetch current entity state so UI can present valid per-entity options.
+  useEffect(() => {
+    if (!config.entity) {
+      setSelectedEntityState('');
+      return;
+    }
+    haService.getEntityData(config.entity).then(entity => {
+      setSelectedEntityState(entity?.state || '');
+    });
+  }, [config.entity]);
+
+  // Keep live stream controls aligned with entity capabilities.
+  useEffect(() => {
+    if (!entityCapabilities.supportsLiveStream && config.showLiveStream) {
+      setConfig(prev => ({
+        ...prev,
+        showLiveStream: false,
+        liveStreamAspectRatio: '',
+        liveStreamFitMode: ''
+      }));
+    }
+  }, [entityCapabilities.supportsLiveStream, config.showLiveStream, setConfig]);
+
+  // Replace unsupported toggle actions with valid equivalents for current entity type.
+  useEffect(() => {
+    const togglePairs: Array<[string, string]> = [
+      ['tapAction', 'tapActionData'],
+      ['holdAction', 'holdActionData'],
+      ['doubleTapAction', 'doubleTapActionData'],
+      ['pressAction', 'pressActionData'],
+      ['releaseAction', 'releaseActionData'],
+      ['iconTapAction', 'iconTapActionData'],
+      ['iconHoldAction', 'iconHoldActionData'],
+      ['iconDoubleTapAction', 'iconDoubleTapActionData'],
+      ['iconPressAction', 'iconPressActionData'],
+      ['iconReleaseAction', 'iconReleaseActionData'],
+    ];
+    const unsupportedActions = new Set(['perform-action', 'assist', 'fire-dom-event', 'multi-actions']);
+    const fallbackService = entityCapabilities.toggleFallbackService;
+
+    const updates: Record<string, any> = {};
+    let hasChanges = false;
+
+    togglePairs.forEach(([actionKey, actionDataKey]) => {
+      const currentAction = (config as any)[actionKey];
+      if (unsupportedActions.has(currentAction)) {
+        hasChanges = true;
+        updates[actionKey] = 'none';
+        updates[actionDataKey] = '';
+        return;
+      }
+      if (currentAction !== 'toggle') return;
+      if (entityCapabilities.supportsToggleAction || !config.entity) return;
+
+      hasChanges = true;
+      if (fallbackService) {
+        updates[actionKey] = 'call-service';
+        updates[actionDataKey] = JSON.stringify({
+          service: fallbackService,
+          target: { entity_id: config.entity }
+        });
+      } else {
+        updates[actionKey] = 'more-info';
+      }
+    });
+
+    if (hasChanges) {
+      setConfig(prev => ({ ...prev, ...updates }));
+    }
+  }, [
+    entityCapabilities.supportsToggleAction,
+    entityCapabilities.toggleFallbackService,
+    config.entity,
+    actionTypeSnapshot,
+    setConfig
+  ]);
 
   // Fetch custom field entity attributes when entities change
   useEffect(() => {
@@ -311,6 +521,100 @@ export const ConfigPanel: React.FC<Props> = ({
     };
     fetchAllAttributes();
   }, [config.customFields.map(f => f.entity).join(',')]);
+
+  const renderPresetFieldEditor = (key: keyof ButtonConfig, originalValue: any) => {
+    const currentValue = (config as any)[key] !== undefined ? (config as any)[key] : originalValue;
+    const fieldKey = key as string;
+    const fieldLabel = formatPresetFieldLabel(fieldKey);
+
+    if (typeof originalValue === 'boolean') {
+      return (
+        <ControlInput
+          key={fieldKey}
+          label={fieldLabel}
+          type="checkbox"
+          value={Boolean(currentValue)}
+          onChange={(v) => updatePresetField(key, Boolean(v))}
+          className="bg-gray-800/40 p-2 rounded border border-gray-700"
+        />
+      );
+    }
+
+    if (typeof originalValue === 'number') {
+      return (
+        <ControlInput
+          key={fieldKey}
+          label={fieldLabel}
+          type="number"
+          value={Number(currentValue)}
+          onChange={(v) => updatePresetField(key, Number(v))}
+        />
+      );
+    }
+
+    if (typeof originalValue === 'string') {
+      const selectOptions = presetSelectOptionsByKey[fieldKey];
+      const isColorField = fieldKey.toLowerCase().includes('color') && fieldKey !== 'colorType';
+
+      if (fieldKey === 'extraStyles') {
+        return (
+          <div key={fieldKey} className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{fieldLabel}</label>
+            <textarea
+              value={String(currentValue || '')}
+              onChange={(e) => updatePresetField(key, e.target.value)}
+              rows={4}
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 resize-y"
+            />
+          </div>
+        );
+      }
+
+      if (selectOptions) {
+        const normalizedValue = String(currentValue ?? '');
+        const hasOption = selectOptions.some(opt => opt.value === normalizedValue);
+        if (hasOption) {
+          return (
+            <ControlInput
+              key={fieldKey}
+              label={fieldLabel}
+              type="select"
+              value={normalizedValue}
+              options={selectOptions}
+              onChange={(v) => updatePresetField(key, v)}
+            />
+          );
+        }
+      }
+
+      if (isColorField) {
+        return (
+          <ControlInput
+            key={fieldKey}
+            label={fieldLabel}
+            type="color"
+            value={String(currentValue || '')}
+            onChange={(v) => updatePresetField(key, v)}
+          />
+        );
+      }
+
+      return (
+        <ControlInput
+          key={fieldKey}
+          label={fieldLabel}
+          value={String(currentValue || '')}
+          onChange={(v) => updatePresetField(key, v)}
+        />
+      );
+    }
+
+    return (
+      <div key={fieldKey} className="p-2 bg-gray-800/40 border border-gray-700 rounded text-xs text-gray-400">
+        {fieldLabel}: complex value not editable here.
+      </div>
+    );
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
@@ -333,12 +637,21 @@ export const ConfigPanel: React.FC<Props> = ({
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase font-bold">Editing State</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Changes apply to <span className={editingState === 'on' ? 'text-green-400 font-medium' : 'text-gray-400 font-medium'}>{editingState.toUpperCase()}</span> state
+                    {entityCapabilities.hasOnOffState ? (
+                      <>
+                        Changes apply to <span className={editingState === 'on' ? 'text-green-400 font-medium' : 'text-gray-400 font-medium'}>{editingState.toUpperCase()}</span> state
+                      </>
+                    ) : (
+                      <>
+                        This entity state is <span className="text-amber-300 font-medium">{selectedEntityState || 'unknown'}</span>; ON/OFF editing is disabled.
+                      </>
+                    )}
                   </p>
                 </div>
                 <div className="flex bg-gray-800/80 rounded-full p-0.5 border border-gray-700">
                   <button
-                    onClick={() => onEditingStateChange?.('on')}
+                    onClick={() => entityCapabilities.hasOnOffState && onEditingStateChange?.('on')}
+                    disabled={!entityCapabilities.hasOnOffState}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                       editingState === 'on' 
                         ? 'bg-green-600 text-white shadow-lg' 
@@ -348,7 +661,8 @@ export const ConfigPanel: React.FC<Props> = ({
                     ON
                   </button>
                   <button
-                    onClick={() => onEditingStateChange?.('off')}
+                    onClick={() => entityCapabilities.hasOnOffState && onEditingStateChange?.('off')}
+                    disabled={!entityCapabilities.hasOnOffState}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                       editingState === 'off' 
                         ? 'bg-gray-600 text-white shadow-lg' 
@@ -365,6 +679,37 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== PRESETS > GALLERY ===== */}
           {showSection('presetGallery') && (
             <>
+              {/* Save Custom Preset */}
+              <div className="p-3 bg-gray-800/40 border border-gray-700 rounded-lg mb-4">
+                <p className="text-xs font-bold text-gray-300 uppercase mb-2">Save Current Style as Preset</p>
+                <div className="space-y-2">
+                  <ControlInput
+                    label="Preset Name"
+                    value={newPresetName}
+                    onChange={(v) => {
+                      setNewPresetName(v);
+                      if (savePresetError) setSavePresetError('');
+                    }}
+                    placeholder="My Kiln Green"
+                  />
+                  <ControlInput
+                    label="Description"
+                    value={newPresetDescription}
+                    onChange={(v) => setNewPresetDescription(v)}
+                    placeholder="Optional"
+                  />
+                  <button
+                    onClick={handleSaveCurrentStylePreset}
+                    disabled={!onSaveCustomPreset || !newPresetName.trim()}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed rounded text-sm font-medium text-white transition-colors"
+                  >
+                    Save as Preset
+                  </button>
+                  {savePresetError && <p className="text-[10px] text-red-400">{savePresetError}</p>}
+                  {savePresetSuccess && <p className="text-[10px] text-green-400">{savePresetSuccess}</p>}
+                </div>
+              </div>
+
               {/* Preset Search */}
               <div className="relative mb-4">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -396,10 +741,26 @@ export const ConfigPanel: React.FC<Props> = ({
                   </div>
                 </div>
               )}
+
+              {/* Preset Styler - edits keep preset active and sync with normal controls */}
+              {activePreset && onPresetConfigChange && (
+                <div className="p-3 bg-gray-800/40 border border-gray-700 rounded-lg mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-gray-300 uppercase">Preset Styler</p>
+                    <span className="text-[10px] text-gray-500">{presetEditableEntries.length} fields</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mb-3">
+                    Changes here update this preset and sync with the normal editors. Editing outside this panel exits preset mode.
+                  </p>
+                  <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                    {presetEditableEntries.map(([key, value]) => renderPresetFieldEditor(key, value))}
+                  </div>
+                </div>
+              )}
               
               {/* Preset Gallery */}
-              {['minimal', 'glass', 'neon', 'gradient', 'animated', '3d', 'cyberpunk', 'retro', 'nature', 'icon-styles', 'custom'].map(category => {
-                const filteredPresets = PRESETS.filter(p => {
+              {presetCategoryOrder.map(category => {
+                const filteredPresets = presets.filter(p => {
                   if (p.category !== category) return false;
                   if (!presetSearch) return true;
                   const query = presetSearch.toLowerCase();
@@ -414,18 +775,38 @@ export const ConfigPanel: React.FC<Props> = ({
                     </p>
                     <div className="grid grid-cols-1 gap-1">
                       {filteredPresets.map(preset => (
-                        <button
-                          key={preset.name}
-                          onClick={() => onApplyPreset?.(preset)}
-                          className={`w-full px-3 py-2 text-left rounded transition-colors ${
-                            activePreset?.name === preset.name
-                              ? 'bg-purple-500/20 border border-purple-500/50'
-                              : 'hover:bg-gray-800 border border-transparent'
+                        <div
+                          key={preset.id || preset.name}
+                          className={`w-full px-3 py-2 rounded border transition-colors ${
+                            isActivePreset(preset)
+                              ? 'bg-purple-500/20 border-purple-500/50'
+                              : 'hover:bg-gray-800 border-transparent'
                           }`}
                         >
-                          <div className="text-sm text-white font-medium">{preset.name}</div>
-                          <div className="text-[10px] text-gray-500">{preset.description}</div>
-                        </button>
+                          <div className="flex items-start gap-2">
+                            <button
+                              onClick={() => onApplyPreset?.(preset)}
+                              className="flex-1 text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm text-white font-medium">{preset.name}</div>
+                                {preset.isUserPreset && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">Saved</span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-gray-500">{preset.description}</div>
+                            </button>
+                            {preset.isUserPreset && onDeleteCustomPreset && (
+                              <button
+                                onClick={() => onDeleteCustomPreset(preset)}
+                                className="text-[10px] px-2 py-1 rounded bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors"
+                                title="Delete saved preset"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -433,7 +814,7 @@ export const ConfigPanel: React.FC<Props> = ({
               })}
               
               {/* No results message */}
-              {presetSearch && PRESETS.filter(p => {
+              {presetSearch && presets.filter(p => {
                 const query = presetSearch.toLowerCase();
                 return p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query);
               }).length === 0 && (
@@ -563,7 +944,7 @@ export const ConfigPanel: React.FC<Props> = ({
                       ) : (
                         <select
                           onChange={(e) => {
-                            const preset = PRESETS.find(p => p.name === e.target.value);
+                            const preset = presets.find(p => (p.id || p.name) === e.target.value);
                             if (preset) {
                               onSetOffStatePreset?.(preset);
                               // User manually selected a preset, disable auto dark mode
@@ -574,8 +955,8 @@ export const ConfigPanel: React.FC<Props> = ({
                           defaultValue=""
                         >
                           <option value="" disabled>Select preset for OFF state...</option>
-                          {PRESETS.map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
+                          {presets.map(p => (
+                            <option key={p.id || p.name} value={p.id || p.name}>{p.name}</option>
                           ))}
                         </select>
                       )}
@@ -607,15 +988,15 @@ export const ConfigPanel: React.FC<Props> = ({
                       ) : (
                         <select
                           onChange={(e) => {
-                            const preset = PRESETS.find(p => p.name === e.target.value);
+                            const preset = presets.find(p => (p.id || p.name) === e.target.value);
                             if (preset) onSetOnStatePreset?.(preset);
                           }}
                           className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
                           defaultValue=""
                         >
                           <option value="" disabled>Select preset for ON state...</option>
-                          {PRESETS.map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
+                          {presets.map(p => (
+                            <option key={p.id || p.name} value={p.id || p.name}>{p.name}</option>
                           ))}
                         </select>
                       )}
@@ -817,7 +1198,14 @@ export const ConfigPanel: React.FC<Props> = ({
             <ControlInput type="checkbox" label="Show Last Chg." value={config.showLastChanged} onChange={(v) => update('showLastChanged', v)} />
             <ControlInput type="checkbox" label="Entity Picture" value={config.showEntityPicture} onChange={(v) => update('showEntityPicture', v)} />
             <ControlInput type="checkbox" label="Show Units" value={config.showUnits} onChange={(v) => update('showUnits', v)} />
-            <ControlInput type="checkbox" label="Live Stream" value={config.showLiveStream} onChange={(v) => update('showLiveStream', v)} />
+            <ControlInput
+              type="checkbox"
+              label="Live Stream"
+              value={config.showLiveStream}
+              onChange={(v) => update('showLiveStream', v)}
+              disabled={!entityCapabilities.supportsLiveStream}
+              disabledReason="Live stream is only supported for camera entities."
+            />
             <ControlInput type="checkbox" label="Hidden" value={config.hidden} onChange={(v) => update('hidden', v)} />
           </div>
           {config.showLiveStream && (
@@ -1138,7 +1526,7 @@ export const ConfigPanel: React.FC<Props> = ({
                   onClick={() => update('stateStyles', [...config.stateStyles, { 
                     id: 'state_' + (config.stateStyles.length + 1), 
                     operator: 'equals', 
-                    value: 'on',
+                    value: entityCapabilities.hasOnOffState ? 'on' : (selectedEntityState || ''),
                     name: '',
                     icon: '',
                     color: '',
@@ -1165,6 +1553,16 @@ export const ConfigPanel: React.FC<Props> = ({
               </div>
               
               <p className="text-[10px] text-gray-500 mb-3">Define conditions to change colors, animations, or properties based on entity state.</p>
+              {!entityCapabilities.hasOnOffState && (
+                <p className="text-[10px] text-amber-300/90 mb-3">
+                  This entity is not ON/OFF based. Use exact state values like "{selectedEntityState || 'idle'}", regex, or numeric operators.
+                </p>
+              )}
+              {config.stateStyles.some(style => style.operator === 'template') && (
+                <p className="text-[10px] text-amber-300/90 mb-3">
+                  Template operators are generated in YAML, but preview cannot execute custom JS templates.
+                </p>
+              )}
               
               {config.stateStyles.length === 0 ? (
                 <div className="text-xs text-gray-500 italic text-center py-2">No conditionals defined</div>
@@ -1772,8 +2170,17 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('cardActions') && (
             <>
           <div className="space-y-4">
+            {!entityCapabilities.supportsToggleAction && (
+              <div className="text-[10px] text-amber-300 p-2 bg-amber-500/10 border border-amber-500/20 rounded">
+                <code className="text-amber-200">toggle</code> is not supported for{' '}
+                <code className="text-amber-200">{config.entity || 'this entity type'}</code>.
+                {entityCapabilities.toggleFallbackService
+                  ? ` Switched to call-service (${entityCapabilities.toggleFallbackService}).`
+                  : ' Use call-service or more-info instead.'}
+              </div>
+            )}
             <div>
-              <ControlInput label="Tap Action" type="select" value={config.tapAction} options={ACTION_OPTIONS} onChange={(v) => update('tapAction', v)} />
+              <ControlInput label="Tap Action" type="select" value={config.tapAction} options={entityActionOptions} onChange={(v) => update('tapAction', v)} />
               {(config.tapAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.tapActionData} onChange={(v) => update('tapActionData', v)} placeholder='{"service": "light.turn_on"}' />
@@ -1798,7 +2205,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div>
-              <ControlInput label="Hold Action" type="select" value={config.holdAction} options={ACTION_OPTIONS} onChange={(v) => update('holdAction', v)} />
+              <ControlInput label="Hold Action" type="select" value={config.holdAction} options={entityActionOptions} onChange={(v) => update('holdAction', v)} />
               {(config.holdAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.holdActionData} onChange={(v) => update('holdActionData', v)} placeholder='{"service": "light.turn_on"}' />
@@ -1821,7 +2228,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div>
-              <ControlInput label="Double Tap Action" type="select" value={config.doubleTapAction} options={ACTION_OPTIONS} onChange={(v) => update('doubleTapAction', v)} />
+              <ControlInput label="Double Tap Action" type="select" value={config.doubleTapAction} options={entityActionOptions} onChange={(v) => update('doubleTapAction', v)} />
               {(config.doubleTapAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.doubleTapActionData} onChange={(v) => update('doubleTapActionData', v)} placeholder='{"service": "light.turn_on"}' />
@@ -1857,7 +2264,7 @@ export const ConfigPanel: React.FC<Props> = ({
           <p className="text-xs text-gray-400 mb-4">Press/release actions for momentary switches (e.g., garage doors)</p>
           <div className="space-y-4">
             <div>
-              <ControlInput label="Press Action" type="select" value={config.pressAction} options={ACTION_OPTIONS} onChange={(v) => update('pressAction', v)} />
+              <ControlInput label="Press Action" type="select" value={config.pressAction} options={entityActionOptions} onChange={(v) => update('pressAction', v)} />
               {(config.pressAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.pressActionData} onChange={(v) => update('pressActionData', v)} placeholder='{"service": "switch.turn_on"}' />
@@ -1876,7 +2283,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div>
-              <ControlInput label="Release Action" type="select" value={config.releaseAction} options={ACTION_OPTIONS} onChange={(v) => update('releaseAction', v)} />
+              <ControlInput label="Release Action" type="select" value={config.releaseAction} options={entityActionOptions} onChange={(v) => update('releaseAction', v)} />
               {(config.releaseAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.releaseActionData} onChange={(v) => update('releaseActionData', v)} placeholder='{"service": "switch.turn_off"}' />
@@ -1903,7 +2310,7 @@ export const ConfigPanel: React.FC<Props> = ({
           <p className="text-xs text-gray-400 mb-4">Separate actions when clicking on the icon specifically</p>
           <div className="space-y-4">
             <div>
-              <ControlInput label="Icon Tap Action" type="select" value={config.iconTapAction} options={ACTION_OPTIONS} onChange={(v) => update('iconTapAction', v)} />
+              <ControlInput label="Icon Tap Action" type="select" value={config.iconTapAction} options={entityActionOptions} onChange={(v) => update('iconTapAction', v)} />
               {(config.iconTapAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.iconTapActionData} onChange={(v) => update('iconTapActionData', v)} />
@@ -1922,7 +2329,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div>
-              <ControlInput label="Icon Hold Action" type="select" value={config.iconHoldAction} options={ACTION_OPTIONS} onChange={(v) => update('iconHoldAction', v)} />
+              <ControlInput label="Icon Hold Action" type="select" value={config.iconHoldAction} options={entityActionOptions} onChange={(v) => update('iconHoldAction', v)} />
               {(config.iconHoldAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.iconHoldActionData} onChange={(v) => update('iconHoldActionData', v)} />
@@ -1941,7 +2348,7 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div>
-              <ControlInput label="Icon Double Tap Action" type="select" value={config.iconDoubleTapAction} options={ACTION_OPTIONS} onChange={(v) => update('iconDoubleTapAction', v)} />
+              <ControlInput label="Icon Double Tap Action" type="select" value={config.iconDoubleTapAction} options={entityActionOptions} onChange={(v) => update('iconDoubleTapAction', v)} />
               {(config.iconDoubleTapAction === 'call-service') && (
                 <div className="mt-2">
                   <ControlInput label="Service Data (JSON)" value={config.iconDoubleTapActionData} onChange={(v) => update('iconDoubleTapActionData', v)} />
@@ -1964,7 +2371,7 @@ export const ConfigPanel: React.FC<Props> = ({
             <p className="text-xs font-bold text-gray-400 uppercase">Icon Momentary Actions</p>
             <div className="space-y-4">
               <div>
-                <ControlInput label="Icon Press Action" type="select" value={config.iconPressAction} options={ACTION_OPTIONS} onChange={(v) => update('iconPressAction', v)} />
+                <ControlInput label="Icon Press Action" type="select" value={config.iconPressAction} options={entityActionOptions} onChange={(v) => update('iconPressAction', v)} />
                 {(config.iconPressAction === 'call-service') && (
                   <div className="mt-2">
                     <ControlInput label="Service Data (JSON)" value={config.iconPressActionData} onChange={(v) => update('iconPressActionData', v)} />
@@ -1978,7 +2385,7 @@ export const ConfigPanel: React.FC<Props> = ({
               </div>
               
               <div>
-                <ControlInput label="Icon Release Action" type="select" value={config.iconReleaseAction} options={ACTION_OPTIONS} onChange={(v) => update('iconReleaseAction', v)} />
+                <ControlInput label="Icon Release Action" type="select" value={config.iconReleaseAction} options={entityActionOptions} onChange={(v) => update('iconReleaseAction', v)} />
                 {(config.iconReleaseAction === 'call-service') && (
                   <div className="mt-2">
                     <ControlInput label="Service Data (JSON)" value={config.iconReleaseActionData} onChange={(v) => update('iconReleaseActionData', v)} />
