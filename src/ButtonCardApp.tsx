@@ -266,7 +266,9 @@ export const ButtonCardApp: React.FC = () => {
       value: presetCondition,
       name: '',
       icon: activePreset.config.icon || '',
-      color: activePreset.config.color || '',
+      // Do not force state.color from presets; with color_type: card this can
+      // override intended gradient/background styling in dashboard.
+      color: '',
       entityPicture: '',
       label: '',
       stateDisplay: '',
@@ -293,7 +295,8 @@ export const ButtonCardApp: React.FC = () => {
         value: oppositeState,
         name: '',
         icon: secondaryPreset.config.icon || '',
-        color: secondaryPreset.config.color || '',
+        // Same reasoning as main preset style above.
+        color: '',
         entityPicture: '',
         label: '',
         stateDisplay: '',
