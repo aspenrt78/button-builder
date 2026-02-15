@@ -546,7 +546,10 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   const liveEntityState = (mainEntityData?.state || '').toString().toLowerCase();
   const entityCaps = getEntityCapabilities(config.entity, liveEntityState);
-  const canTogglePreviewState = !mainEntityData || entityCaps.hasOnOffState;
+  // Keep simulated ON/OFF preview for binary and stateless trigger entities
+  // (e.g. button/input_button), otherwise HA timestamp-like states can
+  // immediately override preview styling after entity data loads.
+  const canTogglePreviewState = !mainEntityData || entityCaps.hasOnOffState || entityCaps.isStateless;
   const effectiveEntityState = canTogglePreviewState
     ? simulatedState
     : (liveEntityState || simulatedState || '').toString().toLowerCase();
