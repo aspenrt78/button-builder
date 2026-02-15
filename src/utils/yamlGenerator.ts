@@ -1149,8 +1149,20 @@ export const generateYaml = (config: ButtonConfig): string => {
     }
   }
 
+  const hasExplicitEqualsStateStyle = (stateVal: 'on' | 'off') =>
+    (config.stateStyles || []).some(stateStyle =>
+      stateStyle.operator === 'equals' &&
+      String(stateStyle.value || '').toLowerCase() === stateVal
+    );
+
   // --- Conditional State Logic ---
   const getStateLogic = (stateVal: 'on' | 'off') => {
+     // Avoid duplicate ON/OFF entries. button-card uses first matching state,
+     // so explicit stateStyles for on/off should take precedence.
+     if (hasExplicitEqualsStateStyle(stateVal)) {
+       return '';
+     }
+
      // Background color is now handled by state appearance, not hardcoded on/off colors
      const stateCardStyles: string[] = [];
      const stateIconStyles: string[] = [];

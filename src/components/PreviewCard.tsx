@@ -594,7 +594,6 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   const matchingStateStyle = (() => {
     let defaultStyle: StateStyleConfig | undefined;
-    let matchedStyle: StateStyleConfig | undefined;
     for (const stateStyle of config.stateStyles || []) {
       if (stateStyle.operator === 'default') {
         defaultStyle = defaultStyle || stateStyle;
@@ -602,10 +601,10 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       }
       const conditionValue = getConditionSourceValue(stateStyle);
       if (evaluateStateStyleMatch(stateStyle, conditionValue)) {
-        matchedStyle = stateStyle;
+        return stateStyle;
       }
     }
-    return matchedStyle || defaultStyle;
+    return defaultStyle;
   })();
 
   const getThresholdValue = (): number | null => {

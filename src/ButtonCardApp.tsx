@@ -224,24 +224,28 @@ export const ButtonCardApp: React.FC = () => {
     const newStateStyles = [...(config.stateStyles || [])];
     
     const presetBgColor = activePreset.config.backgroundColor || '';
+    const activePresetUsesAdvancedBackground =
+      !!activePreset.config.extraStyles || !!activePreset.config.gradientEnabled;
     const secondaryPreset = presetCondition === 'on' ? offStatePreset : onStatePreset;
     const secondaryBgColor = secondaryPreset?.config.backgroundColor || '';
+    const secondaryPresetUsesAdvancedBackground =
+      !!secondaryPreset?.config.extraStyles || !!secondaryPreset?.config.gradientEnabled;
     
     if (presetCondition === 'on') {
-      if (!config.stateOnColor && presetBgColor) {
+      if (!config.stateOnColor && presetBgColor && !activePresetUsesAdvancedBackground) {
         newConfig.stateOnColor = presetBgColor;
         newConfig.stateOnOpacity = activePreset.config.backgroundColorOpacity ?? 100;
       }
-      if (secondaryPreset && !config.stateOffColor && secondaryBgColor) {
+      if (secondaryPreset && !config.stateOffColor && secondaryBgColor && !secondaryPresetUsesAdvancedBackground) {
         newConfig.stateOffColor = secondaryBgColor;
         newConfig.stateOffOpacity = secondaryPreset.config.backgroundColorOpacity ?? 100;
       }
     } else {
-      if (!config.stateOffColor && presetBgColor) {
+      if (!config.stateOffColor && presetBgColor && !activePresetUsesAdvancedBackground) {
         newConfig.stateOffColor = presetBgColor;
         newConfig.stateOffOpacity = activePreset.config.backgroundColorOpacity ?? 100;
       }
-      if (secondaryPreset && !config.stateOnColor && secondaryBgColor) {
+      if (secondaryPreset && !config.stateOnColor && secondaryBgColor && !secondaryPresetUsesAdvancedBackground) {
         newConfig.stateOnColor = secondaryBgColor;
         newConfig.stateOnOpacity = secondaryPreset.config.backgroundColorOpacity ?? 100;
       }
