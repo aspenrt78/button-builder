@@ -454,16 +454,18 @@ export const ButtonCardApp: React.FC = () => {
         ...preset.config
       }));
       setActivePreset(preset);
+      // Main preset application should target base styles by default.
+      // Users can still choose ON/OFF conditional preset behavior explicitly.
+      setPresetCondition('always');
       isApplyingPresetRef.current = false;
       
       // Auto-generate dark mode preset for off state if auto mode is enabled
       if (useAutoDarkMode && supportsBinaryPresetConditions) {
         const darkPreset = generateDarkModePreset(preset);
         setOffStatePreset(darkPreset);
-        // If condition is 'always', switch to 'on' so the dark mode is used for off state
-        if (presetCondition === 'always') {
-          setPresetCondition('on');
-        }
+        // Keep preset condition as-is. Auto-switching to "on" moves preset
+        // backgrounds into state blocks, which breaks parity for presets like
+        // holographic that should live in base styles/extra_styles.
       } else if (!supportsBinaryPresetConditions) {
         // Stateless/non-binary entities cannot match ON/OFF in dashboard state logic.
         setPresetCondition('always');
