@@ -396,6 +396,14 @@ export const ButtonCardApp: React.FC = () => {
       result.stateStyles = (result.stateStyles || stateStyles).filter(
         s => !s.id.startsWith('state-appearance-on') && !s.id.startsWith('state-appearance-off')
       );
+
+      // ON/OFF triggers are invalid for non-binary entities; force always for parity.
+      if (result.cardAnimationTrigger !== 'always') {
+        result.cardAnimationTrigger = 'always';
+      }
+      if (result.iconAnimationTrigger !== 'always') {
+        result.iconAnimationTrigger = 'always';
+      }
     }
     
     return result;

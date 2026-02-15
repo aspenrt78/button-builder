@@ -796,12 +796,27 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
   // Add generic keyframes if any animation is used
   // Also check if extraStyles contains animation references (for presets like Holographic, Lava Lamp)
-  const extraStylesHasAnimation = config.extraStyles && (
-    config.extraStyles.includes('holo-shift') || 
+  const extraStylesHasAnimation = !!config.extraStyles && (
+    config.extraStyles.includes('holo-shift') ||
     config.extraStyles.includes('lava-shift') ||
     config.extraStyles.includes('animation:')
   );
-  const needsGenericKeyframes = (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') || config.iconAnimation !== 'none' || config.spin || config.rotate || extraStylesHasAnimation;
+  const stateStylesHasAnimation = (config.stateStyles || []).some(stateStyle =>
+    (stateStyle.cardAnimation && stateStyle.cardAnimation !== 'none') ||
+    (stateStyle.iconAnimation && stateStyle.iconAnimation !== 'none') ||
+    (!!stateStyle.styles && (
+      stateStyle.styles.includes('holo-shift') ||
+      stateStyle.styles.includes('lava-shift') ||
+      stateStyle.styles.includes('animation:')
+    ))
+  );
+  const needsGenericKeyframes =
+    (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') ||
+    config.iconAnimation !== 'none' ||
+    config.spin ||
+    config.rotate ||
+    extraStylesHasAnimation ||
+    stateStylesHasAnimation;
   if (needsGenericKeyframes) {
      extraStyles += `  @keyframes cba-flash {
     0%, 50%, 100% { opacity: 1; }

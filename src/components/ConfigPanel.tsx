@@ -538,6 +538,32 @@ export const ConfigPanel: React.FC<Props> = ({
     }
   }, [entityCapabilities.supportsLiveStream, config.showLiveStream, setConfig]);
 
+  // Non-binary entities cannot use ON/OFF animation triggers reliably.
+  // Normalize to "always" so preview and generated YAML behave the same.
+  useEffect(() => {
+    if (entityCapabilities.hasOnOffState) return;
+    const updates: Partial<ButtonConfig> = {};
+    let changed = false;
+
+    if (config.cardAnimationTrigger !== 'always') {
+      updates.cardAnimationTrigger = 'always';
+      changed = true;
+    }
+    if (config.iconAnimationTrigger !== 'always') {
+      updates.iconAnimationTrigger = 'always';
+      changed = true;
+    }
+
+    if (changed) {
+      setConfig(prev => ({ ...prev, ...updates }));
+    }
+  }, [
+    entityCapabilities.hasOnOffState,
+    config.cardAnimationTrigger,
+    config.iconAnimationTrigger,
+    setConfig,
+  ]);
+
   // Replace unsupported toggle actions with valid equivalents for current entity type.
   useEffect(() => {
     const togglePairs: Array<[string, string]> = [
@@ -1923,9 +1949,16 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Card Animation */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
                   <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
+                  <ControlInput
+                    label="Trigger"
+                    type="select"
+                    value={config.cardAnimationTrigger}
+                    options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
+                    onChange={(v) => update('cardAnimationTrigger', v)}
+                  />
                 </div>
                 <ControlInput 
                   type="checkbox" 
@@ -1940,9 +1973,16 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Icon Animation - NOT locked by extraStyles since it only affects card */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
                   <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
+                  <ControlInput
+                    label="Trigger"
+                    type="select"
+                    value={config.iconAnimationTrigger}
+                    options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
+                    onChange={(v) => update('iconAnimationTrigger', v)}
+                  />
                 </div>
                 <ControlInput 
                   type="checkbox" 
