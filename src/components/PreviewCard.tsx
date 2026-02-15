@@ -122,6 +122,26 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha / 100})`;
 };
 
+// Accept hex/rgb/rgba so gradient rendering does not break if a non-hex value appears.
+const toRgbaSafe = (color: string, alpha: number): string => {
+  if (!color) return `rgba(0, 0, 0, ${alpha})`;
+  const trimmed = color.trim();
+  if (trimmed.startsWith('#') && trimmed.length >= 7) {
+    const r = Number.parseInt(trimmed.slice(1, 3), 16);
+    const g = Number.parseInt(trimmed.slice(3, 5), 16);
+    const b = Number.parseInt(trimmed.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  if (trimmed.startsWith('rgb(')) {
+    const m = trimmed.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+    if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})`;
+  }
+  if (trimmed.startsWith('rgba(')) {
+    return trimmed.replace(/rgba\(([^)]+),\s*[\d.]+\s*\)/i, `rgba($1, ${alpha})`);
+  }
+  return trimmed;
+};
+
 const getShadowStyle = (size: string, color: string, opacity: number) => {
   if (size === 'none') return 'none';
   const rgba = hexToRgba(color, opacity);
@@ -571,6 +591,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   const matchingStateStyle = (() => {
     let defaultStyle: StateStyleConfig | undefined;
+    let matchedStyle: StateStyleConfig | undefined;
     for (const stateStyle of config.stateStyles || []) {
       if (stateStyle.operator === 'default') {
         defaultStyle = defaultStyle || stateStyle;
@@ -578,10 +599,10 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       }
       const conditionValue = getConditionSourceValue(stateStyle);
       if (evaluateStateStyleMatch(stateStyle, conditionValue)) {
-        return stateStyle;
+        matchedStyle = stateStyle;
       }
     }
-    return defaultStyle;
+    return matchedStyle || defaultStyle;
   })();
 
   const getThresholdValue = (): number | null => {
@@ -781,17 +802,9 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     const gradientColor3Enabled = matchingStateStyle?.gradientColor3Enabled ?? config.gradientColor3Enabled;
     const gradientOpacity = (matchingStateStyle?.gradientOpacity ?? config.gradientOpacity ?? 100) / 100;
     
-    // Convert hex colors to rgba with opacity
-    const toRgba = (hex: string, alpha: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-    
-    const color1 = toRgba(gradientColor1, gradientOpacity);
-    const color2 = toRgba(gradientColor2, gradientOpacity);
-    const color3 = toRgba(gradientColor3, gradientOpacity);
+    const color1 = toRgbaSafe(gradientColor1, gradientOpacity);
+    const color2 = toRgbaSafe(gradientColor2, gradientOpacity);
+    const color3 = toRgbaSafe(gradientColor3, gradientOpacity);
     
     const colors = gradientColor3Enabled 
       ? `${color1}, ${color2}, ${color3}`
@@ -819,7 +832,8 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   
   // Filter out background/backgroundImage from extraStyles if user explicitly set a backgroundColor
   // This allows user's backgroundColor to take precedence over preset animations/gradients
-  const filteredExtraStyles: React.CSSProperties = userSetBackgroundColor && hasExtraBackground
+  const shouldOverrideExtraBackground = userSetBackgroundColor || !!gradientBg;
+  const filteredExtraStyles: React.CSSProperties = shouldOverrideExtraBackground && hasExtraBackground
     ? Object.fromEntries(
         Object.entries(effectiveExtraStyles).filter(([key]) => 
           key !== 'background' && key !== 'backgroundImage' && key !== 'backgroundColor'

@@ -1688,9 +1688,15 @@ export const ConfigPanel: React.FC<Props> = ({
                             value={style.conditionEntity || config.entity || ''}
                             allowAll={true}
                             onChange={(v) => {
+                              const selectedState = conditionEntityStates[v] || '';
+                              const shouldAutofillValue =
+                                !style.value ||
+                                style.value === selectedEntityState ||
+                                style.value === selectedStateHint;
                               updateStateStyle(idx, {
                                 conditionEntity: v,
                                 conditionAttribute: '',
+                                ...(shouldAutofillValue ? { value: selectedState } : {}),
                               });
                             }}
                             placeholder="sensor.kiln_status"
