@@ -8,6 +8,7 @@ import { Preview } from './components/Preview';
 import { YamlViewer } from './components/YamlViewer';
 import { generateTileCardYaml } from './utils/yamlGenerator';
 import { Copy, Check, FileDown, FileUp } from 'lucide-react';
+import { APP_VERSION_LABEL } from '../version';
 
 const STORAGE_KEY = 'tile-card-config';
 
@@ -117,7 +118,12 @@ export const TileCardApp: React.FC = () => {
     <div className="h-full w-full flex flex-col bg-black text-white overflow-hidden">
       {/* Header */}
       <div className="shrink-0 h-12 bg-gray-950 border-b border-gray-800 flex items-center justify-between px-4">
-        <h1 className="text-sm font-semibold text-gray-200">Tile Card Builder</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-semibold text-gray-200">Tile Card Builder</h1>
+          <span className="px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400">
+            {APP_VERSION_LABEL}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <label className="cursor-pointer p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Import Config">
             <FileUp size={16} className="text-gray-400" />

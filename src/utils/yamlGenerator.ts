@@ -47,6 +47,91 @@ const getAnimationCSS = (type: AnimationType, speed: string = '2s') => {
   }
 };
 
+const quoteYamlSingle = (value: string): string => `'${String(value).replace(/'/g, "''")}'`;
+
+const escapeJsSingle = (value: string): string =>
+  String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+const normalizeTemplateValue = (rawValue: string): string => {
+  const trimmed = (rawValue || '').trim();
+  if (!trimmed) {
+    return `[[[
+  return false;
+]]]`;
+  }
+  if (trimmed.includes('[[[')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('return ')) {
+    const statement = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+    return `[[[
+  ${statement}
+]]]`;
+  }
+  return `[[[
+  return ${trimmed};
+]]]`;
+};
+
+const shouldUseTemplateCondition = (stateStyle: StateStyleConfig, cardEntityId: string): boolean => {
+  const conditionEntity = (stateStyle.conditionEntity || '').trim();
+  const conditionAttribute = (stateStyle.conditionAttribute || '').trim();
+  const normalizedCardEntity = (cardEntityId || '').trim();
+  const targetsOtherEntity = !!conditionEntity && conditionEntity !== normalizedCardEntity;
+  return !!conditionAttribute || targetsOtherEntity;
+};
+
+const buildStateConditionTemplate = (stateStyle: StateStyleConfig, cardEntityId: string): string => {
+  const conditionEntity = (stateStyle.conditionEntity || '').trim();
+  const conditionAttribute = (stateStyle.conditionAttribute || '').trim();
+  const normalizedCardEntity = (cardEntityId || '').trim();
+  const hasExplicitConditionEntity = !!conditionEntity;
+  const usesCardEntityContext = !hasExplicitConditionEntity || conditionEntity === normalizedCardEntity;
+  const escapedConditionEntity = escapeJsSingle(conditionEntity);
+
+  let sourceExpr = `''`;
+  if (conditionAttribute) {
+    const escapedAttribute = escapeJsSingle(conditionAttribute);
+    sourceExpr = usesCardEntityContext
+      ? `(entity.attributes && entity.attributes['${escapedAttribute}'] !== undefined ? entity.attributes['${escapedAttribute}'] : '')`
+      : `(states['${escapedConditionEntity}'] && states['${escapedConditionEntity}'].attributes && states['${escapedConditionEntity}'].attributes['${escapedAttribute}'] !== undefined ? states['${escapedConditionEntity}'].attributes['${escapedAttribute}'] : '')`;
+  } else {
+    sourceExpr = usesCardEntityContext
+      ? `entity.state`
+      : `(states['${escapedConditionEntity}'] ? states['${escapedConditionEntity}'].state : '')`;
+  }
+
+  const rawValue = String(stateStyle.value ?? '');
+  const escapedValue = escapeJsSingle(rawValue);
+
+  let comparisonExpr = 'false';
+  switch (stateStyle.operator) {
+    case 'equals':
+      comparisonExpr = `String(val) === '${escapedValue}'`;
+      break;
+    case 'not_equals':
+      comparisonExpr = `String(val) !== '${escapedValue}'`;
+      break;
+    case 'above':
+      comparisonExpr = `Number.parseFloat(String(val)) > Number.parseFloat('${escapedValue}')`;
+      break;
+    case 'below':
+      comparisonExpr = `Number.parseFloat(String(val)) < Number.parseFloat('${escapedValue}')`;
+      break;
+    case 'regex':
+      comparisonExpr = `new RegExp(${JSON.stringify(rawValue)}).test(String(val))`;
+      break;
+    default:
+      comparisonExpr = 'false';
+      break;
+  }
+
+  return `[[[
+  const val = ${sourceExpr};
+  return ${comparisonExpr};
+]]]`;
+};
+
 // Helper to generate threshold color template
 const generateThresholdColorTemplate = (config: ThresholdColorConfig): string => {
   if (!config.enabled) return '';
@@ -167,9 +252,13 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Resolve Gradient
   const getGradientCSS = () => {
     if (!config.gradientEnabled) return null;
-    const colors = config.gradientColor3Enabled 
-      ? `${config.gradientColor1}, ${config.gradientColor2}, ${config.gradientColor3}`
-      : `${config.gradientColor1}, ${config.gradientColor2}`;
+    const gradientOpacity = config.gradientOpacity ?? 100;
+    const color1 = hexToRgba(config.gradientColor1, gradientOpacity);
+    const color2 = hexToRgba(config.gradientColor2, gradientOpacity);
+    const color3 = hexToRgba(config.gradientColor3, gradientOpacity);
+    const colors = config.gradientColor3Enabled
+      ? `${color1}, ${color2}, ${color3}`
+      : `${color1}, ${color2}`;
     
     switch (config.gradientType) {
       case 'linear':
@@ -177,7 +266,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       case 'radial':
         return `background: radial-gradient(circle, ${colors})`;
       case 'conic':
-        return `background: conic-gradient(from ${config.gradientAngle}deg, ${colors}, ${config.gradientColor1})`;
+        return `background: conic-gradient(from ${config.gradientAngle}deg, ${colors}, ${color1})`;
       default:
         return null;
     }
@@ -308,12 +397,12 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Show options - only include if true (false is default, so omit for cleaner YAML)
   // Automatically disable options if their content is not set
   const hasLabelContent = !!(config.labelTemplate || config.labelEntity || config.label);
-  const hasEntityPicture = !!config.entityPicture;
   const hasUnits = !!config.units;
   const hasEntity = !!config.entity;
+  const canShowEntityPicture = hasEntity || !!config.entityPicture;
   
   const showLabel = hasLabelContent ? config.showLabel : false;
-  const showEntityPicture = hasEntityPicture ? config.showEntityPicture : false;
+  const showEntityPicture = canShowEntityPicture ? config.showEntityPicture : false;
   const showUnits = hasUnits ? config.showUnits : false;
   const showState = hasEntity ? config.showState : false;
   const showLastChanged = hasEntity ? config.showLastChanged : false;
@@ -1117,47 +1206,58 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
   // Custom State Styles / Conditionals
   if (hasStateConditionals) {
     config.stateStyles.forEach(stateStyle => {
-      yaml += `  - `;
-      
-      // Operator
+      yaml += `  -\n`;
+
+      const usesCrossEntityCondition = shouldUseTemplateCondition(stateStyle, config.entity || '');
+      const outputAsTemplate =
+        stateStyle.operator === 'template' ||
+        (stateStyle.operator !== 'default' && usesCrossEntityCondition);
+
       if (stateStyle.operator === 'default') {
-        yaml += `operator: default\n`;
-      } else if (stateStyle.operator === 'template') {
-        yaml += `value: ${stateStyle.value}\n`;
+        yaml += `    operator: default\n`;
+      } else if (outputAsTemplate) {
+        const templateValue = stateStyle.operator === 'template'
+          ? normalizeTemplateValue(stateStyle.value)
+          : buildStateConditionTemplate(stateStyle, config.entity || '');
+        yaml += `    operator: template\n`;
+        yaml += `    value: |\n`;
+        templateValue.split('\n').forEach(line => {
+          yaml += `      ${line}\n`;
+        });
       } else if (stateStyle.operator === 'regex') {
-        yaml += `operator: regex\n`;
-        yaml += `    value: "${stateStyle.value}"\n`;
+        yaml += `    operator: regex\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       } else if (stateStyle.operator === 'above') {
-        yaml += `operator: '>'\n`;
-        yaml += `    value: ${stateStyle.value}\n`;
+        yaml += `    operator: '>'\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       } else if (stateStyle.operator === 'below') {
-        yaml += `operator: '<'\n`;
-        yaml += `    value: ${stateStyle.value}\n`;
+        yaml += `    operator: '<'\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       } else if (stateStyle.operator === 'not_equals') {
-        yaml += `operator: '!='\n`;
-        yaml += `    value: '${stateStyle.value}'\n`;
+        yaml += `    operator: '!='\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       } else {
-        yaml += `value: '${stateStyle.value}'\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       }
       
       // Basic Overrides
       if (stateStyle.name) {
-        yaml += `    name: "${stateStyle.name}"\n`;
+        yaml += `    name: ${JSON.stringify(stateStyle.name)}\n`;
       }
       if (stateStyle.icon) {
-        yaml += `    icon: ${stateStyle.icon}\n`;
+        yaml += `    icon: ${JSON.stringify(stateStyle.icon)}\n`;
       }
       if (stateStyle.color) {
-        yaml += `    color: "${stateStyle.color}"\n`;
+        yaml += `    color: ${JSON.stringify(stateStyle.color)}\n`;
       }
       if (stateStyle.entityPicture) {
-        yaml += `    entity_picture: ${stateStyle.entityPicture}\n`;
+        yaml += `    entity_picture: ${JSON.stringify(stateStyle.entityPicture)}\n`;
       }
       if (stateStyle.label) {
-        yaml += `    label: "${stateStyle.label}"\n`;
+        yaml += `    label: ${JSON.stringify(stateStyle.label)}\n`;
       }
       if (stateStyle.stateDisplay) {
-        yaml += `    state_display: "${stateStyle.stateDisplay}"\n`;
+        yaml += `    state_display: ${JSON.stringify(stateStyle.stateDisplay)}\n`;
       }
       if (stateStyle.spin) {
         yaml += `    spin: true\n`;
@@ -1374,7 +1474,10 @@ button_card_templates:
   if (!config.gradientEnabled && config.backgroundColor && config.backgroundColorOpacity !== undefined) {
     cardStyles.push(`background: ${hexToRgba(config.backgroundColor, config.backgroundColorOpacity)}`);
   } else if (config.gradientEnabled && config.gradientColor1 && config.gradientColor2) {
-    const gradient = `linear-gradient(${config.gradientAngle || 135}deg, ${config.gradientColor1}, ${config.gradientColor2})`;
+    const gradientOpacity = config.gradientOpacity ?? 100;
+    const color1 = hexToRgba(config.gradientColor1, gradientOpacity);
+    const color2 = hexToRgba(config.gradientColor2, gradientOpacity);
+    const gradient = `linear-gradient(${config.gradientAngle || 135}deg, ${color1}, ${color2})`;
     cardStyles.push(`background: '${gradient}'`);
   }
 
@@ -1466,9 +1569,37 @@ button_card_templates:
   if (config.stateStyles && config.stateStyles.length > 0) {
     yaml += `    state:\n`;
     config.stateStyles.forEach(stateStyle => {
-      yaml += `      - value: '${stateStyle.value}'\n`;
-      if (stateStyle.operator && stateStyle.operator !== '==' as any) {
-        yaml += `        operator: '${stateStyle.operator}'\n`;
+      yaml += `      -\n`;
+      const usesCrossEntityCondition = shouldUseTemplateCondition(stateStyle, '');
+      const outputAsTemplate =
+        stateStyle.operator === 'template' ||
+        (stateStyle.operator !== 'default' && usesCrossEntityCondition);
+
+      if (stateStyle.operator === 'default') {
+        yaml += `        operator: default\n`;
+      } else if (outputAsTemplate) {
+        const templateValue = stateStyle.operator === 'template'
+          ? normalizeTemplateValue(stateStyle.value)
+          : buildStateConditionTemplate(stateStyle, '');
+        yaml += `        operator: template\n`;
+        yaml += `        value: |\n`;
+        templateValue.split('\n').forEach(line => {
+          yaml += `          ${line}\n`;
+        });
+      } else if (stateStyle.operator === 'regex') {
+        yaml += `        operator: regex\n`;
+        yaml += `        value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
+      } else if (stateStyle.operator === 'above') {
+        yaml += `        operator: '>'\n`;
+        yaml += `        value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
+      } else if (stateStyle.operator === 'below') {
+        yaml += `        operator: '<'\n`;
+        yaml += `        value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
+      } else if (stateStyle.operator === 'not_equals') {
+        yaml += `        operator: '!='\n`;
+        yaml += `        value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
+      } else {
+        yaml += `        value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       }
       
       const stateCardStyles: string[] = [];

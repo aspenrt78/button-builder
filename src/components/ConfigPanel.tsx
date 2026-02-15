@@ -5,7 +5,7 @@ import { ControlInput } from './ControlInput';
 import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
-import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, STATE_OPERATOR_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
+import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
 import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge, Search, AlertCircle } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
 import { haService } from '../services/homeAssistantService';
@@ -216,6 +216,34 @@ const ColorPairInput = ({ label, colorValue, setColor, autoValue, setAuto }: any
   </div>
 );
 
+const YamlOnlyBadge: React.FC<{ title?: string }> = ({
+  title = 'This option is exported to YAML and applied in Home Assistant runtime; local preview does not execute it.'
+}) => (
+  <span
+    title={title}
+    className="inline-flex items-center px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-[9px] font-bold uppercase tracking-wider text-amber-300"
+  >
+    YAML-only
+  </span>
+);
+
+const YamlOnlyHint: React.FC<{ text: string }> = ({ text }) => (
+  <div className="flex items-start gap-2 p-2 rounded border border-amber-500/20 bg-amber-500/5">
+    <YamlOnlyBadge />
+    <p className="text-[10px] text-amber-200/90 leading-snug">{text}</p>
+  </div>
+);
+
+const CONDITION_MATCH_OPTIONS = [
+  { value: 'equals', label: 'State is' },
+  { value: 'not_equals', label: 'State is not' },
+  { value: 'above', label: 'Value is above' },
+  { value: 'below', label: 'Value is below' },
+  { value: 'regex', label: 'Matches pattern' },
+  { value: 'template', label: 'Advanced template' },
+  { value: 'default', label: 'Fallback (else)' },
+];
+
 export const ConfigPanel: React.FC<Props> = ({ 
   config, 
   setConfig, 
@@ -244,6 +272,12 @@ export const ConfigPanel: React.FC<Props> = ({
   
   const update = (key: keyof ButtonConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateStateStyle = (idx: number, patch: Partial<StateStyleConfig>) => {
+    const updated = [...config.stateStyles];
+    updated[idx] = { ...updated[idx], ...patch };
+    update('stateStyles', updated);
   };
 
   const updatePresetField = (key: keyof ButtonConfig, value: any) => {
@@ -287,17 +321,22 @@ export const ConfigPanel: React.FC<Props> = ({
   
   // Update appearance for current editing state - uses functional update to handle rapid successive calls
   const updateAppearance = (key: keyof StateAppearanceConfig, value: any) => {
-    if (setCurrentAppearance) {
+    if (entityCapabilities.hasOnOffState && setCurrentAppearance) {
       // Use functional update to avoid stale state when multiple updates happen in sequence
       setCurrentAppearance(prev => ({ ...prev, [key]: value }));
+      return;
     }
+    // Non-binary entities should edit base card appearance directly.
+    update(key as unknown as keyof ButtonConfig, value);
   };
   
   // Get value from current appearance or fall back to config
   const getAppearanceValue = <K extends keyof StateAppearanceConfig>(key: K): StateAppearanceConfig[K] => {
-    const appearanceValue = (currentAppearance as StateAppearanceConfig)[key];
-    if (appearanceValue !== undefined && appearanceValue !== '') {
-      return appearanceValue as StateAppearanceConfig[K];
+    if (entityCapabilities.hasOnOffState) {
+      const appearanceValue = (currentAppearance as StateAppearanceConfig)[key];
+      if (appearanceValue !== undefined && appearanceValue !== '') {
+        return appearanceValue as StateAppearanceConfig[K];
+      }
     }
     // Fall back to base config value if applicable
     if (key in config) {
@@ -330,6 +369,8 @@ export const ConfigPanel: React.FC<Props> = ({
   // Label entity attributes
   const [labelEntityAttributes, setLabelEntityAttributes] = useState<string[]>([]);
   const [selectedEntityState, setSelectedEntityState] = useState<string>('');
+  const [conditionEntityAttributes, setConditionEntityAttributes] = useState<Record<string, string[]>>({});
+  const [conditionEntityStates, setConditionEntityStates] = useState<Record<string, string>>({});
   
   // Custom field entity attributes (indexed by field index)
   const [customFieldAttributes, setCustomFieldAttributes] = useState<Record<number, string[]>>({});
@@ -338,6 +379,9 @@ export const ConfigPanel: React.FC<Props> = ({
     () => getEntityCapabilities(config.entity, selectedEntityState),
     [config.entity, selectedEntityState]
   );
+  const selectedStateHint = entityCapabilities.isStateless
+    ? 'stateless'
+    : (selectedEntityState || 'unknown');
 
   const baseActionOptions = useMemo(
     () => ACTION_OPTIONS.filter(option => !['perform-action', 'assist', 'fire-dom-event', 'multi-actions'].includes(option.value)),
@@ -439,6 +483,48 @@ export const ConfigPanel: React.FC<Props> = ({
       setSelectedEntityState(entity?.state || '');
     });
   }, [config.entity]);
+
+  // Fetch condition-source entity metadata for conditional styling UI.
+  useEffect(() => {
+    const conditionEntityIds = Array.from(
+      new Set(
+        (config.stateStyles || [])
+          .map(style => (style.conditionEntity || config.entity || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (conditionEntityIds.length === 0) {
+      setConditionEntityAttributes({});
+      setConditionEntityStates({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const nextAttributes: Record<string, string[]> = {};
+      const nextStates: Record<string, string> = {};
+
+      for (const entityId of conditionEntityIds) {
+        const entity = await haService.getEntityData(entityId);
+        if (!entity) continue;
+
+        nextStates[entityId] = entity.state || '';
+        nextAttributes[entityId] = Object.keys(entity.attributes || {}).filter(attr =>
+          !['friendly_name', 'icon', 'entity_picture', 'supported_features', 'device_class'].includes(attr)
+        );
+      }
+
+      if (!cancelled) {
+        setConditionEntityAttributes(nextAttributes);
+        setConditionEntityStates(nextStates);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config.entity, config.stateStyles.map(style => style.conditionEntity || '').join('|')]);
 
   // Keep live stream controls aligned with entity capabilities.
   useEffect(() => {
@@ -641,9 +727,13 @@ export const ConfigPanel: React.FC<Props> = ({
                       <>
                         Changes apply to <span className={editingState === 'on' ? 'text-green-400 font-medium' : 'text-gray-400 font-medium'}>{editingState.toUpperCase()}</span> state
                       </>
+                    ) : entityCapabilities.isStateless ? (
+                      <>
+                        This entity is <span className="text-amber-300 font-medium">stateless</span>; ON/OFF editing is disabled and appearance edits apply to base card style.
+                      </>
                     ) : (
                       <>
-                        This entity state is <span className="text-amber-300 font-medium">{selectedEntityState || 'unknown'}</span>; ON/OFF editing is disabled.
+                        This entity state is <span className="text-amber-300 font-medium">{selectedStateHint}</span>; ON/OFF editing is disabled, so appearance edits apply to base card style.
                       </>
                     )}
                   </p>
@@ -1087,6 +1177,7 @@ export const ConfigPanel: React.FC<Props> = ({
           
           <div className="pt-3 border-t border-gray-800">
             <p className="text-xs font-bold text-gray-400 uppercase mb-3">Templates (Advanced)</p>
+            <YamlOnlyHint text="Templates are evaluated by button-card at dashboard runtime. The local preview does not execute JS templates." />
             <div className="space-y-3">
               <ControlInput label="Name Template" value={config.nameTemplate} onChange={(v) => update('nameTemplate', v)} placeholder="[[[ return entity.state ]]]" />
               <ControlInput label="Label Template" value={config.labelTemplate} onChange={(v) => update('labelTemplate', v)} placeholder="[[[ return entity.attributes.temperature + '°C' ]]]" />
@@ -1101,6 +1192,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('variables') && (
             <>
             <p className="text-xs text-gray-400">Define variables for use in templates</p>
+            <YamlOnlyHint text="Variables are available to templates in dashboard runtime and are exported in YAML." />
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-gray-400 uppercase">Variable List</p>
               <button
@@ -1166,6 +1258,7 @@ export const ConfigPanel: React.FC<Props> = ({
              <ControlInput label="Border Radius" value={config.borderRadius} onChange={(v) => update('borderRadius', v)} suffix="px" />
              <ControlInput label="Padding" value={config.padding} onChange={(v) => update('padding', v)} suffix="px" />
           </div>
+          <YamlOnlyHint text="Card Size, Section Mode, and Grid Columns/Rows are dashboard layout options and are only applied in Home Assistant views." />
           <div className="grid grid-cols-2 gap-4">
              <ControlInput label="Card Size (1-6)" value={config.cardSize.toString()} onChange={(v) => update('cardSize', Number(v) || 3)} placeholder="3" />
              <ControlInput type="checkbox" label="Section Mode" value={config.sectionMode} onChange={(v) => update('sectionMode', v)} />
@@ -1208,6 +1301,7 @@ export const ConfigPanel: React.FC<Props> = ({
             />
             <ControlInput type="checkbox" label="Hidden" value={config.hidden} onChange={(v) => update('hidden', v)} />
           </div>
+          <YamlOnlyHint text="Live Stream and Hidden Template are runtime-only features in Home Assistant and are not fully simulated in preview." />
           {config.showLiveStream && (
             <>
             <ControlInput label="Stream Aspect Ratio" value={config.liveStreamAspectRatio} onChange={(v) => update('liveStreamAspectRatio', v)} placeholder="16x9, 50%, 1.78" className="mt-2" />
@@ -1397,21 +1491,16 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput type="checkbox" label="" value={!!getAppearanceValue('gradientEnabled')} onChange={(v) => {
                     // When enabling gradient, clear solid background color and set defaults
                     if (v) {
-                      if (setCurrentAppearance && currentAppearance) {
-                        setCurrentAppearance({ 
-                          ...currentAppearance, 
-                          gradientEnabled: true,
-                          backgroundColor: '',
-                          backgroundColorOpacity: 100,
-                          gradientType: currentAppearance.gradientType || DEFAULT_STATE_APPEARANCE.gradientType,
-                          gradientAngle: currentAppearance.gradientAngle ?? DEFAULT_STATE_APPEARANCE.gradientAngle,
-                          gradientColor1: currentAppearance.gradientColor1 || DEFAULT_STATE_APPEARANCE.gradientColor1,
-                          gradientColor2: currentAppearance.gradientColor2 || DEFAULT_STATE_APPEARANCE.gradientColor2,
-                          gradientColor3: currentAppearance.gradientColor3 || DEFAULT_STATE_APPEARANCE.gradientColor3,
-                          gradientColor3Enabled: currentAppearance.gradientColor3Enabled ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled,
-                          gradientOpacity: currentAppearance.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
-                        });
-                      }
+                      updateAppearance('gradientEnabled', true);
+                      updateAppearance('backgroundColor', '');
+                      updateAppearance('backgroundColorOpacity', 100);
+                      updateAppearance('gradientType', getAppearanceValue('gradientType') || DEFAULT_STATE_APPEARANCE.gradientType);
+                      updateAppearance('gradientAngle', getAppearanceValue('gradientAngle') ?? DEFAULT_STATE_APPEARANCE.gradientAngle);
+                      updateAppearance('gradientColor1', getAppearanceValue('gradientColor1') || DEFAULT_STATE_APPEARANCE.gradientColor1);
+                      updateAppearance('gradientColor2', getAppearanceValue('gradientColor2') || DEFAULT_STATE_APPEARANCE.gradientColor2);
+                      updateAppearance('gradientColor3', getAppearanceValue('gradientColor3') || DEFAULT_STATE_APPEARANCE.gradientColor3);
+                      updateAppearance('gradientColor3Enabled', getAppearanceValue('gradientColor3Enabled') ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled);
+                      updateAppearance('gradientOpacity', getAppearanceValue('gradientOpacity') ?? DEFAULT_STATE_APPEARANCE.gradientOpacity);
                       // Also clear base config backgroundColor so it doesn't output in base styles
                       update('backgroundColor', '');
                     } else {
@@ -1525,8 +1614,12 @@ export const ConfigPanel: React.FC<Props> = ({
                 <button
                   onClick={() => update('stateStyles', [...config.stateStyles, { 
                     id: 'state_' + (config.stateStyles.length + 1), 
+                    conditionEntity: config.entity || '',
+                    conditionAttribute: '',
                     operator: 'equals', 
-                    value: entityCapabilities.hasOnOffState ? 'on' : (selectedEntityState || ''),
+                    value: entityCapabilities.hasOnOffState
+                      ? 'on'
+                      : (entityCapabilities.isStateless ? '' : (selectedEntityState || '')),
                     name: '',
                     icon: '',
                     color: '',
@@ -1552,10 +1645,17 @@ export const ConfigPanel: React.FC<Props> = ({
                 </button>
               </div>
               
-              <p className="text-[10px] text-gray-500 mb-3">Define conditions to change colors, animations, or properties based on entity state.</p>
-              {!entityCapabilities.hasOnOffState && (
+              <p className="text-[10px] text-gray-500 mb-3">
+                Define conditions to change appearance based on any entity state. For trigger-only buttons, pick a helper/sensor entity as the condition source.
+              </p>
+              {!entityCapabilities.hasOnOffState && entityCapabilities.isStateless && (
                 <p className="text-[10px] text-amber-300/90 mb-3">
-                  This entity is not ON/OFF based. Use exact state values like "{selectedEntityState || 'idle'}", regex, or numeric operators.
+                  This entity is stateless (trigger-only). State conditionals are usually not meaningful for button entities.
+                </p>
+              )}
+              {!entityCapabilities.hasOnOffState && !entityCapabilities.isStateless && (
+                <p className="text-[10px] text-amber-300/90 mb-3">
+                  This entity is not ON/OFF based. Use exact state values like "{selectedStateHint}", regex, or numeric operators.
                 </p>
               )}
               {config.stateStyles.some(style => style.operator === 'template') && (
@@ -1581,17 +1681,83 @@ export const ConfigPanel: React.FC<Props> = ({
                       </div>
                       <div className="space-y-3">
                         {/* Condition */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <ControlInput label="Operator" type="select" value={style.operator} options={STATE_OPERATOR_OPTIONS} onChange={(v) => {
-                            const updated = [...config.stateStyles];
-                            updated[idx] = { ...style, operator: v };
-                            update('stateStyles', updated);
-                          }} />
-                          <ControlInput label="Value" value={style.value} onChange={(v) => {
-                            const updated = [...config.stateStyles];
-                            updated[idx] = { ...style, value: v };
-                            update('stateStyles', updated);
-                          }} placeholder="on, off, 50, etc." />
+                        <div className="pt-2 border-t border-gray-700">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Condition</p>
+                          <EntitySelector
+                            label="When Entity"
+                            value={style.conditionEntity || config.entity || ''}
+                            allowAll={true}
+                            onChange={(v) => {
+                              updateStateStyle(idx, {
+                                conditionEntity: v,
+                                conditionAttribute: '',
+                              });
+                            }}
+                            placeholder="sensor.kiln_status"
+                          />
+                          <p className="text-[10px] text-gray-500 mt-1">
+                            Current value:{' '}
+                            <span className="text-gray-300">
+                              {entityCapabilities.isStateless &&
+                              ((style.conditionEntity || config.entity || '').trim() === (config.entity || '').trim())
+                                ? 'stateless trigger'
+                                : (conditionEntityStates[(style.conditionEntity || config.entity || '').trim()] || 'unknown')}
+                            </span>
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <ControlInput
+                              label="Use Attribute"
+                              type="select"
+                              value={style.conditionAttribute || ''}
+                              options={[
+                                { value: '', label: 'Entity State' },
+                                ...((conditionEntityAttributes[(style.conditionEntity || config.entity || '').trim()] || []).map(attr => ({
+                                  value: attr,
+                                  label: attr
+                                })))
+                              ]}
+                              onChange={(v) => updateStateStyle(idx, { conditionAttribute: v })}
+                            />
+                            <ControlInput
+                              label="Condition Type"
+                              type="select"
+                              value={style.operator}
+                              options={CONDITION_MATCH_OPTIONS}
+                              onChange={(v) => updateStateStyle(idx, { operator: v })}
+                            />
+                          </div>
+
+                          {style.operator !== 'default' && (
+                            <ControlInput
+                              className="mt-2"
+                              label={
+                                style.operator === 'above' || style.operator === 'below'
+                                  ? 'Compare Number'
+                                  : style.operator === 'regex'
+                                    ? 'Pattern'
+                                    : style.operator === 'template'
+                                      ? 'Template Expression'
+                                      : 'Expected State/Value'
+                              }
+                              value={style.value}
+                              onChange={(v) => updateStateStyle(idx, { value: v })}
+                              placeholder={
+                                style.operator === 'template'
+                                  ? "[[[ return states['sensor.kiln_temp'].state > 1000 ]]]"
+                                  : 'on, off, idle, 50, etc.'
+                              }
+                            />
+                          )}
+                          {entityCapabilities.isStateless &&
+                            (
+                              !(style.conditionEntity || '').trim() ||
+                              (style.conditionEntity || '').trim() === (config.entity || '').trim()
+                            ) && (
+                            <p className="text-[10px] text-amber-300/90 mt-2">
+                              Tip: For button press feedback, set a helper/sensor entity above and style from that state.
+                            </p>
+                          )}
                         </div>
                         
                         {/* Basic Overrides */}
@@ -1824,11 +1990,12 @@ export const ConfigPanel: React.FC<Props> = ({
              <ControlInput label="Font Weight" type="select" value={config.fontWeight} options={WEIGHT_OPTIONS} onChange={(v) => update('fontWeight', v)} />
              <ControlInput label="Letter Spacing" type="select" value={config.letterSpacing} options={LETTER_SPACING_OPTIONS} onChange={(v) => update('letterSpacing', v)} />
            </div>
-           <div className="grid grid-cols-2 gap-4 mt-3">
-             <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
-             <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
-           </div>
-            </>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
+              <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
+            </div>
+            <YamlOnlyHint text="Numeric Precision formatting is applied by button-card in dashboard runtime." />
+             </>
           )}
 
           {/* ===== APPEARANCE > THRESHOLD ALERTS ===== */}
@@ -2170,6 +2337,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('cardActions') && (
             <>
           <div className="space-y-4">
+            <YamlOnlyHint text="Actions and action sounds are exported to YAML and run in Home Assistant. Preview does not execute action behavior." />
             {!entityCapabilities.supportsToggleAction && (
               <div className="text-[10px] text-amber-300 p-2 bg-amber-500/10 border border-amber-500/20 rounded">
                 <code className="text-amber-200">toggle</code> is not supported for{' '}
@@ -2262,6 +2430,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('momentaryActions') && (
             <>
           <p className="text-xs text-gray-400 mb-4">Press/release actions for momentary switches (e.g., garage doors)</p>
+          <YamlOnlyHint text="Momentary press/release actions are runtime behavior in Home Assistant and are not simulated by preview." />
           <div className="space-y-4">
             <div>
               <ControlInput label="Press Action" type="select" value={config.pressAction} options={entityActionOptions} onChange={(v) => update('pressAction', v)} />
@@ -2308,6 +2477,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('iconActions') && (
             <>
           <p className="text-xs text-gray-400 mb-4">Separate actions when clicking on the icon specifically</p>
+          <YamlOnlyHint text="Icon-specific actions are exported to YAML and executed on dashboard interaction only." />
           <div className="space-y-4">
             <div>
               <ControlInput label="Icon Tap Action" type="select" value={config.iconTapAction} options={entityActionOptions} onChange={(v) => update('iconTapAction', v)} />
@@ -2406,6 +2576,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('confirmation') && (
             <>
           <div className="space-y-4">
+            <YamlOnlyHint text="Confirmation prompts are shown by Home Assistant at runtime; preview does not trigger them." />
             <ControlInput type="checkbox" label="Require Confirmation" value={config.confirmation.enabled} onChange={(v) => update('confirmation', { ...config.confirmation, enabled: v })} />
             {config.confirmation.enabled && (
               <ControlInput label="Confirmation Text" value={config.confirmation.text} onChange={(v) => update('confirmation', { ...config.confirmation, text: v })} placeholder="Are you sure?" />
@@ -2480,6 +2651,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('protect') && (
             <>
           <div className="space-y-4">
+            <YamlOnlyHint text="PIN/password protection is a runtime feature and cannot be simulated in local preview." />
             <ControlInput type="checkbox" label="Enable Protection" value={config.protect.enabled} onChange={(v) => update('protect', { ...config.protect, enabled: v })} />
             {config.protect.enabled && (
               <>
@@ -2677,6 +2849,7 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('advancedSettings') && (
             <>
           <div className="space-y-4">
+            <YamlOnlyHint text="Most options here are runtime-only (timers, templates, haptic, trigger rules, conditional display)." />
             <div className="grid grid-cols-2 gap-4">
               <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
               <ControlInput label="Update Timer (s)" value={config.updateTimer.toString()} onChange={(v) => update('updateTimer', Number(v) || 0)} placeholder="0 = disabled" />
@@ -2716,7 +2889,10 @@ export const ConfigPanel: React.FC<Props> = ({
             
             <div className="h-px bg-gray-700/50" />
             
-            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Trigger Options</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold text-gray-400 uppercase mb-2">Trigger Options</p>
+              <YamlOnlyBadge />
+            </div>
             <ControlInput label="Trigger Entity" value={config.triggerEntity} onChange={(v) => update('triggerEntity', v)} placeholder="sensor.time" />
             <div>
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Triggers Update (one entity per line)</label>
@@ -2730,7 +2906,10 @@ export const ConfigPanel: React.FC<Props> = ({
             
             <div className="h-px bg-gray-700/50" />
             
-            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Conditional Display</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold text-gray-400 uppercase mb-2">Conditional Display</p>
+              <YamlOnlyBadge />
+            </div>
             <p className="text-[10px] text-gray-500 mb-3">Show/hide this button based on an entity's state</p>
             <EntitySelector
               value={config.conditionalEntity}

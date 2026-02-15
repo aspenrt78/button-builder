@@ -1,6 +1,12 @@
 import path from 'path';
+import { readFileSync } from 'node:fs';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+
+const packageJson = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
+) as { version?: string };
+const appVersion = packageJson.version || '0.0.0';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -30,6 +36,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
+        __APP_VERSION__: JSON.stringify(appVersion),
         // No API keys - users provide their own via the UI (BYOK)
       },
       resolve: {

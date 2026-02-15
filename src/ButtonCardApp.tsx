@@ -12,6 +12,7 @@ import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporte
 import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig } from './presets';
 import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2 } from 'lucide-react';
 import { hasOnOffState } from './utils/entityCapabilities';
+import { APP_VERSION_LABEL } from './version';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -543,7 +544,12 @@ export const ButtonCardApp: React.FC = () => {
             alt="Button Builder logo"
             className="w-7 h-7 md:w-9 md:h-9 rounded-lg object-contain border border-gray-800 bg-black/40"
           />
-          <h1 className="font-bold text-sm md:text-lg tracking-tight text-gray-200">Button Card Builder</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-bold text-sm md:text-lg tracking-tight text-gray-200">Button Card Builder</h1>
+            <span className="px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400">
+              {APP_VERSION_LABEL}
+            </span>
+          </div>
         </div>
         
         {/* Desktop Actions */}

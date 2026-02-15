@@ -223,6 +223,203 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   return config;
 };
 
+function unescapeJsSingleQuoted(value: string): string {
+  return value.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+}
+
+function parseGeneratedTemplateCondition(
+  templateValue: string
+): Pick<StateStyleConfig, 'conditionEntity' | 'conditionAttribute' | 'operator' | 'value'> | null {
+  const normalized = String(templateValue || '').replace(/\s+/g, ' ').trim();
+  if (!normalized.includes('const val =') || !normalized.includes('return ')) {
+    return null;
+  }
+
+  let conditionEntity = '';
+  let conditionAttribute = '';
+
+  const externalAttributeMatch = normalized.match(
+    /const val = \(states\['((?:\\.|[^'])+)'\] && states\['\1'\]\.attributes && states\['\1'\]\.attributes\['((?:\\.|[^'])+)'\] !== undefined \? states\['\1'\]\.attributes\['\2'\] : ''\);/
+  );
+  if (externalAttributeMatch) {
+    conditionEntity = unescapeJsSingleQuoted(externalAttributeMatch[1]);
+    conditionAttribute = unescapeJsSingleQuoted(externalAttributeMatch[2]);
+  } else {
+    const externalStateMatch = normalized.match(
+      /const val = \(states\['((?:\\.|[^'])+)'\] \? states\['\1'\]\.state : ''\);/
+    );
+    if (externalStateMatch) {
+      conditionEntity = unescapeJsSingleQuoted(externalStateMatch[1]);
+    } else {
+      const entityAttributeMatch = normalized.match(
+        /const val = \(entity\.attributes && entity\.attributes\['((?:\\.|[^'])+)'\] !== undefined \? entity\.attributes\['\1'\] : ''\);/
+      );
+      if (entityAttributeMatch) {
+        conditionAttribute = unescapeJsSingleQuoted(entityAttributeMatch[1]);
+      } else if (!/const val = entity\.state;/.test(normalized)) {
+        return null;
+      }
+    }
+  }
+
+  const equalsMatch = normalized.match(/return String\(val\) === '((?:\\.|[^'])*)';/);
+  if (equalsMatch) {
+    return {
+      conditionEntity,
+      conditionAttribute,
+      operator: 'equals',
+      value: unescapeJsSingleQuoted(equalsMatch[1])
+    };
+  }
+
+  const notEqualsMatch = normalized.match(/return String\(val\) !== '((?:\\.|[^'])*)';/);
+  if (notEqualsMatch) {
+    return {
+      conditionEntity,
+      conditionAttribute,
+      operator: 'not_equals',
+      value: unescapeJsSingleQuoted(notEqualsMatch[1])
+    };
+  }
+
+  const aboveMatch = normalized.match(/return Number\.parseFloat\(String\(val\)\) > Number\.parseFloat\('((?:\\.|[^'])*)'\);/);
+  if (aboveMatch) {
+    return {
+      conditionEntity,
+      conditionAttribute,
+      operator: 'above',
+      value: unescapeJsSingleQuoted(aboveMatch[1])
+    };
+  }
+
+  const belowMatch = normalized.match(/return Number\.parseFloat\(String\(val\)\) < Number\.parseFloat\('((?:\\.|[^'])*)'\);/);
+  if (belowMatch) {
+    return {
+      conditionEntity,
+      conditionAttribute,
+      operator: 'below',
+      value: unescapeJsSingleQuoted(belowMatch[1])
+    };
+  }
+
+  const regexMatch = normalized.match(/return new RegExp\(("(?:\\.|[^"])*")\)\.test\(String\(val\)\);/);
+  if (regexMatch) {
+    try {
+      const parsedPattern = JSON.parse(regexMatch[1]);
+      return {
+        conditionEntity,
+        conditionAttribute,
+        operator: 'regex',
+        value: String(parsedPattern)
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+type ParsedGradientType = 'linear' | 'radial' | 'conic';
+
+interface ParsedColorToken {
+  color: string;
+  opacity?: number;
+}
+
+interface ParsedGradient {
+  type: ParsedGradientType;
+  angle?: number;
+  colors: ParsedColorToken[];
+}
+
+const clamp255 = (num: number): number => Math.max(0, Math.min(255, Math.round(num)));
+const toHex2 = (num: number): string => clamp255(num).toString(16).padStart(2, '0');
+const normalizeCssToken = (token: string): string => token.replace(/\s+/g, '').toLowerCase();
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
+}
+
+function parseColorToken(token: string): ParsedColorToken {
+  const trimmed = token.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return { color: trimmed };
+  }
+
+  const rgbMatch = trimmed.match(
+    /^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*([0-9.]+))?\s*\)$/i
+  );
+  if (rgbMatch) {
+    const r = Number.parseFloat(rgbMatch[1]);
+    const g = Number.parseFloat(rgbMatch[2]);
+    const b = Number.parseFloat(rgbMatch[3]);
+    const alpha = rgbMatch[4] !== undefined ? Number.parseFloat(rgbMatch[4]) : undefined;
+
+    const parsed: ParsedColorToken = { color: rgbToHex(r, g, b) };
+    if (alpha !== undefined && Number.isFinite(alpha)) {
+      parsed.opacity = Math.round(Math.max(0, Math.min(1, alpha)) * 100);
+    }
+    return parsed;
+  }
+
+  return { color: trimmed };
+}
+
+function parseGradientBackground(value: string): ParsedGradient | null {
+  if (!value.includes('gradient')) return null;
+
+  let type: ParsedGradientType = 'linear';
+  let angle: number | undefined;
+
+  if (value.includes('linear-gradient')) {
+    type = 'linear';
+    const angleMatch = value.match(/linear-gradient\(\s*(-?\d+(?:\.\d+)?)deg/i);
+    if (angleMatch) angle = Math.round(Number.parseFloat(angleMatch[1]));
+  } else if (value.includes('radial-gradient')) {
+    type = 'radial';
+  } else if (value.includes('conic-gradient')) {
+    type = 'conic';
+    const angleMatch = value.match(/from\s+(-?\d+(?:\.\d+)?)deg/i);
+    if (angleMatch) angle = Math.round(Number.parseFloat(angleMatch[1]));
+  }
+
+  const colorTokens = (value.match(/#[0-9a-fA-F]{6}|rgba?\([^)]+\)/g) || []).map(s => s.trim());
+  if (colorTokens.length === 0) {
+    return { type, angle, colors: [] };
+  }
+
+  // Conic gradients emitted by generator repeat color1 at the end for loop closure.
+  let normalizedTokens = [...colorTokens];
+  if (
+    type === 'conic' &&
+    normalizedTokens.length >= 2 &&
+    normalizeCssToken(normalizedTokens[0]) === normalizeCssToken(normalizedTokens[normalizedTokens.length - 1])
+  ) {
+    normalizedTokens = normalizedTokens.slice(0, -1);
+  }
+
+  return {
+    type,
+    angle,
+    colors: normalizedTokens.map(parseColorToken)
+  };
+}
+
+function getStyleEntries(style: any): Array<{ property: string; value: string }> {
+  if (typeof style === 'string') {
+    const parsed = parseStyleString(style);
+    return parsed ? [parsed] : [];
+  }
+  if (style && typeof style === 'object') {
+    return Object.entries(style).map(([property, value]) => ({
+      property,
+      value: String(value)
+    }));
+  }
+  return [];
+}
+
 /**
  * Parse an action from YAML into config
  */
@@ -455,37 +652,28 @@ function mapCardStyle(
   switch (property) {
     case 'background':
       // Check if it's a gradient
-      if (value.includes('gradient')) {
+      const parsedGradient = parseGradientBackground(value);
+      if (parsedGradient) {
         config.gradientEnabled = true;
-        
-        // Detect gradient type
-        if (value.includes('linear-gradient')) {
-          config.gradientType = 'linear';
-          // Extract angle: linear-gradient(135deg, ...)
-          const angleMatch = value.match(/linear-gradient\((\d+)deg/);
-          if (angleMatch) {
-            config.gradientAngle = parseInt(angleMatch[1]);
-          }
-        } else if (value.includes('radial-gradient')) {
-          config.gradientType = 'radial';
-        } else if (value.includes('conic-gradient')) {
-          config.gradientType = 'conic';
-          // Extract angle: conic-gradient(from 45deg, ...)
-          const angleMatch = value.match(/from (\d+)deg/);
-          if (angleMatch) {
-            config.gradientAngle = parseInt(angleMatch[1]);
-          }
+        config.gradientType = parsedGradient.type;
+        if (parsedGradient.angle !== undefined) {
+          config.gradientAngle = parsedGradient.angle;
         }
-        
-        // Extract colors - match hex colors or color names
-        const colorMatches = value.match(/#[0-9a-fA-F]{6}|rgb\([^)]+\)|rgba\([^)]+\)/g);
-        if (colorMatches) {
-          if (colorMatches.length >= 1) config.gradientColor1 = colorMatches[0];
-          if (colorMatches.length >= 2) config.gradientColor2 = colorMatches[1];
-          if (colorMatches.length >= 3) {
-            config.gradientColor3Enabled = true;
-            config.gradientColor3 = colorMatches[2];
-          }
+
+        if (parsedGradient.colors.length >= 1) config.gradientColor1 = parsedGradient.colors[0].color;
+        if (parsedGradient.colors.length >= 2) config.gradientColor2 = parsedGradient.colors[1].color;
+        if (parsedGradient.colors.length >= 3) {
+          config.gradientColor3Enabled = true;
+          config.gradientColor3 = parsedGradient.colors[2].color;
+        } else {
+          config.gradientColor3Enabled = false;
+        }
+
+        const opacityValues = parsedGradient.colors
+          .map(c => c.opacity)
+          .filter((v): v is number => v !== undefined);
+        if (opacityValues.length > 0) {
+          config.gradientOpacity = opacityValues[0];
         }
       }
       break;
@@ -638,9 +826,9 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
     if (stateValue === 'on' || stateValue === 'off') {
       if (state.styles?.card) {
         for (const style of state.styles.card) {
-          if (typeof style === 'string') {
-            const parsed = parseStyleString(style);
-            if (parsed && parsed.property === 'background-color') {
+          const parsedEntries = getStyleEntries(style);
+          for (const parsed of parsedEntries) {
+            if (parsed.property === 'background-color') {
               const hexMatch = parsed.value.match(/#[0-9a-fA-F]{6}/);
               if (stateValue === 'on') {
                 if (hexMatch) config.stateOnColor = hexMatch[0];
@@ -661,6 +849,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
     // Custom state
     const customState: StateStyleConfig = {
       id: crypto.randomUUID(),
+      conditionEntity: '',
+      conditionAttribute: '',
       operator: 'equals',
       value: String(stateValue ?? ''),
       name: state.name ?? '',
@@ -694,30 +884,73 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       customState.operator = 'not_equals';
     } else if (state.operator === 'regex') {
       customState.operator = 'regex';
-    } else if (typeof stateValue === 'string' && stateValue.includes('[[[')) {
-      customState.operator = 'template';
+    } else if (state.operator === 'template' || (typeof stateValue === 'string' && stateValue.includes('[[['))) {
+      const parsedGenerated = parseGeneratedTemplateCondition(String(stateValue ?? ''));
+      if (parsedGenerated) {
+        customState.operator = parsedGenerated.operator;
+        customState.value = parsedGenerated.value;
+        customState.conditionEntity = parsedGenerated.conditionEntity || '';
+        customState.conditionAttribute = parsedGenerated.conditionAttribute || '';
+      } else {
+        customState.operator = 'template';
+      }
     }
     
     // Parse state styles
     if (state.styles) {
       if (state.styles.card) {
         for (const style of state.styles.card) {
-          if (typeof style === 'string') {
-            const parsed = parseStyleString(style);
-            if (parsed) {
-              if (parsed.property === 'background-color') {
-                customState.backgroundColor = parsed.value;
-              } else if (parsed.property === 'border-color') {
-                customState.borderColor = parsed.value;
-              } else if (parsed.property === 'animation') {
-                // Parse animation type
-                if (parsed.value.includes('flash')) customState.cardAnimation = 'flash';
-                else if (parsed.value.includes('pulse')) customState.cardAnimation = 'pulse';
-                // ... add other animations as needed
-                
-                const speedMatch = parsed.value.match(/(\d+(?:\.\d+)?s)/);
-                if (speedMatch) customState.cardAnimationSpeed = speedMatch[1];
+          for (const parsed of getStyleEntries(style)) {
+            if (parsed.property === 'background-color') {
+              customState.backgroundColor = parsed.value;
+            } else if (parsed.property === 'background') {
+              const parsedGradient = parseGradientBackground(parsed.value);
+              if (parsedGradient) {
+                customState.gradientEnabled = true;
+                customState.gradientType = parsedGradient.type;
+                if (parsedGradient.angle !== undefined) {
+                  customState.gradientAngle = parsedGradient.angle;
+                }
+                if (parsedGradient.colors.length >= 1) customState.gradientColor1 = parsedGradient.colors[0].color;
+                if (parsedGradient.colors.length >= 2) customState.gradientColor2 = parsedGradient.colors[1].color;
+                if (parsedGradient.colors.length >= 3) {
+                  customState.gradientColor3Enabled = true;
+                  customState.gradientColor3 = parsedGradient.colors[2].color;
+                } else {
+                  customState.gradientColor3Enabled = false;
+                }
+
+                const opacityValues = parsedGradient.colors
+                  .map(c => c.opacity)
+                  .filter((v): v is number => v !== undefined);
+                if (opacityValues.length > 0) {
+                  customState.gradientOpacity = opacityValues[0];
+                }
               }
+            } else if (parsed.property === 'border-color') {
+              customState.borderColor = parsed.value;
+            } else if (parsed.property === 'animation') {
+              // Parse animation type
+              if (parsed.value.includes('flash')) customState.cardAnimation = 'flash';
+              else if (parsed.value.includes('pulse')) customState.cardAnimation = 'pulse';
+              else if (parsed.value.includes('jiggle')) customState.cardAnimation = 'jiggle';
+              else if (parsed.value.includes('shake')) customState.cardAnimation = 'shake';
+              else if (parsed.value.includes('bounce')) customState.cardAnimation = 'bounce';
+              else if (parsed.value.includes('blink')) customState.cardAnimation = 'blink';
+              else if (parsed.value.includes('spin') || parsed.value.includes('rotate')) customState.cardAnimation = 'spin';
+              else if (parsed.value.includes('glow')) customState.cardAnimation = 'glow';
+              else if (parsed.value.includes('float')) customState.cardAnimation = 'float';
+              else if (parsed.value.includes('swing')) customState.cardAnimation = 'swing';
+              else if (parsed.value.includes('rubberBand') || parsed.value.includes('rubber')) customState.cardAnimation = 'rubberBand';
+              else if (parsed.value.includes('tada')) customState.cardAnimation = 'tada';
+              else if (parsed.value.includes('heartbeat')) customState.cardAnimation = 'heartbeat';
+              else if (parsed.value.includes('flip')) customState.cardAnimation = 'flip';
+              else if (parsed.value.includes('wobble')) customState.cardAnimation = 'wobble';
+              else if (parsed.value.includes('breathe')) customState.cardAnimation = 'breathe';
+              else if (parsed.value.includes('ripple')) customState.cardAnimation = 'ripple';
+
+              const speedMatch = parsed.value.match(/(\d+(?:\.\d+)?s)/);
+              if (speedMatch) customState.cardAnimationSpeed = speedMatch[1];
             }
           }
         }
@@ -725,10 +958,30 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       
       if (state.styles.icon) {
         for (const style of state.styles.icon) {
-          if (typeof style === 'string') {
-            const parsed = parseStyleString(style);
-            if (parsed && parsed.property === 'color') {
+          for (const parsed of getStyleEntries(style)) {
+            if (parsed.property === 'color') {
               customState.iconColor = parsed.value;
+            } else if (parsed.property === 'animation') {
+              if (parsed.value.includes('flash')) customState.iconAnimation = 'flash';
+              else if (parsed.value.includes('pulse')) customState.iconAnimation = 'pulse';
+              else if (parsed.value.includes('jiggle')) customState.iconAnimation = 'jiggle';
+              else if (parsed.value.includes('shake')) customState.iconAnimation = 'shake';
+              else if (parsed.value.includes('bounce')) customState.iconAnimation = 'bounce';
+              else if (parsed.value.includes('blink')) customState.iconAnimation = 'blink';
+              else if (parsed.value.includes('spin') || parsed.value.includes('rotate')) customState.iconAnimation = 'spin';
+              else if (parsed.value.includes('glow')) customState.iconAnimation = 'glow';
+              else if (parsed.value.includes('float')) customState.iconAnimation = 'float';
+              else if (parsed.value.includes('swing')) customState.iconAnimation = 'swing';
+              else if (parsed.value.includes('rubberBand') || parsed.value.includes('rubber')) customState.iconAnimation = 'rubberBand';
+              else if (parsed.value.includes('tada')) customState.iconAnimation = 'tada';
+              else if (parsed.value.includes('heartbeat')) customState.iconAnimation = 'heartbeat';
+              else if (parsed.value.includes('flip')) customState.iconAnimation = 'flip';
+              else if (parsed.value.includes('wobble')) customState.iconAnimation = 'wobble';
+              else if (parsed.value.includes('breathe')) customState.iconAnimation = 'breathe';
+              else if (parsed.value.includes('ripple')) customState.iconAnimation = 'ripple';
+
+              const speedMatch = parsed.value.match(/(\d+(?:\.\d+)?s)/);
+              if (speedMatch) customState.iconAnimationSpeed = speedMatch[1];
             }
           }
         }
@@ -736,9 +989,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       
       if (state.styles.name) {
         for (const style of state.styles.name) {
-          if (typeof style === 'string') {
-            const parsed = parseStyleString(style);
-            if (parsed && parsed.property === 'color') {
+          for (const parsed of getStyleEntries(style)) {
+            if (parsed.property === 'color') {
               customState.nameColor = parsed.value;
             }
           }
@@ -747,9 +999,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       
       if (state.styles.state) {
         for (const style of state.styles.state) {
-          if (typeof style === 'string') {
-            const parsed = parseStyleString(style);
-            if (parsed && parsed.property === 'color') {
+          for (const parsed of getStyleEntries(style)) {
+            if (parsed.property === 'color') {
               customState.stateColor = parsed.value;
             }
           }
@@ -758,9 +1009,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       
       if (state.styles.label) {
         for (const style of state.styles.label) {
-          if (typeof style === 'string') {
-            const parsed = parseStyleString(style);
-            if (parsed && parsed.property === 'color') {
+          for (const parsed of getStyleEntries(style)) {
+            if (parsed.property === 'color') {
               customState.labelColor = parsed.value;
             }
           }

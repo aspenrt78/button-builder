@@ -4,6 +4,7 @@ export interface EntityCapabilities {
   toggleFallbackService: string | null;
   supportsLiveStream: boolean;
   hasOnOffState: boolean;
+  isStateless: boolean;
 }
 
 const NON_TOGGLE_DOMAINS = new Set([
@@ -40,6 +41,11 @@ const BINARY_STATE_DOMAINS = new Set([
   'siren',
   'alarm_control_panel',
   'remote'
+]);
+
+const STATELESS_DOMAINS = new Set([
+  'button',
+  'input_button',
 ]);
 
 export const getEntityDomain = (entityId: string): string => {
@@ -80,6 +86,11 @@ export const hasOnOffState = (entityId: string, currentState?: string): boolean 
   return BINARY_STATE_DOMAINS.has(domain);
 };
 
+export const isStatelessEntity = (entityId: string): boolean => {
+  const domain = getEntityDomain(entityId);
+  return STATELESS_DOMAINS.has(domain);
+};
+
 export const getEntityCapabilities = (entityId: string, currentState?: string): EntityCapabilities => {
   const domain = getEntityDomain(entityId);
   return {
@@ -88,6 +99,6 @@ export const getEntityCapabilities = (entityId: string, currentState?: string): 
     toggleFallbackService: getToggleFallbackService(entityId),
     supportsLiveStream: supportsLiveStream(entityId),
     hasOnOffState: hasOnOffState(entityId, currentState),
+    isStateless: isStatelessEntity(entityId),
   };
 };
-

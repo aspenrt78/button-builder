@@ -271,6 +271,8 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   const [labelEntityData, setLabelEntityData] = useState<HAEntity | null>(null);
   const [mainEntityData, setMainEntityData] = useState<HAEntity | null>(null);
   const [thresholdEntityData, setThresholdEntityData] = useState<HAEntity | null>(null);
+  const [conditionEntityData, setConditionEntityData] = useState<Record<string, HAEntity | null>>({});
+  const [entityPictureLoadFailed, setEntityPictureLoadFailed] = useState(false);
   
   // Custom field entity data (indexed by field index)
   const [customFieldEntityData, setCustomFieldEntityData] = useState<Record<number, HAEntity | null>>({});
@@ -314,6 +316,35 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       setThresholdEntityData(data);
     });
   }, [config.thresholdColor.enabled, config.thresholdColor.entity, config.entity]);
+
+  // Fetch additional condition source entities used by conditional styles.
+  useEffect(() => {
+    const conditionEntityIds = Array.from(
+      new Set(
+        (config.stateStyles || [])
+          .map(style => (style.conditionEntity || '').trim())
+          .filter(entityId => entityId && entityId !== config.entity)
+      )
+    );
+
+    if (conditionEntityIds.length === 0) {
+      setConditionEntityData({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const entries: Record<string, HAEntity | null> = {};
+      for (const entityId of conditionEntityIds) {
+        entries[entityId] = await haService.getEntityData(entityId);
+      }
+      if (!cancelled) setConditionEntityData(entries);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config.entity, config.stateStyles.map(style => style.conditionEntity || '').join('|')]);
 
   // Fetch custom field entity data when entities change
   useEffect(() => {
@@ -514,8 +545,30 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     return defaultColor;
   };
 
-  // 0. Find matching stateStyle for current simulated state (preset conditions)
-  // This allows preset conditions to apply different styles for ON vs OFF
+  // 0. Find matching stateStyle using each condition's selected source entity/attribute.
+  // This keeps preview behavior aligned with generated dashboard YAML.
+  const getConditionSourceValue = (stateStyle: StateStyleConfig): string => {
+    const conditionEntityId = (stateStyle.conditionEntity || '').trim();
+    const sourceEntityId = conditionEntityId || config.entity;
+    const sourceAttribute = (stateStyle.conditionAttribute || '').trim();
+
+    if (!sourceEntityId || sourceEntityId === config.entity) {
+      if (!sourceAttribute) {
+        return effectiveEntityState;
+      }
+      const attrValue = mainEntityData?.attributes?.[sourceAttribute];
+      return attrValue === undefined || attrValue === null ? '' : String(attrValue);
+    }
+
+    const sourceEntity = conditionEntityData[sourceEntityId];
+    if (!sourceAttribute) {
+      return sourceEntity?.state ? String(sourceEntity.state) : '';
+    }
+
+    const attrValue = sourceEntity?.attributes?.[sourceAttribute];
+    return attrValue === undefined || attrValue === null ? '' : String(attrValue);
+  };
+
   const matchingStateStyle = (() => {
     let defaultStyle: StateStyleConfig | undefined;
     for (const stateStyle of config.stateStyles || []) {
@@ -523,7 +576,8 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
         defaultStyle = defaultStyle || stateStyle;
         continue;
       }
-      if (evaluateStateStyleMatch(stateStyle, effectiveEntityState)) {
+      const conditionValue = getConditionSourceValue(stateStyle);
+      if (evaluateStateStyleMatch(stateStyle, conditionValue)) {
         return stateStyle;
       }
     }
@@ -772,6 +826,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
         )
       )
     : effectiveExtraStyles;
+  const gridStylesParsed = parseExtraStyles(config.gridStyles || '');
 
   const containerStyle: React.CSSProperties = {
     // Set backgroundColor if: no gradient AND (no extraStyles background OR user explicitly set one)
@@ -793,6 +848,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     gridTemplateAreas: config.customGridEnabled ? config.customGridTemplateAreas : getGridTemplate(config.layout),
     gridTemplateRows: config.customGridEnabled ? config.customGridTemplateRows : getGridRows(config.layout),
     gridTemplateColumns: config.customGridEnabled ? config.customGridTemplateColumns : getGridCols(config.layout),
+    ...gridStylesParsed,
     justifyItems: 'center',
     alignItems: 'center',
     gap: '4px',
@@ -824,6 +880,19 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       ? getDomainStateDisplay(config.entity, simulatedState)
       : (mainEntityData?.state || getDomainStateDisplay(config.entity, simulatedState)));
   const displayLabelOverride = matchingStateStyle?.label || '';
+  const displayEntityPicture =
+    matchingStateStyle?.entityPicture
+    || config.entityPicture
+    || (mainEntityData?.attributes?.entity_picture as string | undefined)
+    || '';
+  const showEntityPicture = config.showEntityPicture && !!displayEntityPicture;
+  const tooltipStylesParsed = parseExtraStyles(config.tooltipStyles || '');
+  const lockStylesParsed = parseExtraStyles(config.lockStyles || '');
+  const entityPictureStylesParsed = parseExtraStyles(config.entityPictureStyles || '');
+
+  useEffect(() => {
+    setEntityPictureLoadFailed(false);
+  }, [displayEntityPicture]);
 
   // Calculate canvas style - support both color and background image
   const canvasStyle: React.CSSProperties = canvasBackground 
@@ -1150,7 +1219,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
                config.tooltip.position === 'left' ? 'right-full mr-2 top-1/2 -translate-y-1/2' :
                config.tooltip.position === 'right' ? 'left-full ml-2 top-1/2 -translate-y-1/2' :
                'bottom-full mb-2 left-1/2 -translate-x-1/2' /* top (default) */
-             }`}>
+             }`} style={tooltipStylesParsed}>
                {config.tooltip.content}
              </div>
            )}
@@ -1164,11 +1233,23 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
            )}
 
           {/* Icon / Entity Picture */}
-          {(config.showIcon || config.showEntityPicture) && (
+          {(config.showIcon || showEntityPicture) && (
             <div style={{ gridArea: 'i', ...parseExtraStyles(config.imgCellStyles) }} className="flex justify-center items-center w-full h-full relative">
-              {config.showEntityPicture ? (
-                <div className="rounded-full bg-gray-300 overflow-hidden w-full h-full max-w-[80%] aspect-square flex items-center justify-center border-2 border-white/20">
-                  <User className="text-gray-500 w-2/3 h-2/3" />
+              {showEntityPicture ? (
+                <div
+                  className="rounded-full bg-gray-300 overflow-hidden w-full h-full max-w-[80%] aspect-square flex items-center justify-center border-2 border-white/20"
+                  style={entityPictureStylesParsed}
+                >
+                  {!entityPictureLoadFailed ? (
+                    <img
+                      src={displayEntityPicture}
+                      alt={displayName || 'Entity picture'}
+                      className="w-full h-full object-cover"
+                      onError={() => setEntityPictureLoadFailed(true)}
+                    />
+                  ) : (
+                    <User className="text-gray-500 w-2/3 h-2/3" />
+                  )}
                 </div>
               ) : (
                 config.showIcon && (
@@ -1264,7 +1345,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
           {/* Lock Overlay */}
           {config.lock.enabled && (
-            <div className="absolute top-1 right-1 z-10">
+            <div className="absolute top-1 right-1 z-10" style={lockStylesParsed}>
               <Lock size={14} className="text-white/70" />
             </div>
           )}

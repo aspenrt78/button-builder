@@ -29,6 +29,7 @@ import { BubbleConfigPanel } from './components/ConfigPanel';
 import { BubblePreview } from './components/Preview';
 import { BubbleYamlViewer } from './components/YamlViewer';
 import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Check, AlertCircle, AlertTriangle, Info, Undo2, Redo2 } from 'lucide-react';
+import { APP_VERSION_LABEL } from '../version';
 
 // ============================================
 // DEFAULT CONFIGS FOR EACH CARD TYPE
@@ -484,7 +485,12 @@ export function BubbleCardApp() {
           <div className="w-7 h-7 md:w-9 md:h-9 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center border border-cyan-500/30">
             <span className="text-sm md:text-base">🫧</span>
           </div>
-          <h1 className="font-bold text-sm md:text-lg tracking-tight text-gray-200">Bubble Card Builder</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-bold text-sm md:text-lg tracking-tight text-gray-200">Bubble Card Builder</h1>
+            <span className="px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700 text-[10px] font-medium text-cyan-300">
+              {APP_VERSION_LABEL}
+            </span>
+          </div>
         </div>
         
         {/* Active Preset Badge */}

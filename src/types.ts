@@ -102,6 +102,10 @@ export const DEFAULT_THRESHOLD_CONFIG: ThresholdColorConfig = {
 
 export interface StateStyleConfig {
   id: string;
+  // If set, this condition evaluates against this entity instead of the card entity.
+  conditionEntity?: string;
+  // Optional attribute on the condition entity; empty means entity state.
+  conditionAttribute?: string;
   operator: StateOperator;
   value: string;
   name: string;
