@@ -215,7 +215,8 @@ export const ButtonCardApp: React.FC = () => {
   }, [customPresets]);
 
   const configWithPresetConditions = useMemo(() => {
-    if (presetCondition === 'always' || !activePreset) {
+    const supportsBinaryPresetConditions = hasOnOffState(config.entity);
+    if (!supportsBinaryPresetConditions || presetCondition === 'always' || !activePreset) {
       return config;
     }
     
@@ -417,6 +418,7 @@ export const ButtonCardApp: React.FC = () => {
   };
 
   const handleApplyPreset = (preset: Preset, forState?: 'on' | 'off') => {
+    const supportsBinaryPresetConditions = hasOnOffState(config.entity);
     if (forState === 'off') {
       setOffStatePreset(preset);
       // User explicitly chose an off-state preset, so disable auto dark mode
@@ -440,13 +442,18 @@ export const ButtonCardApp: React.FC = () => {
       isApplyingPresetRef.current = false;
       
       // Auto-generate dark mode preset for off state if auto mode is enabled
-      if (useAutoDarkMode) {
+      if (useAutoDarkMode && supportsBinaryPresetConditions) {
         const darkPreset = generateDarkModePreset(preset);
         setOffStatePreset(darkPreset);
         // If condition is 'always', switch to 'on' so the dark mode is used for off state
         if (presetCondition === 'always') {
           setPresetCondition('on');
         }
+      } else if (!supportsBinaryPresetConditions) {
+        // Stateless/non-binary entities cannot match ON/OFF in dashboard state logic.
+        setPresetCondition('always');
+        setOffStatePreset(null);
+        setOnStatePreset(null);
       }
       
       // Reset on-state preset since we're applying a new main preset
