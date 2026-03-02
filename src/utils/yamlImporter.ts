@@ -439,11 +439,14 @@ function parseAction(
     cfg[configPrefix] = action.action;
   }
   
-  // Service data
-  if (action.service || action.service_data || action.target) {
+  // Service data - handle both call-service (service/service_data) and perform-action (perform_action/data) formats
+  if (action.service || action.service_data || action.target || action.perform_action || action.data) {
     const serviceData: any = {};
-    if (action.service) serviceData.service = action.service;
-    if (action.service_data) serviceData.service_data = action.service_data;
+    // Support both old (call-service: service key) and new (perform-action: perform_action key)
+    const serviceName = action.service || action.perform_action;
+    if (serviceName) serviceData.service = serviceName;
+    const dataObj = action.service_data || action.data;
+    if (dataObj) serviceData.service_data = dataObj;
     if (action.target) serviceData.target = action.target;
     cfg[`${configPrefix}Data`] = JSON.stringify(serviceData, null, 2);
   }

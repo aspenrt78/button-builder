@@ -178,13 +178,19 @@ const generateActionYaml = (
 ): string => {
   let yaml = `  action: ${actionType}\n`;
   
-  if (actionType === 'call-service' && actionData) {
+  if ((actionType === 'call-service' || actionType === 'perform-action') && actionData) {
     try {
       const data = JSON.parse(actionData);
-      yaml += `  service: ${data.service || ''}\n`;
-      if (data.service_data) {
-        yaml += `  service_data:\n`;
-        Object.entries(data.service_data).forEach(([key, value]) => {
+      // perform-action uses perform_action key; call-service uses service key
+      if (actionType === 'perform-action') {
+        yaml += `  perform_action: ${data.service || data.perform_action || ''}\n`;
+      } else {
+        yaml += `  service: ${data.service || ''}\n`;
+      }
+      if (data.service_data || data.data) {
+        const serviceData = data.service_data || data.data;
+        yaml += actionType === 'perform-action' ? `  data:\n` : `  service_data:\n`;
+        Object.entries(serviceData).forEach(([key, value]) => {
           yaml += `    ${key}: ${JSON.stringify(value)}\n`;
         });
       }
@@ -276,12 +282,13 @@ export const generateYaml = (config: ButtonConfig): string => {
   // --- Base Card Styles ---
   const cardStyles = [
     config.height !== 'auto' ? `height: ${config.height}` : null,
-    config.aspectRatio ? `aspect-ratio: ${config.aspectRatio}` : null,
+    // aspect-ratio is already emitted as a top-level YAML property; omit from styles.card
     gradientCSS ? gradientCSS : (bgColor ? `background-color: ${bgColor}` : null),
     config.cardOpacity < 100 ? `opacity: ${config.cardOpacity / 100}` : null,
     `border-radius: ${config.borderRadius}`,
     `padding: ${config.padding}`,
-    `color: ${config.color}`,
+    // Only emit color in styles.card when not using color:auto (which is a top-level override)
+    !config.colorAuto ? `color: ${config.color}` : null,
     // Use custom font if specified, otherwise use fontFamily dropdown
     (config.customFontName && config.customFontUrl) 
       ? `font-family: '${config.customFontName}', sans-serif`
@@ -346,7 +353,8 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.nameTemplate) {
     yaml += `name: ${config.nameTemplate}\n`;
   } else if (config.name) {
-    yaml += `name: ${config.name}\n`;
+    // Quote the name to handle colons, hashes and other YAML special characters
+    yaml += `name: "${config.name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`;
   }
 
   if (config.iconTemplate) {
@@ -407,9 +415,9 @@ export const generateYaml = (config: ButtonConfig): string => {
   const showState = hasEntity ? config.showState : false;
   const showLastChanged = hasEntity ? config.showLastChanged : false;
   
-  // Only output show options that are true
-  if (config.showName) yaml += `show_name: true\n`;
-  if (config.showIcon) yaml += `show_icon: true\n`;
+  // show_name/show_icon default to true in button-card — only emit when overriding to false
+  if (!config.showName) yaml += `show_name: false\n`;
+  if (!config.showIcon) yaml += `show_icon: false\n`;
   if (showState) yaml += `show_state: true\n`;
   if (showLabel) yaml += `show_label: true\n`;
   if (showEntityPicture) yaml += `show_entity_picture: true\n`;
@@ -1334,7 +1342,10 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
           conditionalCardStyles.push(gradientBg);
         }
       } else if (stateStyle.backgroundColor) {
-        conditionalCardStyles.push(`background-color: ${stateStyle.backgroundColor}`);
+        // Apply backgroundColorOpacity if set to something other than full opacity
+        const bgOpacity = stateStyle.backgroundColorOpacity !== undefined ? stateStyle.backgroundColorOpacity : 100;
+        const bgValue = bgOpacity < 100 ? hexToRgba(stateStyle.backgroundColor, bgOpacity) : stateStyle.backgroundColor;
+        conditionalCardStyles.push(`background-color: ${bgValue}`);
       }
       if (stateStyle.borderColor) {
         conditionalCardStyles.push(`border-color: ${stateStyle.borderColor}`);

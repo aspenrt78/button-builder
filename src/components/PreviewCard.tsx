@@ -743,13 +743,14 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   const stateIconAnimation = matchingStateStyle?.iconAnimation;
   const stateIconAnimationSpeed = matchingStateStyle?.iconAnimationSpeed;
   
-  // Use state-specific animation if it exists and is not 'none', otherwise use config animation
+  // Use state-specific animation if it exists and is not 'none', otherwise use config animation.
+  // config.spin (legacy "Icon Spin" checkbox) maps to the 'spin' animation type.
   const effectiveIconAnimation = (stateIconAnimation && stateIconAnimation !== 'none') 
     ? stateIconAnimation 
-    : config.iconAnimation;
+    : (config.spin && config.iconAnimation === 'none' ? 'spin' : config.iconAnimation);
   const effectiveIconAnimationTrigger = (stateIconAnimation && stateIconAnimation !== 'none')
     ? 'always'
-    : config.iconAnimationTrigger;
+    : (config.spin ? 'always' : config.iconAnimationTrigger);
 
   // Icon animations: Always apply when selected (alwaysAnimateIcon checkbox overrides state logic)
   const shouldShowIconAnimation = config.alwaysAnimateIcon || 
@@ -760,7 +761,10 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   const iconAnimationClass = (effectiveIconAnimation !== 'none' && shouldShowIconAnimation) 
     ? `cba-animate-${effectiveIconAnimation}` 
     : '';
-  const iconAnimationDuration = stateIconAnimationSpeed || config.iconAnimationSpeed || '2s';
+  // Use spinDuration for the legacy spin property, otherwise use animation speed
+  const iconAnimationDuration = config.spin && config.iconAnimation === 'none'
+    ? (config.spinDuration || '2s')
+    : (stateIconAnimationSpeed || config.iconAnimationSpeed || '2s');
 
   // Marquee Logic: If marquee is active and valid
   const isMarquee = effectiveCardAnimation === 'marquee' && 
