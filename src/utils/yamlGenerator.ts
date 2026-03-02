@@ -1,6 +1,6 @@
 
 import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig, ThresholdColorConfig } from "../types";
-import { getToggleFallbackService, supportsToggleAction, supportsLiveStream } from "./entityCapabilities";
+import { getToggleFallbackService, supportsToggleAction, supportsLiveStream, hasOnOffState } from "./entityCapabilities";
 
 // Helper to convert hex + opacity (0-100) to RGBA string
 const hexToRgba = (hex: string, opacity: number) => {
@@ -1184,6 +1184,11 @@ export const generateYaml = (config: ButtonConfig): string => {
        } else {
          stateCardStyles.push(`background-color: ${stateColor}`);
        }
+     } else if (stateVal === 'off' && !config.colorAuto && hasOnOffState(config.entity)) {
+       // Default OFF-state dimming: button-card puts background-color in styles.card which applies
+       // to both states, making ON and OFF look identical. Automatically dim the card when OFF
+       // so it visually indicates the entity is inactive.
+       stateCardStyles.push(`filter: brightness(0.5)`);
      }
      
      // Conditional Card Animation (skip if alwaysAnimateCard is enabled - handled globally)

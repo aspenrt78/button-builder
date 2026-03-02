@@ -885,6 +885,18 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     zIndex: 1,
     overflow: isMarquee ? 'hidden' : 'visible', // Only hide overflow for marquee mask
     opacity: Math.min(100, Math.max(0, config.cardOpacity)) / 100,
+    // Auto-dim when OFF: mirrors the brightness(0.5) filter emitted in the YAML off-state.
+    // Only applies when the entity has binary on/off state AND no explicit off-state styling
+    // (stateOffColor / matching conditional) has been configured.
+    ...(
+      canTogglePreviewState &&
+      isOff &&
+      !stateSpecificBgColor &&
+      !matchingStateStyle &&
+      !config.colorAuto
+        ? { filter: 'brightness(0.5)' }
+        : {}
+    ),
     // Only set animationDuration if we have a cardAnimationClass (avoid overriding extraStyles animation)
     ...(cardAnimationClass ? { animationDuration: cardAnimationDuration } : {}),
     // Apply extra styles LAST so they can override defaults
