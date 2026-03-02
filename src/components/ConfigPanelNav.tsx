@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2, Gauge } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2, Gauge, GitBranch } from 'lucide-react';
 
 // ============= NAVIGATION TYPES =============
 export type SectionId = 
   | 'core' | 'variables' 
   | 'dimensions' | 'visibility' | 'gridLayout'
-  | 'colors' | 'glass' | 'borders' | 'animations' | 'typography' | 'thresholdColors'
+  | 'colors' | 'glass' | 'borders' | 'animations' | 'typography' | 'thresholdColors' | 'conditionalStyles'
   | 'cardActions' | 'momentaryActions' | 'iconActions'
   | 'confirmation' | 'lock' | 'protect' | 'tooltip' | 'customFields' | 'advancedSettings'
   | 'presetGallery' | 'presetConditions';
@@ -55,6 +55,7 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'borders', label: 'Borders', icon: BoxSelect },
       { id: 'typography', label: 'Typography', icon: Type },
       { id: 'thresholdColors', label: 'Threshold Alerts', icon: Gauge },
+      { id: 'conditionalStyles', label: 'Conditionals', icon: GitBranch },
     ]
   },
   { 

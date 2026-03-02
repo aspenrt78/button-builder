@@ -6,7 +6,7 @@ import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
-import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge, Search, AlertCircle } from 'lucide-react';
+import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge, Search, AlertCircle, ChevronDown } from 'lucide-react';
 import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
 import { haService } from '../services/homeAssistantService';
 import { PRESETS, Preset, generateDarkModePreset } from '../presets';
@@ -365,6 +365,7 @@ export const ConfigPanel: React.FC<Props> = ({
   
   // Grid designer modal state
   const [showGridDesigner, setShowGridDesigner] = useState(false);
+  const [expandedConditions, setExpandedConditions] = useState<Set<number>>(new Set());
 
   // Label entity attributes
   const [labelEntityAttributes, setLabelEntityAttributes] = useState<string[]>([]);
@@ -1630,281 +1631,193 @@ export const ConfigPanel: React.FC<Props> = ({
                   setAuto={(v: boolean) => update('labelColorAuto', v)}
                 />
              </div>
-             
-             <div className="h-px bg-gray-700/50" />
-
-             {/* Conditionals (State-Based Styling) - Moved from State Styles section */}
-             <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-gray-400 uppercase">Conditionals (State-Based Styling)</p>
-                <button
-                  onClick={() => update('stateStyles', [...config.stateStyles, { 
-                    id: 'state_' + (config.stateStyles.length + 1), 
-                    conditionEntity: config.entity || '',
-                    conditionAttribute: '',
-                    operator: 'equals', 
-                    value: entityCapabilities.hasOnOffState
-                      ? 'on'
-                      : (entityCapabilities.isStateless ? '' : (selectedEntityState || '')),
-                    name: '',
-                    icon: '',
-                    color: '',
-                    entityPicture: '',
-                    label: '',
-                    stateDisplay: '',
-                    spin: false,
-                    styles: '',
-                    backgroundColor: '',
-                    iconColor: '',
-                    nameColor: '',
-                    stateColor: '',
-                    labelColor: '',
-                    borderColor: '',
-                    cardAnimation: 'none',
-                    cardAnimationSpeed: '2s',
-                    iconAnimation: 'none',
-                    iconAnimationSpeed: '2s',
-                  } as StateStyleConfig])}
-                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white"
-                >
-                  <Plus size={12} /> Add Conditional
-                </button>
-              </div>
-              
-              <p className="text-[10px] text-gray-500 mb-3">
-                Define conditions to change appearance based on any entity state. For trigger-only buttons, pick a helper/sensor entity as the condition source.
-              </p>
-              {!entityCapabilities.hasOnOffState && entityCapabilities.isStateless && (
-                <p className="text-[10px] text-amber-300/90 mb-3">
-                  This entity is stateless (trigger-only). State conditionals are usually not meaningful for button entities.
-                </p>
-              )}
-              {!entityCapabilities.hasOnOffState && !entityCapabilities.isStateless && (
-                <p className="text-[10px] text-amber-300/90 mb-3">
-                  This entity is not ON/OFF based. Use exact state values like "{selectedStateHint}", regex, or numeric operators.
-                </p>
-              )}
-              {config.stateStyles.some(style => style.operator === 'template') && (
-                <p className="text-[10px] text-amber-300/90 mb-3">
-                  Template operators are generated in YAML, but preview cannot execute custom JS templates.
-                </p>
-              )}
-              
-              {config.stateStyles.length === 0 ? (
-                <div className="text-xs text-gray-500 italic text-center py-2">No conditionals defined</div>
-              ) : (
-                <div className="space-y-3">
-                  {config.stateStyles.map((style, idx) => (
-                    <div key={idx} className="p-3 bg-gray-800 rounded border border-gray-700">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-gray-400">Condition {idx + 1}</span>
-                        <button
-                          onClick={() => update('stateStyles', config.stateStyles.filter((_, i) => i !== idx))}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                      <div className="space-y-3">
-                        {/* Condition */}
-                        <div className="pt-2 border-t border-gray-700">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Condition</p>
-                          <EntitySelector
-                            label="When Entity"
-                            value={style.conditionEntity || config.entity || ''}
-                            allowAll={true}
-                            onChange={(v) => {
-                              const selectedState = conditionEntityStates[v] || '';
-                              const shouldAutofillValue =
-                                !style.value ||
-                                style.value === selectedEntityState ||
-                                style.value === selectedStateHint;
-                              updateStateStyle(idx, {
-                                conditionEntity: v,
-                                conditionAttribute: '',
-                                ...(shouldAutofillValue ? { value: selectedState } : {}),
-                              });
-                            }}
-                            placeholder="sensor.kiln_status"
-                          />
-                          <p className="text-[10px] text-gray-500 mt-1">
-                            Current value:{' '}
-                            <span className="text-gray-300">
-                              {entityCapabilities.isStateless &&
-                              ((style.conditionEntity || config.entity || '').trim() === (config.entity || '').trim())
-                                ? 'stateless trigger'
-                                : (conditionEntityStates[(style.conditionEntity || config.entity || '').trim()] || 'unknown')}
-                            </span>
-                          </p>
-
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            <ControlInput
-                              label="Use Attribute"
-                              type="select"
-                              value={style.conditionAttribute || ''}
-                              options={[
-                                { value: '', label: 'Entity State' },
-                                ...((conditionEntityAttributes[(style.conditionEntity || config.entity || '').trim()] || []).map(attr => ({
-                                  value: attr,
-                                  label: attr
-                                })))
-                              ]}
-                              onChange={(v) => updateStateStyle(idx, { conditionAttribute: v })}
-                            />
-                            <ControlInput
-                              label="Condition Type"
-                              type="select"
-                              value={style.operator}
-                              options={CONDITION_MATCH_OPTIONS}
-                              onChange={(v) => updateStateStyle(idx, { operator: v })}
-                            />
-                          </div>
-
-                          {style.operator !== 'default' && (
-                            <ControlInput
-                              className="mt-2"
-                              label={
-                                style.operator === 'above' || style.operator === 'below'
-                                  ? 'Compare Number'
-                                  : style.operator === 'regex'
-                                    ? 'Pattern'
-                                    : style.operator === 'template'
-                                      ? 'Template Expression'
-                                      : 'Expected State/Value'
-                              }
-                              value={style.value}
-                              onChange={(v) => updateStateStyle(idx, { value: v })}
-                              placeholder={
-                                style.operator === 'template'
-                                  ? "[[[ return states['sensor.kiln_temp'].state > 1000 ]]]"
-                                  : 'on, off, idle, 50, etc.'
-                              }
-                            />
-                          )}
-                          {entityCapabilities.isStateless &&
-                            (
-                              !(style.conditionEntity || '').trim() ||
-                              (style.conditionEntity || '').trim() === (config.entity || '').trim()
-                            ) && (
-                            <p className="text-[10px] text-amber-300/90 mt-2">
-                              Tip: For button press feedback, set a helper/sensor entity above and style from that state.
-                            </p>
-                          )}
-                        </div>
-                        
-                        {/* Basic Overrides */}
-                        <div className="pt-2 border-t border-gray-700">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Overrides</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <ControlInput label="Name" value={style.name} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, name: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="Icon" value={style.icon} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, icon: v };
-                              update('stateStyles', updated);
-                            }} placeholder="mdi:..." />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            <ControlInput label="Label" value={style.label} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, label: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="State Display" value={style.stateDisplay} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, stateDisplay: v };
-                              update('stateStyles', updated);
-                            }} />
-                          </div>
-                        </div>
-                        
-                        {/* Conditional Colors */}
-                        <div className="pt-2 border-t border-gray-700">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Conditional Colors</p>
-                          <div className="grid grid-cols-3 gap-2">
-                            <ControlInput label="Entity Color" type="color" value={style.color} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, color: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="Background" type="color" value={style.backgroundColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, backgroundColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="Border" type="color" value={style.borderColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, borderColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 mt-2">
-                            <ControlInput label="Icon Color" type="color" value={style.iconColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, iconColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="Name Color" type="color" value={style.nameColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, nameColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="State Color" type="color" value={style.stateColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, stateColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 mt-2">
-                            <ControlInput label="Label Color" type="color" value={style.labelColor || ''} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, labelColor: v };
-                              update('stateStyles', updated);
-                            }} />
-                          </div>
-                        </div>
-                        
-                        {/* Conditional Animations */}
-                        <div className="pt-2 border-t border-gray-700">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Conditional Animations</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <ControlInput label="Card Animation" type="select" value={style.cardAnimation || 'none'} options={ANIMATION_OPTIONS} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, cardAnimation: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="Card Speed" value={style.cardAnimationSpeed || '2s'} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, cardAnimationSpeed: v };
-                              update('stateStyles', updated);
-                            }} suffix="s" />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            <ControlInput label="Icon Animation" type="select" value={style.iconAnimation || 'none'} options={ANIMATION_OPTIONS} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, iconAnimation: v };
-                              update('stateStyles', updated);
-                            }} />
-                            <ControlInput label="Icon Speed" value={style.iconAnimationSpeed || '2s'} onChange={(v) => {
-                              const updated = [...config.stateStyles];
-                              updated[idx] = { ...style, iconAnimationSpeed: v };
-                              update('stateStyles', updated);
-                            }} suffix="s" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
            </div>
             </>
           )}
-        
+
+          {/* ===== APPEARANCE > CONDITIONALS ===== */}
+          {showSection('conditionalStyles') && (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <div className="min-w-0 pr-3">
+                  <p className="text-xs text-gray-400">Change appearance based on entity state. Each condition can override colors, icon, text, and animation.</p>
+                  {!entityCapabilities.hasOnOffState && !entityCapabilities.isStateless && (
+                    <p className="text-[10px] text-amber-300/80 mt-1">
+                      {`Not ON/OFF — use exact values like "${selectedStateHint}", regex, or numeric operators.`}
+                    </p>
+                  )}
+                  {entityCapabilities.isStateless && (
+                    <p className="text-[10px] text-amber-300/80 mt-1">Stateless entity — pick a helper/sensor as the condition source instead.</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    const newIdx = config.stateStyles.length;
+                    setExpandedConditions(prev => new Set([...prev, newIdx]));
+                    update('stateStyles', [...config.stateStyles, {
+                      id: 'state_' + (config.stateStyles.length + 1),
+                      conditionEntity: config.entity || '',
+                      conditionAttribute: '',
+                      operator: 'equals',
+                      value: entityCapabilities.hasOnOffState ? 'on' : (entityCapabilities.isStateless ? '' : (selectedEntityState || '')),
+                      name: '', icon: '', color: '', entityPicture: '', label: '', stateDisplay: '',
+                      spin: false, styles: '',
+                      backgroundColor: '', iconColor: '', nameColor: '', stateColor: '', labelColor: '', borderColor: '',
+                      cardAnimation: 'none', cardAnimationSpeed: '2s',
+                      iconAnimation: 'none', iconAnimationSpeed: '2s',
+                    } as StateStyleConfig]);
+                  }}
+                  className="shrink-0 flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+
+              {config.stateStyles.some(s => s.operator === 'template') && (
+                <p className="text-[10px] text-amber-300/80 mb-2">Template operators are YAML-only — preview cannot execute custom JS.</p>
+              )}
+
+              {config.stateStyles.length === 0 ? (
+                <div className="text-xs text-gray-500 italic text-center py-4 border border-dashed border-gray-700 rounded-lg">
+                  No conditionals — click Add to create one
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {config.stateStyles.map((style, idx) => {
+                    const isExpanded = expandedConditions.has(idx);
+                    const entityLabel = ((style.conditionEntity || config.entity || '').split('.').slice(1).join('.') || (style.conditionEntity || config.entity || '') || 'entity').trim();
+                    const opLabel = CONDITION_MATCH_OPTIONS.find(o => o.value === style.operator)?.label ?? style.operator;
+                    const summary = style.operator === 'default'
+                      ? 'Fallback (else — no other condition matched)'
+                      : style.operator === 'template'
+                        ? 'Advanced template condition'
+                        : `${entityLabel} ${opLabel.toLowerCase().replace('state is ', '').trim()} "${style.value}"`;
+                    return (
+                      <div key={idx} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                        {/* Header row */}
+                        <div
+                          className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-700/50 select-none"
+                          onClick={() => setExpandedConditions(prev => {
+                            const next = new Set(prev);
+                            if (next.has(idx)) next.delete(idx); else next.add(idx);
+                            return next;
+                          })}
+                        >
+                          <ChevronDown
+                            size={13}
+                            className={`shrink-0 text-gray-500 transition-transform duration-150 ${isExpanded ? '' : '-rotate-90'}`}
+                          />
+                          <span className="flex-1 text-xs text-gray-300 truncate">{summary}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedConditions(prev => { const next = new Set(prev); next.delete(idx); return next; });
+                              update('stateStyles', config.stateStyles.filter((_, i) => i !== idx));
+                            }}
+                            className="shrink-0 p-0.5 text-gray-600 hover:text-red-400"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+
+                        {/* Expanded body */}
+                        {isExpanded && (
+                          <div className="px-3 pb-3 space-y-3 border-t border-gray-700/60">
+                            {/* WHEN */}
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mt-2.5 mb-1.5">When</p>
+                              <EntitySelector
+                                label="Entity"
+                                value={style.conditionEntity || config.entity || ''}
+                                allowAll={true}
+                                onChange={(v) => {
+                                  const selectedState = conditionEntityStates[v] || '';
+                                  const shouldAutofill = !style.value || style.value === selectedEntityState || style.value === selectedStateHint;
+                                  updateStateStyle(idx, { conditionEntity: v, conditionAttribute: '', ...(shouldAutofill ? { value: selectedState } : {}) });
+                                }}
+                                placeholder="sensor.my_sensor"
+                              />
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                <ControlInput
+                                  label="Attribute"
+                                  type="select"
+                                  value={style.conditionAttribute || ''}
+                                  options={[
+                                    { value: '', label: 'State' },
+                                    ...((conditionEntityAttributes[(style.conditionEntity || config.entity || '').trim()] || []).map(attr => ({ value: attr, label: attr })))
+                                  ]}
+                                  onChange={(v) => updateStateStyle(idx, { conditionAttribute: v })}
+                                />
+                                <ControlInput
+                                  label="Match"
+                                  type="select"
+                                  value={style.operator}
+                                  options={CONDITION_MATCH_OPTIONS}
+                                  onChange={(v) => updateStateStyle(idx, { operator: v })}
+                                />
+                                {style.operator !== 'default' && (
+                                  <ControlInput
+                                    label={style.operator === 'above' || style.operator === 'below' ? 'Number' : style.operator === 'regex' ? 'Pattern' : style.operator === 'template' ? 'Template' : 'Value'}
+                                    value={style.value}
+                                    onChange={(v) => updateStateStyle(idx, { value: v })}
+                                    placeholder={style.operator === 'template' ? '[[[ return ... ]]]' : 'on, off, 50…'}
+                                  />
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-600 mt-1">
+                                Current: <span className="text-gray-400">{entityCapabilities.isStateless && (!(style.conditionEntity || '').trim() || (style.conditionEntity || '').trim() === (config.entity || '').trim()) ? 'stateless trigger' : (conditionEntityStates[(style.conditionEntity || config.entity || '').trim()] || 'unknown')}</span>
+                              </p>
+                            </div>
+
+                            {/* OVERRIDE */}
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">Override</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <ControlInput label="Icon" value={style.icon} onChange={(v) => updateStateStyle(idx, { icon: v })} placeholder="mdi:..." />
+                                <ControlInput label="Name" value={style.name} onChange={(v) => updateStateStyle(idx, { name: v })} />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                <ControlInput label="Label" value={style.label} onChange={(v) => updateStateStyle(idx, { label: v })} />
+                                <ControlInput label="State Text" value={style.stateDisplay} onChange={(v) => updateStateStyle(idx, { stateDisplay: v })} />
+                              </div>
+                            </div>
+
+                            {/* COLORS */}
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">Colors</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                <ControlInput label="Background" type="color" value={style.backgroundColor || ''} onChange={(v) => updateStateStyle(idx, { backgroundColor: v })} />
+                                <ControlInput label="Border" type="color" value={style.borderColor || ''} onChange={(v) => updateStateStyle(idx, { borderColor: v })} />
+                                <ControlInput label="Icon" type="color" value={style.iconColor || ''} onChange={(v) => updateStateStyle(idx, { iconColor: v })} />
+                                <ControlInput label="Entity" type="color" value={style.color || ''} onChange={(v) => updateStateStyle(idx, { color: v })} />
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                <ControlInput label="Name" type="color" value={style.nameColor || ''} onChange={(v) => updateStateStyle(idx, { nameColor: v })} />
+                                <ControlInput label="State" type="color" value={style.stateColor || ''} onChange={(v) => updateStateStyle(idx, { stateColor: v })} />
+                                <ControlInput label="Label" type="color" value={style.labelColor || ''} onChange={(v) => updateStateStyle(idx, { labelColor: v })} />
+                              </div>
+                            </div>
+
+                            {/* ANIMATION */}
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">Animation</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                <ControlInput label="Card" type="select" value={style.cardAnimation || 'none'} options={ANIMATION_OPTIONS} onChange={(v) => updateStateStyle(idx, { cardAnimation: v })} />
+                                <ControlInput label="Speed" value={style.cardAnimationSpeed || '2s'} onChange={(v) => updateStateStyle(idx, { cardAnimationSpeed: v })} suffix="s" />
+                                <ControlInput label="Icon" type="select" value={style.iconAnimation || 'none'} options={ANIMATION_OPTIONS} onChange={(v) => updateStateStyle(idx, { iconAnimation: v })} />
+                                <ControlInput label="Speed" value={style.iconAnimationSpeed || '2s'} onChange={(v) => updateStateStyle(idx, { iconAnimationSpeed: v })} suffix="s" />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
           {/* ===== APPEARANCE > GLASS ===== */}
           {showSection('glass') && (
             <>
