@@ -1133,11 +1133,11 @@ export const ConfigPanel: React.FC<Props> = ({
                 value={config.entity} 
                 onChange={(v) => update('entity', v)} 
                 onEntitySelect={(entity) => {
-                  if (entity.name && (!config.name || config.name === 'Living Room')) {
+                  if (entity.name) {
                     update('name', entity.name);
                   }
-                  if (!config.icon || config.icon === 'mdi:sofa') {
-                    const suggestedIcon = getIconForEntity(entity.id, entity.domain);
+                  const suggestedIcon = getIconForEntity(entity.id, entity.domain);
+                  if (suggestedIcon) {
                     update('icon', suggestedIcon);
                   }
                 }}
