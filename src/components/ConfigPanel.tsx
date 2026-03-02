@@ -372,10 +372,43 @@ export const ConfigPanel: React.FC<Props> = ({
   const [selectedEntityState, setSelectedEntityState] = useState<string>('');
   const [conditionEntityAttributes, setConditionEntityAttributes] = useState<Record<string, string[]>>({});
   const [conditionEntityStates, setConditionEntityStates] = useState<Record<string, string>>({});
+  const [conditionEntityRawAttributes, setConditionEntityRawAttributes] = useState<Record<string, Record<string, any>>>({});
   
   // Custom field entity attributes (indexed by field index)
   const [customFieldAttributes, setCustomFieldAttributes] = useState<Record<number, string[]>>({});
-  
+
+  // Derive suggested values for a condition's value field based on entity domain and attribute
+  const getValueSuggestions = (entityId: string, attribute: string): string[] => {
+    const eid = entityId.trim();
+    const rawAttrs = conditionEntityRawAttributes[eid] || {};
+    const domain = eid.split('.')[0];
+    if (!attribute) {
+      if (['light', 'switch', 'fan', 'automation', 'input_boolean', 'binary_sensor', 'script', 'group', 'siren', 'valve'].includes(domain)) return ['on', 'off'];
+      if (domain === 'cover') return ['open', 'closed', 'opening', 'closing'];
+      if (domain === 'lock') return ['locked', 'unlocked', 'locking', 'unlocking'];
+      if (domain === 'vacuum') return ['cleaning', 'docked', 'idle', 'paused', 'returning', 'error'];
+      if (domain === 'climate') return Array.isArray(rawAttrs.hvac_modes) ? rawAttrs.hvac_modes : ['heat', 'cool', 'off', 'heat_cool', 'auto', 'dry', 'fan_only'];
+      if (domain === 'input_select' || domain === 'select') return Array.isArray(rawAttrs.options) ? rawAttrs.options : [];
+      if (domain === 'media_player') return ['playing', 'paused', 'idle', 'off', 'standby', 'buffering'];
+      if (domain === 'alarm_control_panel') return ['armed_away', 'armed_home', 'armed_night', 'armed_custom_bypass', 'disarmed', 'triggered', 'pending', 'arming'];
+      if (domain === 'person' || domain === 'device_tracker') return ['home', 'not_home'];
+      const curr = conditionEntityStates[eid];
+      return curr ? [curr] : [];
+    } else {
+      const attrVal = rawAttrs[attribute];
+      if (Array.isArray(attrVal)) return attrVal.map(String);
+      if (typeof attrVal === 'boolean') return ['true', 'false'];
+      if (attribute === 'hvac_action') return ['heating', 'cooling', 'idle', 'off'];
+      if (attribute === 'preset_mode' && Array.isArray(rawAttrs.preset_modes)) return rawAttrs.preset_modes;
+      if (attribute === 'fan_mode' && Array.isArray(rawAttrs.fan_modes)) return rawAttrs.fan_modes;
+      if (attribute === 'swing_mode' && Array.isArray(rawAttrs.swing_modes)) return rawAttrs.swing_modes;
+      if (attribute === 'source' && Array.isArray(rawAttrs.source_list)) return rawAttrs.source_list;
+      if (attribute === 'sound_mode' && Array.isArray(rawAttrs.sound_mode_list)) return rawAttrs.sound_mode_list;
+      if (attrVal !== undefined) return [String(attrVal)];
+      return [];
+    }
+  };
+
   const entityCapabilities = useMemo(
     () => getEntityCapabilities(config.entity, selectedEntityState),
     [config.entity, selectedEntityState]
@@ -506,6 +539,8 @@ export const ConfigPanel: React.FC<Props> = ({
       const nextAttributes: Record<string, string[]> = {};
       const nextStates: Record<string, string> = {};
 
+      const nextRawAttributes: Record<string, Record<string, any>> = {};
+
       for (const entityId of conditionEntityIds) {
         const entity = await haService.getEntityData(entityId);
         if (!entity) continue;
@@ -514,11 +549,13 @@ export const ConfigPanel: React.FC<Props> = ({
         nextAttributes[entityId] = Object.keys(entity.attributes || {}).filter(attr =>
           !['friendly_name', 'icon', 'entity_picture', 'supported_features', 'device_class'].includes(attr)
         );
+        nextRawAttributes[entityId] = entity.attributes || {};
       }
 
       if (!cancelled) {
         setConditionEntityAttributes(nextAttributes);
         setConditionEntityStates(nextStates);
+        setConditionEntityRawAttributes(nextRawAttributes);
       }
     })();
 
@@ -1503,7 +1540,7 @@ export const ConfigPanel: React.FC<Props> = ({
                           updateAppearance('backgroundColor', v);
                           updateAppearance('gradientEnabled', false);
                         }} />
-                        <ControlInput label="Opacity" type="slider" value={getAppearanceValue('backgroundColorOpacity')} min={0} max={100} onChange={(v) => updateAppearance('backgroundColorOpacity', v)} />
+                        <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
                    </div>
                    <ControlInput label="Default Text Color" type="color" value={getAppearanceValue('color') || '#ffffff'} onChange={(v) => updateAppearance('color', v)} />
                 </div>
@@ -1737,43 +1774,82 @@ export const ConfigPanel: React.FC<Props> = ({
                                 }}
                                 placeholder="sensor.my_sensor"
                               />
-                              <div className="grid grid-cols-3 gap-2 mt-2">
-                                <ControlInput
-                                  label="Attribute"
-                                  type="select"
-                                  value={style.conditionAttribute || ''}
-                                  options={[
-                                    { value: '', label: 'State' },
-                                    ...((conditionEntityAttributes[(style.conditionEntity || config.entity || '').trim()] || []).map(attr => ({ value: attr, label: attr })))
-                                  ]}
-                                  onChange={(v) => updateStateStyle(idx, { conditionAttribute: v })}
-                                />
-                                <ControlInput
-                                  label="Match"
-                                  type="select"
-                                  value={style.operator}
-                                  options={CONDITION_MATCH_OPTIONS}
-                                  onChange={(v) => updateStateStyle(idx, { operator: v })}
-                                />
-                                {style.operator !== 'default' && (
-                                  <ControlInput
-                                    label={style.operator === 'above' || style.operator === 'below' ? 'Number' : style.operator === 'regex' ? 'Pattern' : style.operator === 'template' ? 'Template' : 'Value'}
-                                    value={style.value}
-                                    onChange={(v) => updateStateStyle(idx, { value: v })}
-                                    placeholder={style.operator === 'template' ? '[[[ return ... ]]]' : 'on, off, 50…'}
-                                  />
-                                )}
-                              </div>
-                              <p className="text-[10px] text-gray-600 mt-1">
-                                Current: <span className="text-gray-400">{entityCapabilities.isStateless && (!(style.conditionEntity || '').trim() || (style.conditionEntity || '').trim() === (config.entity || '').trim()) ? 'stateless trigger' : (conditionEntityStates[(style.conditionEntity || config.entity || '').trim()] || 'unknown')}</span>
-                              </p>
+                              {(() => {
+                                const condEid = (style.conditionEntity || config.entity || '').trim();
+                                const suggestions = getValueSuggestions(condEid, style.conditionAttribute || '');
+                                const listId = `cond-vals-${idx}`;
+                                const currentVal = conditionEntityStates[condEid] || 'unknown';
+                                const attrCurrentVal = style.conditionAttribute
+                                  ? String((conditionEntityRawAttributes[condEid] || {})[style.conditionAttribute] ?? 'unknown')
+                                  : null;
+                                return (
+                                  <>
+                                    <div className="grid grid-cols-3 gap-2 mt-2">
+                                      <ControlInput
+                                        label="Attribute"
+                                        type="select"
+                                        value={style.conditionAttribute || ''}
+                                        options={[
+                                          { value: '', label: 'State' },
+                                          ...((conditionEntityAttributes[condEid] || []).map(attr => ({ value: attr, label: attr })))
+                                        ]}
+                                        onChange={(v) => updateStateStyle(idx, { conditionAttribute: v, value: '' })}
+                                      />
+                                      <ControlInput
+                                        label="Match"
+                                        type="select"
+                                        value={style.operator}
+                                        options={CONDITION_MATCH_OPTIONS}
+                                        onChange={(v) => updateStateStyle(idx, { operator: v })}
+                                      />
+                                      {style.operator !== 'default' && (
+                                        <div>
+                                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                                            {style.operator === 'above' || style.operator === 'below' ? 'Number' : style.operator === 'regex' ? 'Pattern' : style.operator === 'template' ? 'Template' : 'Value'}
+                                          </label>
+                                          {suggestions.length > 0 && style.operator !== 'regex' && style.operator !== 'template' ? (
+                                            <>
+                                              <datalist id={listId}>
+                                                {suggestions.map(s => <option key={s} value={s} />)}
+                                              </datalist>
+                                              <input
+                                                type="text"
+                                                list={listId}
+                                                value={style.value}
+                                                onChange={(e) => updateStateStyle(idx, { value: e.target.value })}
+                                                placeholder="Pick or type…"
+                                                className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                                              />
+                                            </>
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              value={style.value}
+                                              onChange={(e) => updateStateStyle(idx, { value: e.target.value })}
+                                              placeholder={style.operator === 'template' ? '[[[ return ... ]]]' : 'on, off, 50…'}
+                                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                                            />
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-gray-600 mt-1">
+                                      Current: <span className="text-gray-400">
+                                        {entityCapabilities.isStateless && (!(style.conditionEntity || '').trim() || (style.conditionEntity || '').trim() === (config.entity || '').trim())
+                                          ? 'stateless trigger'
+                                          : attrCurrentVal !== null ? attrCurrentVal : currentVal}
+                                      </span>
+                                    </p>
+                                  </>
+                                );
+                              })()}
                             </div>
 
                             {/* OVERRIDE */}
                             <div>
                               <p className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">Override</p>
                               <div className="grid grid-cols-2 gap-2">
-                                <ControlInput label="Icon" value={style.icon} onChange={(v) => updateStateStyle(idx, { icon: v })} placeholder="mdi:..." />
+                                <IconPicker label="Icon" value={style.icon} onChange={(v) => updateStateStyle(idx, { icon: v })} />
                                 <ControlInput label="Name" value={style.name} onChange={(v) => updateStateStyle(idx, { name: v })} />
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2">
@@ -2810,13 +2886,13 @@ export const ConfigPanel: React.FC<Props> = ({
           <div className="space-y-4">
             <YamlOnlyHint text="Most options here are runtime-only (timers, templates, haptic, trigger rules, conditional display)." />
             <div className="grid grid-cols-2 gap-4">
-              <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
               <ControlInput label="Update Timer (s)" value={config.updateTimer.toString()} onChange={(v) => update('updateTimer', Number(v) || 0)} placeholder="0 = disabled" />
+              <ControlInput label="Hold Time (ms)" value={config.holdTime.toString()} onChange={(v) => update('holdTime', Number(v) || 500)} placeholder="500" />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <ControlInput label="Hold Time (ms)" value={config.holdTime.toString()} onChange={(v) => update('holdTime', Number(v) || 500)} placeholder="500" />
               <ControlInput label="Template" value={config.template} onChange={(v) => update('template', v)} placeholder="template_name" />
+              <div />
             </div>
             
             <div className="grid grid-cols-2 gap-4">

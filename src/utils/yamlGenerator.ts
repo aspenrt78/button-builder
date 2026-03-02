@@ -1179,10 +1179,11 @@ export const generateYaml = (config: ButtonConfig): string => {
      const stateColor = stateVal === 'on' ? config.stateOnColor : config.stateOffColor;
      const stateOpacity = stateVal === 'on' ? config.stateOnOpacity : config.stateOffOpacity;
      if (stateColor) {
+       // Use `background:` not `background-color:` so it overrides any gradient in base styles
        if (stateOpacity !== undefined && stateOpacity < 100) {
-         stateCardStyles.push(`background-color: ${hexToRgba(stateColor, stateOpacity)}`);
+         stateCardStyles.push(`background: ${hexToRgba(stateColor, stateOpacity)}`);
        } else {
-         stateCardStyles.push(`background-color: ${stateColor}`);
+         stateCardStyles.push(`background: ${stateColor}`);
        }
      } else if (stateVal === 'off' && !config.colorAuto && hasOnOffState(config.entity)) {
        // Default OFF-state dimming: button-card puts background-color in styles.card which applies
@@ -1348,9 +1349,10 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
         }
       } else if (stateStyle.backgroundColor) {
         // Apply backgroundColorOpacity if set to something other than full opacity
+        // Use `background:` (not `background-color:`) so it overrides any gradient set via `background:` shorthand in base styles
         const bgOpacity = stateStyle.backgroundColorOpacity !== undefined ? stateStyle.backgroundColorOpacity : 100;
         const bgValue = bgOpacity < 100 ? hexToRgba(stateStyle.backgroundColor, bgOpacity) : stateStyle.backgroundColor;
-        conditionalCardStyles.push(`background-color: ${bgValue}`);
+        conditionalCardStyles.push(`background: ${bgValue}`);
       }
       if (stateStyle.borderColor) {
         conditionalCardStyles.push(`border-color: ${stateStyle.borderColor}`);
