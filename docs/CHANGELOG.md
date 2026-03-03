@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.9] - 2026-03-02
+
+### Fixed
+- **hassfest compliance**: Added `CONFIG_SCHEMA` using `cv.config_entry_only_config_schema` to `__init__.py` and added `http` to `dependencies` in `manifest.json` to pass Home Assistant's hassfest validation.
+- **hacs.json**: Removed unsupported `images` key.
+
 ## [2.2.8] - 2026-03-02
 
 ### Changed
