@@ -1542,13 +1542,13 @@ export const ConfigPanel: React.FC<Props> = ({
 
                 <div className="space-y-4">
                    <div className="space-y-2">
-                        <ControlInput label="Card Background" type="color" value={getAppearanceValue('backgroundColor') || '#000000'} onChange={(v) => {
-                          updateAppearance('backgroundColor', v);
-                          updateAppearance('gradientEnabled', false);
+                        <ControlInput label="Card Background" type="color" value={config.backgroundColor || '#000000'} onChange={(v) => {
+                          update('backgroundColor', v);
+                          update('gradientEnabled', false);
                         }} />
                         <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
                    </div>
-                   <ControlInput label="Default Text Color" type="color" value={getAppearanceValue('color') || '#ffffff'} onChange={(v) => updateAppearance('color', v)} />
+                   <ControlInput label="Default Text Color" type="color" value={config.color || '#ffffff'} onChange={(v) => update('color', v)} />
                 </div>
              </div>
              

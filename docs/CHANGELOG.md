@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.7] - 2025-07-21
+
+### Fixed
+- **Card Background Color Picker**: Background color and default text color in the Colors & Theming section now correctly update the base card style instead of being routed to state-specific appearance overrides. Previously, picking a background color after disabling Auto Color had no visible effect because the change was stored as an on-state conditional rather than the base card background.
+
 ## [1.1.0] - 2025-11-23
 
 ### Added
