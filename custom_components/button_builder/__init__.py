@@ -5,6 +5,7 @@ import logging
 import json
 from pathlib import Path
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
@@ -17,6 +18,8 @@ DOMAIN = "button_builder"
 PANEL_ID = "button-builder"
 DATA_PANEL_REGISTERED = "panel_registered"
 DATA_STATIC_REGISTERED = "static_path_registered"
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:

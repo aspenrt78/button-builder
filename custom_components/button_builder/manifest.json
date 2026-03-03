@@ -6,7 +6,8 @@
                    ],
     "config_flow":  true,
     "dependencies":  [
-                         "frontend"
+                         "frontend",
+                         "http"
                      ],
     "documentation":  "https://github.com/aspenrt78/button-builder",
     "integration_type":  "service",
