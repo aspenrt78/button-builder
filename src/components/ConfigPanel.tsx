@@ -1181,9 +1181,15 @@ export const ConfigPanel: React.FC<Props> = ({
               />
               <ControlInput label="Name" value={config.name} onChange={(v) => update('name', v)} />
               <IconPicker label="Icon" value={config.icon} onChange={(v) => update('icon', v)} />
-              <ControlInput label="State Display (Custom)" value={config.stateDisplay} onChange={(v) => update('stateDisplay', v)} placeholder="Custom state text" />
-          <ControlInput label="Entity Picture URL" value={config.entityPicture} onChange={(v) => update('entityPicture', v)} placeholder="https://..." />
-          <ControlInput label="Units Override" value={config.units} onChange={(v) => update('units', v)} placeholder="°C, kW, etc." />
+              {config.showState && (
+                <ControlInput label="State Display (Custom)" value={config.stateDisplay} onChange={(v) => update('stateDisplay', v)} placeholder="Custom state text" />
+              )}
+              {config.showEntityPicture && (
+                <ControlInput label="Entity Picture URL" value={config.entityPicture} onChange={(v) => update('entityPicture', v)} placeholder="https://..." />
+              )}
+              {(config.showState || config.showUnits) && (
+                <ControlInput label="Units Override" value={config.units} onChange={(v) => update('units', v)} placeholder="°C, kW, etc." />
+              )}
           
           <div className="pt-3 border-t border-gray-800">
             <div className="flex items-center justify-between mb-3">
@@ -1635,38 +1641,50 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Element Colors */}
              <div className="space-y-4">
                 <p className="text-xs font-bold text-gray-400 uppercase">Element Colors</p>
-                
-                <ColorPairInput 
-                  label="Icon Color"
-                  colorValue={getAppearanceValue('iconColor')}
-                  setColor={(v: string) => updateAppearance('iconColor', v)}
-                  autoValue={config.iconColorAuto}
-                  setAuto={(v: boolean) => update('iconColorAuto', v)}
-                />
 
-                <ColorPairInput 
-                  label="Name Color"
-                  colorValue={getAppearanceValue('nameColor')}
-                  setColor={(v: string) => updateAppearance('nameColor', v)}
-                  autoValue={config.nameColorAuto}
-                  setAuto={(v: boolean) => update('nameColorAuto', v)}
-                />
+                {!config.showIcon && !config.showName && !config.showState && !config.showLabel && (
+                  <p className="text-[10px] text-gray-500 italic">Enable Name, Icon, State, or Label in Layout → Visibility to unlock element colors.</p>
+                )}
 
-                <ColorPairInput 
-                  label="State Color"
-                  colorValue={getAppearanceValue('stateColor')}
-                  setColor={(v: string) => updateAppearance('stateColor', v)}
-                  autoValue={config.stateColorAuto}
-                  setAuto={(v: boolean) => update('stateColorAuto', v)}
-                />
+                {config.showIcon && (
+                  <ColorPairInput 
+                    label="Icon Color"
+                    colorValue={getAppearanceValue('iconColor')}
+                    setColor={(v: string) => updateAppearance('iconColor', v)}
+                    autoValue={config.iconColorAuto}
+                    setAuto={(v: boolean) => update('iconColorAuto', v)}
+                  />
+                )}
 
-                <ColorPairInput 
-                  label="Label Color"
-                  colorValue={getAppearanceValue('labelColor')}
-                  setColor={(v: string) => updateAppearance('labelColor', v)}
-                  autoValue={config.labelColorAuto}
-                  setAuto={(v: boolean) => update('labelColorAuto', v)}
-                />
+                {config.showName && (
+                  <ColorPairInput 
+                    label="Name Color"
+                    colorValue={getAppearanceValue('nameColor')}
+                    setColor={(v: string) => updateAppearance('nameColor', v)}
+                    autoValue={config.nameColorAuto}
+                    setAuto={(v: boolean) => update('nameColorAuto', v)}
+                  />
+                )}
+
+                {config.showState && (
+                  <ColorPairInput 
+                    label="State Color"
+                    colorValue={getAppearanceValue('stateColor')}
+                    setColor={(v: string) => updateAppearance('stateColor', v)}
+                    autoValue={config.stateColorAuto}
+                    setAuto={(v: boolean) => update('stateColorAuto', v)}
+                  />
+                )}
+
+                {config.showLabel && (
+                  <ColorPairInput 
+                    label="Label Color"
+                    colorValue={getAppearanceValue('labelColor')}
+                    setColor={(v: string) => updateAppearance('labelColor', v)}
+                    autoValue={config.labelColorAuto}
+                    setAuto={(v: boolean) => update('labelColorAuto', v)}
+                  />
+                )}
              </div>
            </div>
             </>
@@ -1850,12 +1868,14 @@ export const ConfigPanel: React.FC<Props> = ({
                               <p className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">Override</p>
                               <div className="grid grid-cols-2 gap-2">
                                 <IconPicker label="Icon" value={style.icon} onChange={(v) => updateStateStyle(idx, { icon: v })} />
-                                <ControlInput label="Name" value={style.name} onChange={(v) => updateStateStyle(idx, { name: v })} />
+                                {config.showName && <ControlInput label="Name" value={style.name} onChange={(v) => updateStateStyle(idx, { name: v })} />}
                               </div>
-                              <div className="grid grid-cols-2 gap-2 mt-2">
-                                <ControlInput label="Label" value={style.label} onChange={(v) => updateStateStyle(idx, { label: v })} />
-                                <ControlInput label="State Text" value={style.stateDisplay} onChange={(v) => updateStateStyle(idx, { stateDisplay: v })} />
-                              </div>
+                              {(config.showLabel || config.showState) && (
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                  {config.showLabel && <ControlInput label="Label" value={style.label} onChange={(v) => updateStateStyle(idx, { label: v })} />}
+                                  {config.showState && <ControlInput label="State Text" value={style.stateDisplay} onChange={(v) => updateStateStyle(idx, { stateDisplay: v })} />}
+                                </div>
+                              )}
                             </div>
 
                             {/* COLORS */}
@@ -1864,14 +1884,16 @@ export const ConfigPanel: React.FC<Props> = ({
                               <div className="grid grid-cols-4 gap-2">
                                 <ControlInput label="Background" type="color" value={style.backgroundColor || ''} onChange={(v) => updateStateStyle(idx, { backgroundColor: v })} />
                                 <ControlInput label="Border" type="color" value={style.borderColor || ''} onChange={(v) => updateStateStyle(idx, { borderColor: v })} />
-                                <ControlInput label="Icon" type="color" value={style.iconColor || ''} onChange={(v) => updateStateStyle(idx, { iconColor: v })} />
+                                {config.showIcon && <ControlInput label="Icon" type="color" value={style.iconColor || ''} onChange={(v) => updateStateStyle(idx, { iconColor: v })} />}
                                 <ControlInput label="Entity" type="color" value={style.color || ''} onChange={(v) => updateStateStyle(idx, { color: v })} />
                               </div>
-                              <div className="grid grid-cols-3 gap-2 mt-2">
-                                <ControlInput label="Name" type="color" value={style.nameColor || ''} onChange={(v) => updateStateStyle(idx, { nameColor: v })} />
-                                <ControlInput label="State" type="color" value={style.stateColor || ''} onChange={(v) => updateStateStyle(idx, { stateColor: v })} />
-                                <ControlInput label="Label" type="color" value={style.labelColor || ''} onChange={(v) => updateStateStyle(idx, { labelColor: v })} />
-                              </div>
+                              {(config.showName || config.showState || config.showLabel) && (
+                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                  {config.showName && <ControlInput label="Name" type="color" value={style.nameColor || ''} onChange={(v) => updateStateStyle(idx, { nameColor: v })} />}
+                                  {config.showState && <ControlInput label="State" type="color" value={style.stateColor || ''} onChange={(v) => updateStateStyle(idx, { stateColor: v })} />}
+                                  {config.showLabel && <ControlInput label="Label" type="color" value={style.labelColor || ''} onChange={(v) => updateStateStyle(idx, { labelColor: v })} />}
+                                </div>
+                              )}
                             </div>
 
                             {/* ANIMATION */}
@@ -1903,10 +1925,12 @@ export const ConfigPanel: React.FC<Props> = ({
                  <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
                  <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                  <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
-              </div>
+              {config.shadowSize !== 'none' && (
+                <div className="grid grid-cols-2 gap-4">
+                    <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
+                    <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
+                </div>
+              )}
            </div>
             </>
           )}
@@ -1920,13 +1944,15 @@ export const ConfigPanel: React.FC<Props> = ({
                <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
             </div>
 
-            <ColorPairInput 
-               label="Border Color"
-               colorValue={getAppearanceValue('borderColor')}
-               setColor={(v: string) => updateAppearance('borderColor', v)}
-               autoValue={config.borderColorAuto}
-               setAuto={(v: boolean) => update('borderColorAuto', v)}
-            />
+            {config.borderStyle !== 'none' && (
+              <ColorPairInput 
+                 label="Border Color"
+                 colorValue={getAppearanceValue('borderColor')}
+                 setColor={(v: string) => updateAppearance('borderColor', v)}
+                 autoValue={config.borderColorAuto}
+                 setAuto={(v: boolean) => update('borderColorAuto', v)}
+              />
+            )}
           </div>
             </>
           )}
@@ -1938,23 +1964,27 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Card Animation */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
-                  <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
-                  <ControlInput
-                    label="Trigger"
-                    type="select"
-                    value={config.cardAnimationTrigger}
-                    options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
-                    onChange={(v) => update('cardAnimationTrigger', v)}
-                  />
-                </div>
-                <ControlInput 
-                  type="checkbox" 
-                  label="Always Animate Card (Bypass State Toggle)" 
-                  value={config.alwaysAnimateCard} 
-                  onChange={(v) => update('alwaysAnimateCard', v)} 
-                />
+                <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
+                {getAppearanceValue('cardAnimation') !== 'none' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
+                      <ControlInput
+                        label="Trigger"
+                        type="select"
+                        value={config.cardAnimationTrigger}
+                        options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
+                        onChange={(v) => update('cardAnimationTrigger', v)}
+                      />
+                    </div>
+                    <ControlInput 
+                      type="checkbox" 
+                      label="Always Animate Card (Bypass State Toggle)" 
+                      value={config.alwaysAnimateCard} 
+                      onChange={(v) => update('alwaysAnimateCard', v)} 
+                    />
+                  </>
+                )}
              </div>
 
              <div className="h-px bg-gray-700/50" />
@@ -1962,23 +1992,27 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Icon Animation - NOT locked by extraStyles since it only affects card */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
-                  <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
-                  <ControlInput
-                    label="Trigger"
-                    type="select"
-                    value={config.iconAnimationTrigger}
-                    options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
-                    onChange={(v) => update('iconAnimationTrigger', v)}
-                  />
-                </div>
-                <ControlInput 
-                  type="checkbox" 
-                  label="Always Animate Icon (Bypass State Toggle)" 
-                  value={config.alwaysAnimateIcon} 
-                  onChange={(v) => update('alwaysAnimateIcon', v)} 
-                />
+                <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
+                {getAppearanceValue('iconAnimation') !== 'none' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
+                      <ControlInput
+                        label="Trigger"
+                        type="select"
+                        value={config.iconAnimationTrigger}
+                        options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
+                        onChange={(v) => update('iconAnimationTrigger', v)}
+                      />
+                    </div>
+                    <ControlInput 
+                      type="checkbox" 
+                      label="Always Animate Icon (Bypass State Toggle)" 
+                      value={config.alwaysAnimateIcon} 
+                      onChange={(v) => update('alwaysAnimateIcon', v)} 
+                    />
+                  </>
+                )}
              </div>
           </div>
             </>
@@ -2027,9 +2061,11 @@ export const ConfigPanel: React.FC<Props> = ({
            </div>
             <div className="grid grid-cols-2 gap-4 mt-3">
               <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
-              <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
+              {config.showState && (
+                <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
+              )}
             </div>
-            <YamlOnlyHint text="Numeric Precision formatting is applied by button-card in dashboard runtime." />
+            {config.showState && <YamlOnlyHint text="Numeric Precision formatting is applied by button-card in dashboard runtime." />}
              </>
           )}
 
@@ -2196,30 +2232,38 @@ export const ConfigPanel: React.FC<Props> = ({
                   <p className="text-[10px] font-bold text-gray-500 uppercase">Apply To</p>
                   
                   <div className="grid grid-cols-2 gap-2">
-                    <ControlInput 
-                      type="checkbox" 
-                      label="Icon" 
-                      value={config.thresholdColor.applyToIcon} 
-                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToIcon: v })} 
-                    />
-                    <ControlInput 
-                      type="checkbox" 
-                      label="State/Value" 
-                      value={config.thresholdColor.applyToState} 
-                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToState: v })} 
-                    />
-                    <ControlInput 
-                      type="checkbox" 
-                      label="Name" 
-                      value={config.thresholdColor.applyToName} 
-                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToName: v })} 
-                    />
-                    <ControlInput 
-                      type="checkbox" 
-                      label="Label" 
-                      value={config.thresholdColor.applyToLabel} 
-                      onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToLabel: v })} 
-                    />
+                    {config.showIcon && (
+                      <ControlInput 
+                        type="checkbox" 
+                        label="Icon" 
+                        value={config.thresholdColor.applyToIcon} 
+                        onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToIcon: v })} 
+                      />
+                    )}
+                    {config.showState && (
+                      <ControlInput 
+                        type="checkbox" 
+                        label="State/Value" 
+                        value={config.thresholdColor.applyToState} 
+                        onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToState: v })} 
+                      />
+                    )}
+                    {config.showName && (
+                      <ControlInput 
+                        type="checkbox" 
+                        label="Name" 
+                        value={config.thresholdColor.applyToName} 
+                        onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToName: v })} 
+                      />
+                    )}
+                    {config.showLabel && (
+                      <ControlInput 
+                        type="checkbox" 
+                        label="Label" 
+                        value={config.thresholdColor.applyToLabel} 
+                        onChange={(v) => update('thresholdColor', { ...config.thresholdColor, applyToLabel: v })} 
+                      />
+                    )}
                   </div>
                 </div>
                 
@@ -2424,10 +2468,12 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput label="JavaScript Code" value={config.holdActionJavascript} onChange={(v) => update('holdActionJavascript', v)} placeholder="alert('Held!')" />
                 </div>
               )}
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <ControlInput label="Repeat (ms)" value={config.holdActionRepeat.toString()} onChange={(v) => update('holdActionRepeat', Number(v) || 0)} placeholder="0 = disabled" />
-                <ControlInput label="Repeat Limit" value={config.holdActionRepeatLimit.toString()} onChange={(v) => update('holdActionRepeatLimit', Number(v) || 0)} placeholder="0 = unlimited" />
-              </div>
+              {config.holdAction !== 'none' && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <ControlInput label="Repeat (ms)" value={config.holdActionRepeat.toString()} onChange={(v) => update('holdActionRepeat', Number(v) || 0)} placeholder="0 = disabled" />
+                  <ControlInput label="Repeat Limit" value={config.holdActionRepeatLimit.toString()} onChange={(v) => update('holdActionRepeatLimit', Number(v) || 0)} placeholder="0 = unlimited" />
+                </div>
+              )}
             </div>
             
             <div>
@@ -2449,14 +2495,17 @@ export const ConfigPanel: React.FC<Props> = ({
               )}
             </div>
             
-            <div className="h-px bg-gray-700/50" />
-            
-            <p className="text-xs font-bold text-gray-400 uppercase">Action Sounds</p>
-            <div className="grid grid-cols-3 gap-2">
-              <ControlInput label="Tap Sound" value={config.tapActionSound} onChange={(v) => update('tapActionSound', v)} placeholder="/local/..." />
-              <ControlInput label="Hold Sound" value={config.holdActionSound} onChange={(v) => update('holdActionSound', v)} placeholder="/local/..." />
-              <ControlInput label="Dbl Tap Sound" value={config.doubleTapActionSound} onChange={(v) => update('doubleTapActionSound', v)} placeholder="/local/..." />
-            </div>
+            {(config.tapAction !== 'none' || config.holdAction !== 'none' || config.doubleTapAction !== 'none') && (
+              <>
+                <div className="h-px bg-gray-700/50" />
+                <p className="text-xs font-bold text-gray-400 uppercase">Action Sounds</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {config.tapAction !== 'none' && <ControlInput label="Tap Sound" value={config.tapActionSound} onChange={(v) => update('tapActionSound', v)} placeholder="/local/..." />}
+                  {config.holdAction !== 'none' && <ControlInput label="Hold Sound" value={config.holdActionSound} onChange={(v) => update('holdActionSound', v)} placeholder="/local/..." />}
+                  {config.doubleTapAction !== 'none' && <ControlInput label="Dbl Tap Sound" value={config.doubleTapActionSound} onChange={(v) => update('doubleTapActionSound', v)} placeholder="/local/..." />}
+                </div>
+              </>
+            )}
           </div>
             </>
           )}
