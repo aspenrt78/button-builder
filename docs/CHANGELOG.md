@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.8] - 2026-03-02
+
+### Changed
+- **Brand icons now self-hosted**: Added `brand/` directory inside the integration (`custom_components/button_builder/brand/`) containing `icon.png`, `logo.png`, `dark_icon.png`, and `dark_logo.png`. Starting with Home Assistant 2026.3.0, custom integrations can ship their own brand images directly — no separate brands repository submission required.
+
 ## [2.2.7] - 2025-07-21
 
 ### Fixed
