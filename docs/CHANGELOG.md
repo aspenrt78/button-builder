@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.10] - 2026-03-27
+
+### Fixed
+- **HACS metadata validation**: Removed the unsupported `filename` field from `hacs.json` for standard source-code releases so HACS validation accepts the repository metadata.
+
 ## [2.2.9] - 2026-03-02
 
 ### Fixed
