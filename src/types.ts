@@ -478,6 +478,24 @@ export const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
   position: 'top',
 };
 
+export interface SavedButtonRecord {
+  id: string;
+  name: string;
+  folder: string;
+  tags: string[];
+  yaml: string;
+  config: ButtonConfig;
+  presetCondition: 'always' | 'on' | 'off';
+  useAutoDarkMode: boolean;
+  activePresetId: string | null;
+  offStatePresetId: string | null;
+  onStatePresetId: string | null;
+  onStateAppearance: Partial<StateAppearanceConfig>;
+  offStateAppearance: Partial<StateAppearanceConfig>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const DEFAULT_CONFIG: ButtonConfig = {
   entity: 'light.living_room',
   name: 'Living Room',

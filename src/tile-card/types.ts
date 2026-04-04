@@ -380,6 +380,17 @@ export interface TileCardConfig {
   features_position?: FeaturesPosition;
 }
 
+export interface SavedTileRecord {
+  id: string;
+  name: string;
+  folder: string;
+  tags: string[];
+  yaml: string;
+  config: TileCardConfig;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // Default configuration
 export const DEFAULT_TILE_CONFIG: TileCardConfig = {
   entity: '',

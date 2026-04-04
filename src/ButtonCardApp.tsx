@@ -6,12 +6,13 @@ import { ConfigPanel } from './components/ConfigPanel';
 import { PreviewCard } from './components/PreviewCard';
 import { YamlViewer } from './components/YamlViewer';
 import { MagicBuilder } from './components/MagicBuilder';
-import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateAppearanceConfig, DEFAULT_STATE_APPEARANCE } from './types';
+import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateAppearanceConfig, DEFAULT_STATE_APPEARANCE, SavedButtonRecord } from './types';
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2 } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, Save, Trash2, AlertTriangle, Pencil } from 'lucide-react';
 import { hasOnOffState } from './utils/entityCapabilities';
+import { checkButtonBuilderEnvironment, ButtonBuilderEnvironmentReport } from './services/dashboardService';
 import { APP_VERSION_LABEL } from './version';
 
 export type PresetCondition = 'always' | 'on' | 'off';
@@ -27,6 +28,35 @@ import logo from './assets/logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
 const CUSTOM_PRESETS_STORAGE_KEY = 'button-builder-custom-presets';
+const SAVED_BUTTONS_STORAGE_KEY = 'button-builder-saved-buttons';
+
+const cloneSnapshot = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const deriveButtonName = (config: ButtonConfig, fallbackIndex?: number): string => {
+  const fromName = config.name.trim();
+  if (fromName) return fromName;
+  const fromEntity = config.entity.trim();
+  if (fromEntity) return fromEntity;
+  return `Button ${fallbackIndex ?? 1}`;
+};
+
+interface SaveButtonMetadata {
+  name: string;
+  folder: string;
+  tags: string[];
+}
+
+type SaveModalState =
+  | { mode: 'current' }
+  | { mode: 'queued'; buttonId: string }
+  | null;
+
+const parseTagInput = (raw: string): string[] =>
+  raw
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(Boolean)
+    .filter((tag, index, all) => all.findIndex(item => item.toLowerCase() === tag.toLowerCase()) === index);
 
 const loadSavedConfig = (): ButtonConfig => {
   try {
@@ -72,6 +102,38 @@ const loadCustomPresets = (): Preset[] => {
   }
 };
 
+const loadSavedButtons = (): SavedButtonRecord[] => {
+  try {
+    const saved = localStorage.getItem(SAVED_BUTTONS_STORAGE_KEY);
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((button: any) => button && typeof button === 'object' && typeof button.id === 'string')
+      .map((button: any) => ({
+        id: button.id,
+        name: typeof button.name === 'string' ? button.name : 'Saved Button',
+        folder: typeof button.folder === 'string' ? button.folder : '',
+        tags: Array.isArray(button.tags) ? button.tags.filter((tag: unknown) => typeof tag === 'string') : [],
+        yaml: typeof button.yaml === 'string' ? button.yaml : '',
+        config: { ...DEFAULT_CONFIG, ...(button.config || {}) },
+        presetCondition: button.presetCondition === 'on' || button.presetCondition === 'off' ? button.presetCondition : 'always',
+        useAutoDarkMode: button.useAutoDarkMode !== false,
+        activePresetId: typeof button.activePresetId === 'string' ? button.activePresetId : null,
+        offStatePresetId: typeof button.offStatePresetId === 'string' ? button.offStatePresetId : null,
+        onStatePresetId: typeof button.onStatePresetId === 'string' ? button.onStatePresetId : null,
+        onStateAppearance: button.onStateAppearance && typeof button.onStateAppearance === 'object' ? button.onStateAppearance : {},
+        offStateAppearance: button.offStateAppearance && typeof button.offStateAppearance === 'object' ? button.offStateAppearance : {},
+        createdAt: typeof button.createdAt === 'number' ? button.createdAt : Date.now(),
+        updatedAt: typeof button.updatedAt === 'number' ? button.updatedAt : Date.now(),
+      }));
+  } catch (e) {
+    console.warn('Failed to load saved buttons:', e);
+    return [];
+  }
+};
+
 const isSamePreset = (a: Preset | null, b: Preset | null): boolean => {
   if (!a || !b) return false;
   if (a.id && b.id) return a.id === b.id;
@@ -92,12 +154,25 @@ export const ButtonCardApp: React.FC = () => {
   const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
   const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
   const [customPresets, setCustomPresets] = useState<Preset[]>(loadCustomPresets);
+  const [savedButtons, setSavedButtons] = useState<SavedButtonRecord[]>(loadSavedButtons);
+  const [queuedButtons, setQueuedButtons] = useState<SavedButtonRecord[]>([]);
+  const [showButtonLibrary, setShowButtonLibrary] = useState(false);
+  const [folderFilter, setFolderFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('');
+  const [environmentReport, setEnvironmentReport] = useState<ButtonBuilderEnvironmentReport | null>(null);
+  const [showRequirementsPrompt, setShowRequirementsPrompt] = useState(false);
+  const [saveModalState, setSaveModalState] = useState<SaveModalState>(null);
+  const [saveNameInput, setSaveNameInput] = useState('');
+  const [saveFolderInput, setSaveFolderInput] = useState('');
+  const [saveTagsInput, setSaveTagsInput] = useState('');
+  const [editingSavedButtonId, setEditingSavedButtonId] = useState<string | null>(null);
+  const [editingNameInput, setEditingNameInput] = useState('');
+  const [editingFolderInput, setEditingFolderInput] = useState('');
+  const [editingTagsInput, setEditingTagsInput] = useState('');
   const [useAutoDarkMode, setUseAutoDarkMode] = useState<boolean>(true);
-  // State-specific appearance configs
   const [onStateAppearance, setOnStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
   const [offStateAppearance, setOffStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
-  
-  // Undo/Redo history
+
   const [historyPast, setHistoryPast] = useState<ButtonConfig[]>([]);
   const [historyFuture, setHistoryFuture] = useState<ButtonConfig[]>([]);
   const historyDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -111,31 +186,26 @@ export const ButtonCardApp: React.FC = () => {
 
   const handleUndo = useCallback(() => {
     if (historyPast.length === 0) return;
-    
     isUndoRedoRef.current = true;
     const previous = historyPast[historyPast.length - 1];
     setHistoryPast(prev => prev.slice(0, -1));
     setHistoryFuture(prev => [config, ...prev].slice(0, MAX_HISTORY));
     setConfigInternal(previous);
     lastSavedConfigRef.current = previous;
-    
     setTimeout(() => { isUndoRedoRef.current = false; }, 0);
   }, [historyPast, config]);
 
   const handleRedo = useCallback(() => {
     if (historyFuture.length === 0) return;
-    
     isUndoRedoRef.current = true;
     const next = historyFuture[0];
     setHistoryFuture(prev => prev.slice(1));
     setHistoryPast(prev => [...prev, config].slice(-MAX_HISTORY));
     setConfigInternal(next);
     lastSavedConfigRef.current = next;
-    
     setTimeout(() => { isUndoRedoRef.current = false; }, 0);
   }, [historyFuture, config]);
 
-  // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -151,17 +221,15 @@ export const ButtonCardApp: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo]);
-  
+
   const isApplyingPresetRef = useRef(false);
-  
+
   const setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>> = (action) => {
     if (!isApplyingPresetRef.current && activePreset) {
       setActivePreset(null);
       if (presetCondition !== 'always' && activePreset.config.extraStyles) {
         setConfigInternal(prev => {
           const result = typeof action === 'function' ? action(prev) : action;
-          
-          // History tracking (debounced)
           if (!isUndoRedoRef.current) {
             if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
             historyDebounceRef.current = setTimeout(() => {
@@ -172,17 +240,14 @@ export const ButtonCardApp: React.FC = () => {
               }
             }, 500);
           }
-          
           return { ...result, extraStyles: '' };
         });
         return;
       }
     }
-    
+
     setConfigInternal(prev => {
       const result = typeof action === 'function' ? action(prev) : action;
-      
-      // History tracking (debounced)
       if (!isUndoRedoRef.current) {
         if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
         historyDebounceRef.current = setTimeout(() => {
@@ -193,11 +258,10 @@ export const ButtonCardApp: React.FC = () => {
           }
         }, 500);
       }
-      
       return result;
     });
   };
-  
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -214,15 +278,45 @@ export const ButtonCardApp: React.FC = () => {
     }
   }, [customPresets]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(SAVED_BUTTONS_STORAGE_KEY, JSON.stringify(savedButtons));
+    } catch (e) {
+      console.warn('Failed to save button library:', e);
+    }
+  }, [savedButtons]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      (async () => {
+        const report = await checkButtonBuilderEnvironment(config);
+        if (cancelled) {
+          return;
+        }
+
+        setEnvironmentReport(report);
+        if (report.requirements.some((requirement) => requirement.required && requirement.status === 'missing')) {
+          setShowRequirementsPrompt(true);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [config]);
+
   const configWithPresetConditions = useMemo(() => {
     const supportsBinaryPresetConditions = hasOnOffState(config.entity);
     if (!supportsBinaryPresetConditions || presetCondition === 'always' || !activePreset) {
       return config;
     }
-    
+
     const newConfig = { ...config };
     const newStateStyles = [...(config.stateStyles || [])];
-    
+
     const presetBgColor = activePreset.config.backgroundColor || '';
     const activePresetUsesAdvancedBackground =
       !!activePreset.config.extraStyles || !!activePreset.config.gradientEnabled;
@@ -230,7 +324,7 @@ export const ButtonCardApp: React.FC = () => {
     const secondaryBgColor = secondaryPreset?.config.backgroundColor || '';
     const secondaryPresetUsesAdvancedBackground =
       !!secondaryPreset?.config.extraStyles || !!secondaryPreset?.config.gradientEnabled;
-    
+
     if (presetCondition === 'on') {
       if (!config.stateOnColor && presetBgColor && !activePresetUsesAdvancedBackground) {
         newConfig.stateOnColor = presetBgColor;
@@ -250,24 +344,22 @@ export const ButtonCardApp: React.FC = () => {
         newConfig.stateOnOpacity = secondaryPreset.config.backgroundColorOpacity ?? 100;
       }
     }
-    
+
     newConfig.extraStyles = '';
-    
+
     if (newConfig.cardAnimation && newConfig.cardAnimation !== 'none') {
       newConfig.cardAnimationTrigger = presetCondition;
     }
     if (newConfig.iconAnimation && newConfig.iconAnimation !== 'none') {
       newConfig.iconAnimationTrigger = presetCondition;
     }
-    
+
     const mainStyle: StateStyleConfig = {
       id: `preset-main-${Date.now()}`,
       operator: 'equals',
       value: presetCondition,
       name: '',
       icon: activePreset.config.icon || '',
-      // Do not force state.color from presets; with color_type: card this can
-      // override intended gradient/background styling in dashboard.
       color: '',
       entityPicture: '',
       label: '',
@@ -286,7 +378,7 @@ export const ButtonCardApp: React.FC = () => {
       iconAnimationSpeed: activePreset.config.iconAnimationSpeed || '2s',
     };
     newStateStyles.push(mainStyle);
-    
+
     if (secondaryPreset) {
       const oppositeState = presetCondition === 'on' ? 'off' : 'on';
       const secondaryStyle: StateStyleConfig = {
@@ -295,7 +387,6 @@ export const ButtonCardApp: React.FC = () => {
         value: oppositeState,
         name: '',
         icon: secondaryPreset.config.icon || '',
-        // Same reasoning as main preset style above.
         color: '',
         entityPicture: '',
         label: '',
@@ -315,39 +406,31 @@ export const ButtonCardApp: React.FC = () => {
       };
       newStateStyles.push(secondaryStyle);
     }
-    
+
     newConfig.stateStyles = newStateStyles;
     return newConfig;
   }, [config, presetCondition, activePreset, offStatePreset, onStatePreset]);
 
-  // Create final config that includes state-specific appearance overrides
   const finalConfig = useMemo(() => {
-    // Start with preset conditions applied
     let result = { ...configWithPresetConditions };
     const stateStyles = [...(result.stateStyles || [])];
     const supportsBinaryStateAppearance = hasOnOffState(configWithPresetConditions.entity);
-    
-    // Helper to check if appearance has any non-empty values
+
     const hasAppearanceValues = (appearance: Partial<StateAppearanceConfig>): boolean => {
       return Object.entries(appearance).some(([key, value]) => {
-        // Numeric opacity fields: only count if NOT the default value (100)
         if (key === 'backgroundColorOpacity' || key === 'gradientOpacity') {
           return value !== undefined && value !== 100;
         }
-        // Skip other numeric fields with default values - they don't indicate user intent
         if (key === 'shadowOpacity' || key === 'gradientAngle') {
           return false;
         }
-        // Boolean fields only count if explicitly true (enabling something)
         if (key === 'gradientEnabled' || key === 'gradientColor3Enabled') {
           return value === true;
         }
-        // For all other fields, check if they have a non-empty value
         return value !== '' && value !== 'none' && value !== undefined && value !== null;
       });
     };
-    
-    // Create state style from appearance config
+
     const createStateStyle = (appearance: Partial<StateAppearanceConfig>, stateValue: 'on' | 'off'): StateStyleConfig => {
       return {
         id: `state-appearance-${stateValue}-${Date.now()}`,
@@ -382,16 +465,13 @@ export const ButtonCardApp: React.FC = () => {
         gradientOpacity: appearance.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
       };
     };
-    
-    // Add ON state appearance if it has values
+
     if (supportsBinaryStateAppearance && hasAppearanceValues(onStateAppearance)) {
-      // Remove any existing state-appearance style for ON
       const filtered = stateStyles.filter(s => !s.id.startsWith('state-appearance-on'));
       filtered.push(createStateStyle(onStateAppearance, 'on'));
       result.stateStyles = filtered;
     }
-    
-    // Add OFF state appearance if it has values
+
     if (supportsBinaryStateAppearance && hasAppearanceValues(offStateAppearance)) {
       const currentStyles = result.stateStyles || stateStyles;
       const filtered = currentStyles.filter(s => !s.id.startsWith('state-appearance-off'));
@@ -403,8 +483,6 @@ export const ButtonCardApp: React.FC = () => {
       result.stateStyles = (result.stateStyles || stateStyles).filter(
         s => !s.id.startsWith('state-appearance-on') && !s.id.startsWith('state-appearance-off')
       );
-
-      // ON/OFF triggers are invalid for non-binary entities; force always for parity.
       if (result.cardAnimationTrigger !== 'always') {
         result.cardAnimationTrigger = 'always';
       }
@@ -412,11 +490,187 @@ export const ButtonCardApp: React.FC = () => {
         result.iconAnimationTrigger = 'always';
       }
     }
-    
+
     return result;
   }, [configWithPresetConditions, onStateAppearance, offStateAppearance]);
 
   const yamlOutput = useMemo(() => generateYaml(finalConfig), [finalConfig]);
+
+  const createButtonRecord = (metadata?: Partial<SaveButtonMetadata>): SavedButtonRecord => {
+    const timestamp = Date.now();
+    return {
+      id: `button-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+      name: (metadata?.name?.trim() || deriveButtonName(config, savedButtons.length + queuedButtons.length + 1)).trim(),
+      folder: metadata?.folder?.trim() || '',
+      tags: metadata?.tags || [],
+      yaml: yamlOutput,
+      config: cloneSnapshot(config),
+      presetCondition,
+      useAutoDarkMode,
+      activePresetId: activePreset?.id || null,
+      offStatePresetId: offStatePreset?.id || null,
+      onStatePresetId: onStatePreset?.id || null,
+      onStateAppearance: cloneSnapshot(onStateAppearance),
+      offStateAppearance: cloneSnapshot(offStateAppearance),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  };
+
+  const resolveSavedPreset = (presetId: string | null): Preset | null => {
+    if (!presetId) return null;
+    return availablePresets.find((preset) => preset.id === presetId) || null;
+  };
+
+  const handleQueueCurrentButton = (): boolean => {
+    setQueuedButtons((prev) => [createButtonRecord(), ...prev]);
+    return true;
+  };
+
+  const handleSaveCurrentButton = (): boolean => {
+    const suggestedName = deriveButtonName(config, savedButtons.length + 1);
+    setSaveNameInput(suggestedName);
+    setSaveFolderInput('');
+    setSaveTagsInput('');
+    setSaveModalState({ mode: 'current' });
+    return true;
+  };
+
+  const handleLoadButtonRecord = (record: SavedButtonRecord) => {
+    const nextConfig = cloneSnapshot(record.config);
+    setConfigInternal(nextConfig);
+    lastSavedConfigRef.current = nextConfig;
+    setHistoryPast([]);
+    setHistoryFuture([]);
+    setActivePreset(resolveSavedPreset(record.activePresetId));
+    setPresetCondition(record.presetCondition);
+    setOffStatePreset(resolveSavedPreset(record.offStatePresetId));
+    setOnStatePreset(resolveSavedPreset(record.onStatePresetId));
+    setUseAutoDarkMode(record.useAutoDarkMode);
+    setOnStateAppearance(cloneSnapshot(record.onStateAppearance || {}));
+    setOffStateAppearance(cloneSnapshot(record.offStateAppearance || {}));
+    setShowButtonLibrary(false);
+  };
+
+  const handleDeleteSavedButton = (buttonId: string) => {
+    setSavedButtons((prev) => prev.filter((button) => button.id !== buttonId));
+  };
+
+  const handleRemoveQueuedButton = (buttonId: string) => {
+    setQueuedButtons((prev) => prev.filter((button) => button.id !== buttonId));
+  };
+
+  const handleSaveQueuedButton = (buttonId: string) => {
+    const queued = queuedButtons.find((button) => button.id === buttonId);
+    if (!queued) return;
+    setSaveNameInput(queued.name);
+    setSaveFolderInput(queued.folder);
+    setSaveTagsInput(queued.tags.join(', '));
+    setSaveModalState({ mode: 'queued', buttonId });
+  };
+
+  const handleConfirmSaveModal = () => {
+    if (!saveModalState) {
+      return;
+    }
+
+    const metadata: SaveButtonMetadata = {
+      name: saveNameInput.trim(),
+      folder: saveFolderInput.trim(),
+      tags: parseTagInput(saveTagsInput),
+    };
+
+    if (!metadata.name) {
+      return;
+    }
+
+    if (saveModalState.mode === 'current') {
+      setSavedButtons((prev) => [createButtonRecord(metadata), ...prev]);
+    } else {
+      const queued = queuedButtons.find((button) => button.id === saveModalState.buttonId);
+      if (!queued) {
+        return;
+      }
+
+      const timestamp = Date.now();
+      setSavedButtons((prev) => [
+        {
+          ...cloneSnapshot(queued),
+          id: `button-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+          name: metadata.name,
+          folder: metadata.folder,
+          tags: metadata.tags,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        ...prev,
+      ]);
+    }
+
+    setSaveModalState(null);
+  };
+
+  const handleStartEditSavedButton = (button: SavedButtonRecord) => {
+    setEditingSavedButtonId(button.id);
+    setEditingNameInput(button.name);
+    setEditingFolderInput(button.folder);
+    setEditingTagsInput(button.tags.join(', '));
+  };
+
+  const handleCancelEditSavedButton = () => {
+    setEditingSavedButtonId(null);
+    setEditingNameInput('');
+    setEditingFolderInput('');
+    setEditingTagsInput('');
+  };
+
+  const handleCommitEditSavedButton = (buttonId: string) => {
+    const nextName = editingNameInput.trim();
+    if (!nextName) {
+      return;
+    }
+
+    setSavedButtons((prev) => prev.map((button) => (
+      button.id === buttonId
+        ? {
+            ...button,
+            name: nextName,
+            folder: editingFolderInput.trim(),
+            tags: parseTagInput(editingTagsInput),
+            updatedAt: Date.now(),
+          }
+        : button
+    )));
+    handleCancelEditSavedButton();
+  };
+
+  const availableFolders = useMemo(() => {
+    const folders = Array.from(new Set(savedButtons.map(button => button.folder.trim()).filter(Boolean)));
+    return folders.sort((a, b) => a.localeCompare(b));
+  }, [savedButtons]);
+
+  const filteredSavedButtons = useMemo(() => {
+    const normalizedTagFilter = tagFilter.trim().toLowerCase();
+    return savedButtons.filter((button) => {
+      const matchesFolder = folderFilter === 'all' || button.folder === folderFilter;
+      const matchesTag = !normalizedTagFilter || button.tags.some(tag => tag.toLowerCase().includes(normalizedTagFilter));
+      return matchesFolder && matchesTag;
+    });
+  }, [folderFilter, savedButtons, tagFilter]);
+
+  const groupedSavedButtons = useMemo(() => {
+    const groups = new Map<string, SavedButtonRecord[]>();
+    filteredSavedButtons.forEach((button) => {
+      const folder = button.folder.trim() || 'Unfiled';
+      const existing = groups.get(folder) || [];
+      existing.push(button);
+      groups.set(folder, existing);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([folder, buttons]) => ({ folder, buttons }));
+  }, [filteredSavedButtons]);
 
   const handleReset = () => {
     if (confirm('Reset all settings to defaults?')) {
@@ -436,7 +690,6 @@ export const ButtonCardApp: React.FC = () => {
     const supportsBinaryPresetConditions = hasOnOffState(config.entity);
     if (forState === 'off') {
       setOffStatePreset(preset);
-      // User explicitly chose an off-state preset, so disable auto dark mode
       setUseAutoDarkMode(false);
     } else if (forState === 'on') {
       setOnStatePreset(preset);
@@ -448,32 +701,23 @@ export const ButtonCardApp: React.FC = () => {
         name: prev.name,
         label: prev.label,
         icon: prev.icon,
-        // Clear state colors so the preset's backgroundColor is used
         stateOnColor: '',
         stateOffColor: '',
         ...preset.config
       }));
       setActivePreset(preset);
-      // Main preset application should target base styles by default.
-      // Users can still choose ON/OFF conditional preset behavior explicitly.
       setPresetCondition('always');
       isApplyingPresetRef.current = false;
-      
-      // Auto-generate dark mode preset for off state if auto mode is enabled
+
       if (useAutoDarkMode && supportsBinaryPresetConditions) {
         const darkPreset = generateDarkModePreset(preset);
         setOffStatePreset(darkPreset);
-        // Keep preset condition as-is. Auto-switching to "on" moves preset
-        // backgrounds into state blocks, which breaks parity for presets like
-        // holographic that should live in base styles/extra_styles.
       } else if (!supportsBinaryPresetConditions) {
-        // Stateless/non-binary entities cannot match ON/OFF in dashboard state logic.
         setPresetCondition('always');
         setOffStatePreset(null);
         setOnStatePreset(null);
       }
-      
-      // Reset on-state preset since we're applying a new main preset
+
       setOnStatePreset(null);
     }
   };
@@ -530,9 +774,7 @@ export const ButtonCardApp: React.FC = () => {
 
   const handleDeleteCustomPreset = (preset: Preset) => {
     if (!preset.isUserPreset) return;
-
     setCustomPresets(prev => prev.filter(p => !isSamePreset(p, preset)));
-
     if (isSamePreset(activePreset, preset)) setActivePreset(null);
     if (isSamePreset(offStatePreset, preset)) setOffStatePreset(null);
     if (isSamePreset(onStatePreset, preset)) setOnStatePreset(null);
@@ -543,12 +785,12 @@ export const ButtonCardApp: React.FC = () => {
     try {
       const imported = parseButtonCardYaml(importYaml);
       const validated = validateImportedConfig(imported);
-      
+
       if (Object.keys(validated).length === 0) {
         setImportError('No valid configuration found. Make sure it\'s valid button-card YAML.');
         return;
       }
-      
+
       setConfig(prev => ({ ...prev, ...validated }));
       setIsImportOpen(false);
       setImportYaml('');
@@ -560,14 +802,9 @@ export const ButtonCardApp: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-black text-white font-sans overflow-hidden selection:bg-blue-500/30">
-      {/* Header - Responsive */}
       <header className="h-12 md:h-14 border-b border-gray-800 flex items-center justify-between px-3 md:px-6 bg-gray-900/50 backdrop-blur-md shrink-0 relative z-50">
         <div className="flex items-center gap-2 md:gap-3">
-          <img
-            src={logo}
-            alt="Button Builder logo"
-            className="w-7 h-7 md:w-9 md:h-9 rounded-lg object-contain border border-gray-800 bg-black/40"
-          />
+          <img src={logo} alt="Button Builder logo" className="w-7 h-7 md:w-9 md:h-9 rounded-lg object-contain border border-gray-800 bg-black/40" />
           <div className="flex items-center gap-2">
             <h1 className="font-bold text-sm md:text-lg tracking-tight text-gray-200">Button Card Builder</h1>
             <span className="px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400">
@@ -575,97 +812,79 @@ export const ButtonCardApp: React.FC = () => {
             </span>
           </div>
         </div>
-        
-        {/* Desktop Actions */}
+
         <div className="hidden md:flex items-center gap-2">
-          {/* Undo/Redo Buttons */}
+          <button onClick={() => setShowRequirementsPrompt(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Check Home Assistant requirements">
+            <AlertTriangle size={14} />
+            Check Setup
+          </button>
+          <button onClick={() => setShowButtonLibrary(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Open button library">
+            <FolderOpen size={14} />
+            Library
+            {(queuedButtons.length + savedButtons.length) > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-gray-700 text-[10px] text-gray-200">
+                {queuedButtons.length + savedButtons.length}
+              </span>
+            )}
+          </button>
           <div className="flex items-center border border-gray-700 rounded-full overflow-hidden">
-            <button 
-              onClick={handleUndo}
-              disabled={!canUndo}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Undo (Ctrl+Z)"
-            >
+            <button onClick={handleUndo} disabled={!canUndo} className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed" title="Undo (Ctrl+Z)">
               <Undo2 size={14} />
             </button>
             <div className="w-px h-5 bg-gray-700" />
-            <button 
-              onClick={handleRedo}
-              disabled={!canRedo}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Redo (Ctrl+Y)"
-            >
+            <button onClick={handleRedo} disabled={!canRedo} className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed" title="Redo (Ctrl+Y)">
               <Redo2 size={14} />
             </button>
           </div>
-          <button 
-            onClick={() => setIsImportOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"
-            title="Import existing YAML"
-          >
+          <button onClick={() => setIsImportOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Import existing YAML">
             <Upload size={14} />
             Import
           </button>
-          <button 
-            onClick={handleReset}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"
-            title="Reset to defaults"
-          >
+          <button onClick={handleReset} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Reset to defaults">
             <RotateCcw size={14} />
             Reset
           </button>
-          <button 
-            onClick={() => setIsMagicOpen(true)}
-            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-medium transition-all group"
-          >
+          <button onClick={() => setIsMagicOpen(true)} className="flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-medium transition-all group">
             <Wand2 size={14} className="group-hover:rotate-12 transition-transform" />
             Magic Build
           </button>
         </div>
 
-        {/* Mobile Menu Button */}
-        <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-gray-400 hover:text-white"
-        >
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-gray-400 hover:text-white">
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </header>
 
-      {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
-          <button 
-            onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left"
-          >
+          <button onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left">
             <Wand2 size={18} className="text-indigo-400" />
             <span>Magic Build</span>
           </button>
-          <button 
-            onClick={() => { setIsImportOpen(true); setMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
-          >
+          <button onClick={() => { setIsImportOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
             <Upload size={18} className="text-blue-400" />
             <span>Import YAML</span>
           </button>
-          <button 
-            onClick={() => { handleReset(); setMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
-          >
+          <button onClick={() => { setShowRequirementsPrompt(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
+            <AlertTriangle size={18} className="text-amber-400" />
+            <span>Check Setup</span>
+          </button>
+          <button onClick={() => { setShowButtonLibrary(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
+            <FolderOpen size={18} className="text-emerald-400" />
+            <span>Button Library</span>
+          </button>
+          <button onClick={() => { handleReset(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
             <RotateCcw size={18} className="text-gray-400" />
             <span>Reset to Defaults</span>
           </button>
         </div>
       )}
 
-      {/* Main Content - Desktop */}
       <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
-        {/* Left: Configuration */}
         <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800">
-          <ConfigPanel 
-            config={config} 
-            setConfig={setConfig} 
+          <ConfigPanel
+            config={config}
+            setConfig={setConfig}
             presets={availablePresets}
             activePreset={activePreset}
             onPresetConfigChange={handlePresetConfigChange}
@@ -690,10 +909,8 @@ export const ButtonCardApp: React.FC = () => {
           />
         </aside>
 
-        {/* Center: Workspace */}
         <section className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className="flex-1 min-h-0 flex">
-            {/* Middle: Preview Canvas */}
             <div className="flex-1 bg-[#0a0a0a] relative flex flex-col min-h-0">
               <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
               <div className="relative z-0 px-6 py-3 flex items-center gap-2 text-gray-500 text-xs font-medium uppercase tracking-wider border-b border-gray-800/50 bg-black/30 backdrop-blur-sm">
@@ -705,17 +922,15 @@ export const ButtonCardApp: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: YAML Output */}
             <div className="w-96 border-l border-gray-800 bg-[#111] flex flex-col shrink-0 min-h-0">
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-4">
-                <YamlViewer yaml={yamlOutput} config={config} className="flex-1" />
+                <YamlViewer yaml={yamlOutput} config={config} className="flex-1" sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Main Content - Mobile */}
       <main className="md:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-hidden">
           {mobileTab === 'preview' && (
@@ -726,11 +941,11 @@ export const ButtonCardApp: React.FC = () => {
               </div>
             </div>
           )}
-          
+
           {mobileTab === 'config' && (
             <div className="h-full overflow-y-auto bg-gray-900">
-              <ConfigPanel 
-                config={config} 
+              <ConfigPanel
+                config={config}
                 setConfig={setConfig}
                 presets={availablePresets}
                 activePreset={activePreset}
@@ -756,53 +971,249 @@ export const ButtonCardApp: React.FC = () => {
               />
             </div>
           )}
-          
+
           {mobileTab === 'yaml' && (
             <div className="h-full overflow-hidden bg-[#111] p-3">
-              <YamlViewer yaml={yamlOutput} config={config} className="h-full" />
+              <YamlViewer yaml={yamlOutput} config={config} className="h-full" sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
             </div>
           )}
         </div>
 
-        {/* Mobile Tab Bar */}
         <nav className="shrink-0 border-t border-gray-800 bg-gray-900 flex">
-          <button 
-            onClick={() => setMobileTab('preview')}
-            className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${
-              mobileTab === 'preview' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
-            }`}
-          >
+          <button onClick={() => setMobileTab('preview')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'preview' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
             <Eye size={20} />
             <span className="text-[10px] font-medium">Preview</span>
           </button>
-          <button 
-            onClick={() => setMobileTab('config')}
-            className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${
-              mobileTab === 'config' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
-            }`}
-          >
+          <button onClick={() => setMobileTab('config')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'config' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
             <Settings size={20} />
             <span className="text-[10px] font-medium">Configure</span>
           </button>
-          <button 
-            onClick={() => setMobileTab('yaml')}
-            className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${
-              mobileTab === 'yaml' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
-            }`}
-          >
+          <button onClick={() => setMobileTab('yaml')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'yaml' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
             <Code size={20} />
             <span className="text-[10px] font-medium">YAML</span>
           </button>
         </nav>
       </main>
 
-      <MagicBuilder 
-        isOpen={isMagicOpen} 
-        onClose={() => setIsMagicOpen(false)}
-        onApply={(newConfig) => setConfig(prev => ({ ...prev, ...newConfig }))}
-      />
+      <MagicBuilder isOpen={isMagicOpen} onClose={() => setIsMagicOpen(false)} onApply={(newConfig) => setConfig(prev => ({ ...prev, ...newConfig }))} />
 
-      {/* Import YAML Modal */}
+      {showRequirementsPrompt && environmentReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 w-full max-w-2xl rounded-xl border border-gray-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <AlertTriangle size={20} className="text-amber-400" />
+                Home Assistant Requirements Check
+              </h3>
+              <button onClick={() => setShowRequirementsPrompt(false)} className="text-gray-400 hover:text-white">
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <p className="text-sm text-gray-300">
+                Button Builder checked this Home Assistant instance for the dependencies needed to make generated buttons work correctly.
+              </p>
+              {environmentReport.requirements.map((requirement) => (
+                <div key={requirement.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-white">{requirement.label}</div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
+                      requirement.status === 'ok'
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : requirement.required
+                          ? 'bg-red-500/15 text-red-300'
+                          : 'bg-amber-500/15 text-amber-300'
+                    }`}>
+                      {requirement.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400">{requirement.details}</p>
+                  {requirement.actionUrl && requirement.actionLabel && (
+                    <a href={requirement.actionUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200">
+                      {requirement.actionLabel}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="p-6 bg-gray-800/50 flex justify-end gap-3">
+              <button onClick={() => setShowRequirementsPrompt(false)} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showButtonLibrary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 w-full max-w-4xl rounded-xl border border-gray-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <FolderOpen size={20} className="text-emerald-400" />
+                Button Library
+              </h3>
+              <button onClick={() => setShowButtonLibrary(false)} className="text-gray-400 hover:text-white">
+                ×
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 p-6 overflow-y-auto">
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Session Queue</h4>
+                  {queuedButtons.length > 0 && (
+                    <button onClick={() => setQueuedButtons([])} className="text-xs text-gray-400 hover:text-white">
+                      Clear Queue
+                    </button>
+                  )}
+                </div>
+                {queuedButtons.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
+                    Queue buttons from the YAML panel to export a batch in one go.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {queuedButtons.map((button) => (
+                      <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
+                        <div>
+                          <div className="text-sm font-medium text-white">{button.name}</div>
+                          <div className="text-xs text-gray-500">Queued for this session</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded">Load</button>
+                          <button onClick={() => handleSaveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded"><Save size={12} /> Save</button>
+                          <button onClick={() => handleRemoveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Saved Buttons</h4>
+                  <div className="text-xs text-gray-500">Stored in browser</div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
+                    <option value="all">All folders</option>
+                    {availableFolders.map((folder) => (
+                      <option key={folder} value={folder}>{folder}</option>
+                    ))}
+                  </select>
+                  <input type="text" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Filter by tag" className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
+                </div>
+                {savedButtons.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
+                    Save buttons to revisit and export them later.
+                  </div>
+                ) : filteredSavedButtons.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
+                    No saved buttons match the current folder/tag filters.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {groupedSavedButtons.map(({ folder, buttons }) => (
+                      <div key={folder} className="space-y-3">
+                        <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950/90 px-3 py-2 backdrop-blur-sm">
+                          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-300">{folder}</div>
+                          <div className="text-[11px] text-gray-500">{buttons.length} saved</div>
+                        </div>
+                        {buttons.map((button) => {
+                          const isEditing = editingSavedButtonId === button.id;
+                          return (
+                            <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
+                              {isEditing ? (
+                                <div className="space-y-3">
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <input type="text" value={editingNameInput} onChange={(e) => setEditingNameInput(e.target.value)} placeholder="Button name" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
+                                    <input type="text" value={editingFolderInput} onChange={(e) => setEditingFolderInput(e.target.value)} placeholder="Folder" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
+                                  </div>
+                                  <input type="text" value={editingTagsInput} onChange={(e) => setEditingTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
+                                  <div className="flex flex-wrap gap-2">
+                                    <button onClick={() => handleCommitEditSavedButton(button.id)} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded">Save Details</button>
+                                    <button onClick={handleCancelEditSavedButton} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded">Cancel</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <div className="text-sm font-medium text-white">{button.name}</div>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {button.folder && (
+                                        <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-[10px] text-blue-300 uppercase tracking-wide">
+                                          {button.folder}
+                                        </span>
+                                      )}
+                                      {button.tags.map((tag) => (
+                                        <span key={tag} className="px-2 py-0.5 rounded-full bg-gray-700 text-[10px] text-gray-200">
+                                          #{tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <div className="text-xs text-gray-500">Updated {new Date(button.updatedAt).toLocaleString()}</div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded">Load</button>
+                                    <button onClick={() => handleStartEditSavedButton(button)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Pencil size={12} /> Edit</button>
+                                    <button onClick={() => handleDeleteSavedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Delete</button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {saveModalState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 w-full max-w-lg rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Save size={20} className="text-emerald-400" />
+                Save Button
+              </h3>
+              <button onClick={() => setSaveModalState(null)} className="text-gray-400 hover:text-white">
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-300">
+                Save this button with a name, optional folder, and tags so it is easy to find later.
+              </p>
+              <div className="space-y-3">
+                <input type="text" value={saveNameInput} onChange={(e) => setSaveNameInput(e.target.value)} placeholder="Button name" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
+                <input type="text" value={saveFolderInput} onChange={(e) => setSaveFolderInput(e.target.value)} placeholder="Folder (optional)" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
+                <input type="text" value={saveTagsInput} onChange={(e) => setSaveTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-800/50 flex justify-end gap-3">
+              <button onClick={() => setSaveModalState(null)} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
+                Cancel
+              </button>
+              <button onClick={handleConfirmSaveModal} disabled={!saveNameInput.trim()} className="inline-flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                <Save size={16} />
+                Save Button
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-gray-900 w-full max-w-lg rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
@@ -815,19 +1226,14 @@ export const ButtonCardApp: React.FC = () => {
                 ×
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               <p className="text-gray-300 text-sm">
                 Paste your existing button-card YAML configuration below to import settings.
               </p>
-              
-              <textarea
-                value={importYaml}
-                onChange={(e) => setImportYaml(e.target.value)}
-                placeholder="type: custom:button-card&#10;entity: light.living_room&#10;name: Living Room&#10;icon: mdi:lightbulb..."
-                className="w-full h-48 bg-black/50 border border-gray-700 rounded-lg p-4 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none placeholder-gray-600"
-              />
-              
+
+              <textarea value={importYaml} onChange={(e) => setImportYaml(e.target.value)} placeholder="type: custom:button-card&#10;entity: light.living_room&#10;name: Living Room&#10;icon: mdi:lightbulb..." className="w-full h-48 bg-black/50 border border-gray-700 rounded-lg p-4 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none placeholder-gray-600" />
+
               {importError && (
                 <div className="p-3 bg-red-900/20 border border-red-800 rounded-lg">
                   <p className="text-red-400 text-xs">{importError}</p>
@@ -836,17 +1242,10 @@ export const ButtonCardApp: React.FC = () => {
             </div>
 
             <div className="p-6 bg-gray-800/50 flex justify-end gap-3">
-              <button 
-                onClick={() => { setIsImportOpen(false); setImportError(''); }}
-                className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white"
-              >
+              <button onClick={() => { setIsImportOpen(false); setImportError(''); }} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
                 Cancel
               </button>
-              <button 
-                onClick={handleImportYaml}
-                disabled={!importYaml.trim()}
-                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
+              <button onClick={handleImportYaml} disabled={!importYaml.trim()} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 <Upload size={16} />
                 Import
               </button>

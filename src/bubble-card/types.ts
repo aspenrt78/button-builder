@@ -541,6 +541,18 @@ export interface BubblePreset {
   config: Partial<BubbleConfig>;
 }
 
+export interface SavedBubbleRecord {
+  id: string;
+  name: string;
+  folder: string;
+  tags: string[];
+  yaml: string;
+  config: BubbleConfig;
+  activePresetName: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ============================================
 // CSS VARIABLES (for reference)
 // ============================================
