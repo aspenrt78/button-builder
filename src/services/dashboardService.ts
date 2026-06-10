@@ -97,10 +97,10 @@ const collectConfigIcons = (config?: ButtonConfigSnapshot): string[] => {
 
   const icons = [
     config.icon,
-    config.lock.lockIcon,
-    config.lock.unlockIcon,
-    ...config.stateStyles.map((style) => style.icon),
-    ...config.customFields.map((field) => field.icon || ''),
+    config.lock?.lockIcon,
+    config.lock?.unlockIcon,
+    ...(config.stateStyles ?? []).map((style) => style.icon),
+    ...(config.customFields ?? []).map((field) => field.icon || ''),
   ];
 
   return icons

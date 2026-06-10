@@ -263,7 +263,7 @@ export const GridDesigner: React.FC<GridDesignerProps> = ({
         name: area.name,
         type: 'entity' as const,
         value: '',
-        entity: area.content!.entity,
+        entity: area.content!.entity || '',
         attribute: area.content!.attribute || '',
         icon: area.content!.icon || '',
         prefix: area.content!.prefix || '',

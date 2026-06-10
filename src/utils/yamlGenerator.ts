@@ -356,7 +356,7 @@ export const generateYaml = (config: ButtonConfig): string => {
     borderStyle,
     config.backdropBlur !== '0px' ? `backdrop-filter: blur(${config.backdropBlur})` : null,
     shadowCSS,
-  ].filter(Boolean);
+  ].filter((s): s is string => Boolean(s));
 
   // --- Base Icon Styles ---
   const iconStyles: string[] = [];

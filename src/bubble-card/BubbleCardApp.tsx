@@ -637,7 +637,7 @@ export function BubbleCardApp() {
     )));
   };
 
-  const updateConfig = <K extends keyof BubbleConfig>(key: K, value: any) => {
+  const updateConfig = (key: string, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
@@ -784,7 +784,7 @@ export function BubbleCardApp() {
           </div>
 
           <div className="flex-1 overflow-y-auto" style={{ contain: 'layout paint' }}>
-            <BubbleConfigPanel config={config as BubbleButtonConfig} updateConfig={updateConfig} setConfig={setConfig as React.Dispatch<React.SetStateAction<BubbleButtonConfig>>} />
+            <BubbleConfigPanel config={config as BubbleButtonConfig} updateConfig={updateConfig} setConfig={setConfig} />
           </div>
         </aside>
 
@@ -891,7 +891,7 @@ export function BubbleCardApp() {
                   {CARD_TYPE_OPTIONS.find(o => o.value === currentCardType)?.description}
                 </p>
               </div>
-              <BubbleConfigPanel config={config as BubbleButtonConfig} updateConfig={updateConfig} setConfig={setConfig as React.Dispatch<React.SetStateAction<BubbleButtonConfig>>} />
+              <BubbleConfigPanel config={config as BubbleButtonConfig} updateConfig={updateConfig} setConfig={setConfig} />
             </div>
           )}
 
