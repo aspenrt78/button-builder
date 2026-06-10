@@ -811,15 +811,11 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
           )}
           <div className="flex items-center gap-3">
             {cfg.show_icon !== false && (
-              <div 
+              <div
                 className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden"
-                style={{ backgroundColor: cfg.entity_picture && !cfg.force_icon ? 'transparent' : (iconBgColor || 'rgba(255, 255, 255, 0.1)') }}
+                style={{ backgroundColor: iconBgColor || 'rgba(255, 255, 255, 0.1)' }}
               >
-                {cfg.entity_picture && !cfg.force_icon ? (
-                  <img src={cfg.entity_picture} alt="Entity" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                ) : (
-                  <BubbleIcon icon={cfg.icon_open || 'mdi:blinds-open'} size={24} color={actualAccent || 'white'} />
-                )}
+                <BubbleIcon icon={cfg.icon_open || 'mdi:blinds-open'} size={24} color={actualAccent || 'white'} />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -876,15 +872,11 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
           )}
           <div className="p-4 flex items-center gap-3">
             {cfg.show_icon !== false && (
-              <div 
+              <div
                 className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
-                style={{ backgroundColor: cfg.entity_picture && !cfg.force_icon ? 'transparent' : (iconBgColor || 'rgba(255, 255, 255, 0.1)') }}
+                style={{ backgroundColor: iconBgColor || 'rgba(255, 255, 255, 0.1)' }}
               >
-                {cfg.entity_picture && !cfg.force_icon ? (
-                  <img src={cfg.entity_picture} alt="Entity" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                ) : (
-                  <BubbleIcon icon={cfg.icon || 'mdi:speaker'} size={28} color={actualAccent || 'white'} />
-                )}
+                <BubbleIcon icon={cfg.icon || 'mdi:speaker'} size={28} color={actualAccent || 'white'} />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -953,15 +945,11 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
           )}
           <div className="flex items-center gap-3">
             {cfg.show_icon !== false && (
-              <div 
+              <div
                 className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden"
-                style={{ backgroundColor: cfg.entity_picture && !cfg.force_icon ? 'transparent' : (iconBgColor || 'rgba(255, 140, 50, 0.3)') }}
+                style={{ backgroundColor: iconBgColor || 'rgba(255, 140, 50, 0.3)' }}
               >
-                {cfg.entity_picture && !cfg.force_icon ? (
-                  <img src={cfg.entity_picture} alt="Entity" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                ) : (
-                  <BubbleIcon icon={cfg.icon || 'mdi:thermometer'} size={24} color={actualAccent || '#FF8C32'} />
-                )}
+                <BubbleIcon icon={cfg.icon || 'mdi:thermometer'} size={24} color={actualAccent || '#FF8C32'} />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -1008,15 +996,11 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
         >
           <div className="flex items-center gap-3">
             {cfg.show_icon !== false && (
-              <div 
+              <div
                 className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden"
-                style={{ backgroundColor: cfg.entity_picture && !cfg.force_icon ? 'transparent' : (iconBgColor || 'rgba(255, 255, 255, 0.1)') }}
+                style={{ backgroundColor: iconBgColor || 'rgba(255, 255, 255, 0.1)' }}
               >
-                {cfg.entity_picture && !cfg.force_icon ? (
-                  <img src={cfg.entity_picture} alt="Entity" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                ) : (
-                  <BubbleIcon icon={cfg.icon || 'mdi:format-list-bulleted'} size={24} color={actualAccent || 'white'} />
-                )}
+                <BubbleIcon icon={cfg.icon || 'mdi:format-list-bulleted'} size={24} color={actualAccent || 'white'} />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -1150,10 +1134,6 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
           animationDuration: cardAnimationClass ? cardAnimationDuration : undefined,
         }}
       >
-        {cfg.ripple_effect && (
-          <div className="absolute inset-0 pointer-events-none animate-pulse" style={{ background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08), transparent 45%)' }} />
-        )}
-
         {cfg.badge_text && (
           <div className="absolute right-3 top-3 px-2 py-0.5 rounded-full text-[10px] font-semibold"
             style={{ background: cfg.badge_color || 'rgba(255,255,255,0.15)', color: '#fff' }}>
@@ -1163,27 +1143,18 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
 
         <div className="flex items-center gap-3">
           {cfg.show_icon !== false && (
-            <div 
+            <div
               className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${iconAnimationClass}`}
-              style={{ 
-                backgroundColor: cfg.entity_picture && !cfg.force_icon ? 'transparent' : actualIconBg,
+              style={{
+                backgroundColor: actualIconBg,
                 animationDuration: iconAnimationClass ? iconAnimationDuration : undefined,
               }}
             >
-              {cfg.entity_picture && !cfg.force_icon ? (
-                <img 
-                  src={cfg.entity_picture} 
-                  alt="Entity" 
-                  className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <BubbleIcon 
-                  icon={cfg.icon || 'mdi:lightbulb'} 
-                  size={iconSize} 
-                  color={parsedStyles.iconColor || actualAccent} 
-                />
-              )}
+              <BubbleIcon
+                icon={cfg.icon || 'mdi:lightbulb'}
+                size={iconSize}
+                color={parsedStyles.iconColor || actualAccent}
+              />
             </div>
           )}
           <div className="flex-1 min-w-0">
@@ -1222,9 +1193,6 @@ function BubblePreviewInner({ config, simulatedState = 'on', onSimulatedStateCha
                 }}
               />
             </div>
-            {cfg.show_slider_value && (
-              <div className="mt-1 text-right text-white/70 text-xs font-mono">{sliderValue}%</div>
-            )}
           </div>
         )}
         {hasSubButtons && isTwoRows && (

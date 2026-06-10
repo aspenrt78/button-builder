@@ -3,8 +3,17 @@
  * to allow users to use their actual dashboard backgrounds as the preview canvas.
  */
 
-import React from 'react';
-import type { ButtonConfig } from '../types';
+import type { CSSProperties } from 'react';
+
+/** Narrow shape of ButtonConfig needed only for environment checks. */
+interface ButtonConfigSnapshot {
+  icon?: string;
+  lock?: { lockIcon?: string; unlockIcon?: string };
+  stateStyles?: Array<{ icon?: string }>;
+  customFields?: Array<{ icon?: string }>;
+  customFontName?: string;
+  customFontUrl?: string;
+}
 
 export interface DashboardInfo {
   id: string;
@@ -81,7 +90,7 @@ export interface ButtonBuilderEnvironmentReport {
   requirements: BuilderRequirementStatus[];
 }
 
-const collectConfigIcons = (config?: ButtonConfig): string[] => {
+const collectConfigIcons = (config?: ButtonConfigSnapshot): string[] => {
   if (!config) {
     return [];
   }
@@ -205,7 +214,7 @@ export const fetchLovelaceResources = async (): Promise<Array<{ id?: string; typ
   return Array.isArray(resources) ? resources : [];
 };
 
-export const checkButtonBuilderEnvironment = async (config?: ButtonConfig): Promise<ButtonBuilderEnvironmentReport> => {
+export const checkButtonBuilderEnvironment = async (config?: ButtonConfigSnapshot): Promise<ButtonBuilderEnvironmentReport> => {
   const requirements: BuilderRequirementStatus[] = [];
 
   if (!getHass()) {
@@ -295,6 +304,47 @@ export const checkButtonBuilderEnvironment = async (config?: ButtonConfig): Prom
     checkedAt: Date.now(),
     requirements,
   };
+};
+
+/**
+ * Environment check for the Bubble Card builder: verifies that the
+ * custom:bubble-card resource is installed in Lovelace.
+ */
+export const checkBubbleCardEnvironment = async (): Promise<ButtonBuilderEnvironmentReport> => {
+  const requirements: BuilderRequirementStatus[] = [];
+
+  if (!getHass()) {
+    requirements.push({
+      id: 'ha-context',
+      label: 'Home Assistant context',
+      required: true,
+      status: 'unavailable',
+      details: 'The panel is running in a restricted context, so Home Assistant checks are unavailable.',
+    });
+    return { checkedAt: Date.now(), requirements };
+  }
+
+  const resources = await fetchLovelaceResources();
+  const resourceInstalled = resources.some((resource) => matchesResourceNeedle(resource.url, 'bubble-card'));
+  const registered = getParentCustomCards().some((entry) => {
+    const type = (entry?.type || '').toString().toLowerCase();
+    return type === 'bubble-card' || type === 'custom:bubble-card';
+  });
+  const installed = resourceInstalled || registered;
+
+  requirements.push({
+    id: 'bubble-card',
+    label: 'custom:bubble-card',
+    required: true,
+    status: installed ? 'ok' : 'missing',
+    details: installed
+      ? 'Bubble Card appears to be installed and available in Lovelace.'
+      : 'This builder generates custom:bubble-card YAML, which requires the Bubble Card custom card to be installed in Home Assistant (available via HACS).',
+    actionLabel: installed ? undefined : 'Install Bubble Card',
+    actionUrl: installed ? undefined : 'https://github.com/Clooos/Bubble-Card',
+  });
+
+  return { checkedAt: Date.now(), requirements };
 };
 
 const callHassWS = async (type: string, data?: any): Promise<any | null> => {
@@ -622,7 +672,7 @@ export const fetchAllDashboardConfigs = async (): Promise<DashboardConfig[]> => 
 export type DashboardBackground = DashboardConfig;
 export const fetchAllDashboardBackgrounds = fetchAllDashboardConfigs;
 
-export const parseBackgroundToCss = (background: string | null | undefined): React.CSSProperties => {
+export const parseBackgroundToCss = (background: string | null | undefined): CSSProperties => {
   if (!background || typeof background !== 'string') return {};
   if (background.includes('url(')) {
     return { background };

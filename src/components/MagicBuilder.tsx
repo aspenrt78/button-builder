@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Wand2, X, Loader2, Sparkles, Key, ExternalLink, Trash2 } from 'lucide-react';
-import { generateButtonConfig, hasApiKey, setApiKey, getApiKey, clearApiKey } from '../services/geminiService';
+import { generateButtonConfig, hasApiKey, setApiKey, getApiKey, clearApiKey, GeminiError } from '../services/geminiService';
 import { ButtonConfig } from '../types';
 
 interface Props {
@@ -13,6 +13,7 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [canRetry, setCanRetry] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(!hasApiKey());
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKeyManagement, setShowKeyManagement] = useState(false);
@@ -30,6 +31,7 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
     if (!prompt.trim()) return;
     setLoading(true);
     setError('');
+    setCanRetry(false);
     try {
       const config = await generateButtonConfig(prompt);
       onApply(config);
@@ -37,19 +39,20 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
       onClose();
     } catch (e) {
       console.error('Magic Builder error:', e);
-      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      if (errorMessage === 'API_KEY_REQUIRED') {
-        setShowApiKeyInput(true);
-        setError('');
-      } else if (errorMessage.includes('API key') || errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('leaked')) {
-        setError('Invalid API key. Please check your key and try again.');
-        setShowApiKeyInput(true);
-      } else if (errorMessage.includes('quota') || errorMessage.includes('429')) {
-        setError('API rate limit exceeded. Please try again later.');
-      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-        setError('Network error. Please check your internet connection.');
+      if (e instanceof GeminiError) {
+        if (e.code === 'API_KEY_REQUIRED') {
+          setShowApiKeyInput(true);
+          setError('');
+        } else if (e.code === 'INVALID_API_KEY') {
+          setError(e.userMessage);
+          setShowApiKeyInput(true);
+        } else {
+          setError(e.userMessage);
+          setCanRetry(e.retryable);
+        }
       } else {
         setError('Failed to generate design. Please try a different description.');
+        setCanRetry(true);
       }
     } finally {
       setLoading(false);
@@ -151,7 +154,8 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
                   className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none placeholder-gray-600 font-mono text-sm"
                 />
                 <p className="text-xs text-gray-500">
-                  Your key is stored locally in your browser and never sent to our servers.
+                  Your key is stored locally in this browser only and never sent to our servers.
+                  Anyone with access to this browser profile can read it — use a free-tier key, not one shared with paid projects.
                 </p>
               </div>
               
@@ -213,8 +217,17 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
               />
               
               {error && (
-                <div className="p-3 bg-red-900/20 border border-red-800 rounded-lg">
+                <div className="p-3 bg-red-900/20 border border-red-800 rounded-lg flex items-center justify-between gap-3">
                   <p className="text-red-400 text-xs">{error}</p>
+                  {canRetry && (
+                    <button
+                      onClick={handleGenerate}
+                      disabled={loading}
+                      className="shrink-0 text-xs px-3 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-300 rounded-lg border border-red-800 transition-colors disabled:opacity-50"
+                    >
+                      Retry
+                    </button>
+                  )}
                 </div>
               )}
             </>

@@ -7,7 +7,7 @@ import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
 import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge, Search, AlertCircle, ChevronDown } from 'lucide-react';
-import { NavHeader, CategoryList, SectionList, useNavigation, SectionId } from './ConfigPanelNav';
+import { NavHeader, CategoryList, SectionList, SearchResults, useNavigation, SectionId } from './ConfigPanelNav';
 import { haService } from '../services/homeAssistantService';
 import { PRESETS, Preset, generateDarkModePreset } from '../presets';
 import { validateCss, formatValidationResults } from '../utils/cssValidator';
@@ -346,7 +346,7 @@ export const ConfigPanel: React.FC<Props> = ({
   };
 
   // Drill-down navigation
-  const { nav, goBack, selectCategory, selectSection } = useNavigation();
+  const { nav, goBack, selectCategory, selectSection, selectFromSearch, searchQuery, setSearchQuery } = useNavigation();
   const showSection = (sectionId: SectionId) => nav.level === 'content' && nav.sectionId === sectionId;
   
   // Preset search state
@@ -768,10 +768,15 @@ export const ConfigPanel: React.FC<Props> = ({
 
   return (
     <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
-      <NavHeader nav={nav} goBack={goBack} activePreset={activePreset} />
+      <NavHeader nav={nav} goBack={goBack} activePreset={activePreset} searchQuery={searchQuery} onSearchChange={nav.level === 'categories' ? setSearchQuery : undefined} />
+
+      {/* Search results (overrides normal navigation when query is present) */}
+      {nav.level === 'categories' && searchQuery && (
+        <SearchResults query={searchQuery} onSelect={selectFromSearch} />
+      )}
 
       {/* Category List */}
-      {nav.level === 'categories' && <CategoryList onSelect={selectCategory} />}
+      {nav.level === 'categories' && !searchQuery && <CategoryList onSelect={selectCategory} />}
 
       {/* Section List */}
       {nav.level === 'sections' && <SectionList categoryId={nav.categoryId} onSelect={selectSection} />}
@@ -1965,26 +1970,47 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
                 <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
-                {getAppearanceValue('cardAnimation') !== 'none' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
-                      <ControlInput
-                        label="Trigger"
-                        type="select"
-                        value={config.cardAnimationTrigger}
-                        options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
-                        onChange={(v) => update('cardAnimationTrigger', v)}
-                      />
-                    </div>
-                    <ControlInput 
-                      type="checkbox" 
-                      label="Always Animate Card (Bypass State Toggle)" 
-                      value={config.alwaysAnimateCard} 
-                      onChange={(v) => update('alwaysAnimateCard', v)} 
-                    />
-                  </>
-                )}
+                {getAppearanceValue('cardAnimation') !== 'none' && (() => {
+                  // Detect whether the animation is stored in the state-appearance slot
+                  // (binary entity AND currentAppearance has a non-none value).
+                  // In that case the state condition itself IS the trigger — the global
+                  // cardAnimationTrigger field is irrelevant and showing it confuses users.
+                  const stateAnim = entityCapabilities.hasOnOffState
+                    ? (currentAppearance as Partial<import('../types').StateAppearanceConfig>)?.cardAnimation
+                    : undefined;
+                  const isStateSpecific = !!(stateAnim) && stateAnim !== 'none';
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <ControlInput label="Speed/Duration" value={getAppearanceValue('cardAnimationSpeed')} onChange={(v) => updateAppearance('cardAnimationSpeed', v)} suffix="s" />
+                        {isStateSpecific ? (
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trigger</p>
+                            <div className="px-2 py-1.5 rounded bg-gray-800 border border-gray-700 text-xs text-gray-400">
+                              When state = <span className="text-white font-semibold">{editingState?.toUpperCase()}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <ControlInput
+                            label="Trigger"
+                            type="select"
+                            value={config.cardAnimationTrigger}
+                            options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
+                            onChange={(v) => update('cardAnimationTrigger', v)}
+                          />
+                        )}
+                      </div>
+                      {!isStateSpecific && (
+                        <ControlInput
+                          type="checkbox"
+                          label="Always Animate Card (Bypass State Toggle)"
+                          value={config.alwaysAnimateCard}
+                          onChange={(v) => update('alwaysAnimateCard', v)}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
              </div>
 
              <div className="h-px bg-gray-700/50" />
@@ -1993,26 +2019,43 @@ export const ConfigPanel: React.FC<Props> = ({
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
                 <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
-                {getAppearanceValue('iconAnimation') !== 'none' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
-                      <ControlInput
-                        label="Trigger"
-                        type="select"
-                        value={config.iconAnimationTrigger}
-                        options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
-                        onChange={(v) => update('iconAnimationTrigger', v)}
-                      />
-                    </div>
-                    <ControlInput 
-                      type="checkbox" 
-                      label="Always Animate Icon (Bypass State Toggle)" 
-                      value={config.alwaysAnimateIcon} 
-                      onChange={(v) => update('alwaysAnimateIcon', v)} 
-                    />
-                  </>
-                )}
+                {getAppearanceValue('iconAnimation') !== 'none' && (() => {
+                  const stateAnim = entityCapabilities.hasOnOffState
+                    ? (currentAppearance as Partial<import('../types').StateAppearanceConfig>)?.iconAnimation
+                    : undefined;
+                  const isStateSpecific = !!(stateAnim) && stateAnim !== 'none';
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <ControlInput label="Speed/Duration" value={getAppearanceValue('iconAnimationSpeed')} onChange={(v) => updateAppearance('iconAnimationSpeed', v)} suffix="s" />
+                        {isStateSpecific ? (
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trigger</p>
+                            <div className="px-2 py-1.5 rounded bg-gray-800 border border-gray-700 text-xs text-gray-400">
+                              When state = <span className="text-white font-semibold">{editingState?.toUpperCase()}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <ControlInput
+                            label="Trigger"
+                            type="select"
+                            value={config.iconAnimationTrigger}
+                            options={entityCapabilities.hasOnOffState ? TRIGGER_OPTIONS : [{ value: 'always', label: 'Always' }]}
+                            onChange={(v) => update('iconAnimationTrigger', v)}
+                          />
+                        )}
+                      </div>
+                      {!isStateSpecific && (
+                        <ControlInput
+                          type="checkbox"
+                          label="Always Animate Icon (Bypass State Toggle)"
+                          value={config.alwaysAnimateIcon}
+                          onChange={(v) => update('alwaysAnimateIcon', v)}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
              </div>
           </div>
             </>

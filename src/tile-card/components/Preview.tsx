@@ -113,9 +113,9 @@ export const Preview: React.FC<Props> = ({ config }) => {
                     {(config.state_content || []).map((content, i) => (
                       <div key={i}>
                         {content === 'state' && 'on'}
-                        {content === 'last-changed' && 'Updated 2h ago'}
-                        {content === 'last-updated' && 'Changed 5m ago'}
-                        {!['state', 'last-changed', 'last-updated'].includes(content) && `${content}: value`}
+                        {content === 'last_changed' && 'Updated 2h ago'}
+                        {content === 'last_updated' && 'Changed 5m ago'}
+                        {!['state', 'last_changed', 'last_updated'].includes(content) && `${content}: value`}
                       </div>
                     ))}
                   </div>

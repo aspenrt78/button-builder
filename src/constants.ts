@@ -20,8 +20,6 @@ export const ACTION_OPTIONS = [
   { value: 'assist', label: 'Assist' },
   { value: 'fire-dom-event', label: 'Fire DOM Event' },
   { value: 'javascript', label: 'JavaScript' },
-  { value: 'multi-actions', label: 'Multi-Actions' },
-  { value: 'toast', label: 'Toast Notification' },
 ];
 
 export const LOCK_UNLOCK_OPTIONS = [
@@ -34,20 +32,27 @@ export const STATE_OPERATOR_OPTIONS = [
   { value: 'equals', label: 'Equals (=)' },
   { value: 'not_equals', label: 'Not Equals (≠)' },
   { value: 'above', label: 'Above (>)' },
+  { value: 'above_equal', label: 'Above or Equal (≥)' },
   { value: 'below', label: 'Below (<)' },
+  { value: 'below_equal', label: 'Below or Equal (≤)' },
   { value: 'regex', label: 'Regex Match' },
   { value: 'template', label: 'Template' },
   { value: 'default', label: 'Default (Fallback)' },
 ];
 
-export const CONDITIONAL_OPERATORS = [
-  { value: 'equals', label: 'Equals (=)' },
-  { value: 'not_equals', label: 'Not Equals (≠)' },
-  { value: 'above', label: 'Above (>)' },
-  { value: 'below', label: 'Below (<)' },
-  { value: 'regex', label: 'Regex Match' },
-  { value: 'template', label: 'Template' },
-  { value: 'default', label: 'Default (Fallback)' },
+export const TOOLTIP_PLACEMENT_OPTIONS = [
+  { value: 'top', label: 'Top' },
+  { value: 'top-start', label: 'Top Start' },
+  { value: 'top-end', label: 'Top End' },
+  { value: 'right', label: 'Right' },
+  { value: 'right-start', label: 'Right Start' },
+  { value: 'right-end', label: 'Right End' },
+  { value: 'bottom', label: 'Bottom' },
+  { value: 'bottom-start', label: 'Bottom Start' },
+  { value: 'bottom-end', label: 'Bottom End' },
+  { value: 'left', label: 'Left' },
+  { value: 'left-start', label: 'Left Start' },
+  { value: 'left-end', label: 'Left End' },
 ];
 
 export const TRANSFORM_OPTIONS = [
@@ -191,6 +196,17 @@ export const FONT_FAMILY_OPTIONS = [
   { value: 'Ubuntu, sans-serif', label: 'Ubuntu (Google)' },
   { value: 'Playfair Display, serif', label: 'Playfair Display (Google)' },
   { value: 'Merriweather, serif', label: 'Merriweather (Google)' },
+];
+
+export const CONDITIONAL_OPERATORS = [
+  { value: 'equals', label: 'Equals' },
+  { value: 'not_equals', label: 'Not Equals' },
+  { value: 'above', label: 'Greater Than (>)' },
+  { value: 'above_equal', label: 'Greater Than or Equal (>=)' },
+  { value: 'below', label: 'Less Than (<)' },
+  { value: 'below_equal', label: 'Less Than or Equal (<=)' },
+  { value: 'regex', label: 'Regex' },
+  { value: 'template', label: 'Template' },
 ];
 
 // Mock icons for preview mapping (since we don't load all MDIs)

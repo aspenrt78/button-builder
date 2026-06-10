@@ -103,7 +103,6 @@ function generateSubButtonYaml(subButton: BubbleSubButton, indentLevel: number =
   if (subButton.entity) lines.push(`${pad}entity: ${subButton.entity}`);
   if (subButton.name) lines.push(`${pad}name: ${formatValue(subButton.name)}`);
   if (subButton.icon) lines.push(`${pad}icon: ${subButton.icon}`);
-  if (subButton.visibility) lines.push(`${pad}visibility: ${subButton.visibility}`);
 
   if (subButton.show_background === false) lines.push(`${pad}show_background: false`);
   if (subButton.state_background === false) lines.push(`${pad}state_background: false`);
@@ -117,11 +116,6 @@ function generateSubButtonYaml(subButton: BubbleSubButton, indentLevel: number =
     if (subButton.attribute) lines.push(`${pad}attribute: ${subButton.attribute}`);
   }
   if (subButton.select_attribute) lines.push(`${pad}select_attribute: ${subButton.select_attribute}`);
-  if (subButton.dropdown && subButton.dropdown.length > 0) {
-    lines.push(`${pad}dropdown:`);
-    subButton.dropdown.forEach(option => lines.push(`${pad}  - ${formatValue(option)}`));
-  }
-  if (subButton.footer_entity) lines.push(`${pad}footer_entity: ${subButton.footer_entity}`);
   if (subButton.show_arrow === false) lines.push(`${pad}show_arrow: false`);
 
   if (subButton.tap_action && subButton.tap_action.action !== 'more-info') {
@@ -151,11 +145,17 @@ function addSubButtonsToYaml(lines: string[], subButtons: BubbleSubButton[] | un
     if (sb.name) sbLines.push(`name: ${formatValue(sb.name)}`);
     if (sb.icon) sbLines.push(`icon: ${sb.icon}`);
 
+    if (sb.sub_button_type && sb.sub_button_type !== 'default') {
+      sbLines.push(`sub_button_type: ${sb.sub_button_type}`);
+    }
+
     if (sb.show_background === false) sbLines.push('show_background: false');
     if (sb.state_background === false) sbLines.push('state_background: false');
+    if (sb.light_background === true) sbLines.push('light_background: true');
     if (sb.show_state === true) sbLines.push('show_state: true');
     if (sb.show_name === true) sbLines.push('show_name: true');
     if (sb.show_icon === false) sbLines.push('show_icon: false');
+    if (sb.force_icon === true) sbLines.push('force_icon: true');
     if (sb.show_last_changed === true) sbLines.push('show_last_changed: true');
     if (sb.show_last_updated === true) sbLines.push('show_last_updated: true');
     if (sb.show_attribute === true) {
@@ -163,12 +163,28 @@ function addSubButtonsToYaml(lines: string[], subButtons: BubbleSubButton[] | un
       if (sb.attribute) sbLines.push(`attribute: ${sb.attribute}`);
     }
     if (sb.select_attribute) sbLines.push(`select_attribute: ${sb.select_attribute}`);
-    if (sb.dropdown && sb.dropdown.length > 0) {
-      sbLines.push('dropdown:');
-      sb.dropdown.forEach(option => sbLines.push(`  - ${formatValue(option)}`));
+    if (sb.scrolling_effect === false) sbLines.push('scrolling_effect: false');
+    if (sb.content_layout && sb.content_layout !== 'icon-left') {
+      sbLines.push(`content_layout: ${sb.content_layout}`);
     }
-    if (sb.footer_entity) sbLines.push(`footer_entity: ${sb.footer_entity}`);
+    if (sb.hide_when_parent_unavailable === true) sbLines.push('hide_when_parent_unavailable: true');
     if (sb.show_arrow === false) sbLines.push('show_arrow: false');
+
+    if (sb.sub_button_type === 'slider') {
+      if (sb.min_value !== undefined && sb.min_value !== 0) sbLines.push(`min_value: ${sb.min_value}`);
+      if (sb.max_value !== undefined && sb.max_value !== 100) sbLines.push(`max_value: ${sb.max_value}`);
+      if (sb.step !== undefined && sb.step !== 1) sbLines.push(`step: ${sb.step}`);
+      if (sb.tap_to_slide === true) sbLines.push('tap_to_slide: true');
+      if (sb.read_only_slider === true) sbLines.push('read_only_slider: true');
+      if (sb.slider_live_update === true) sbLines.push('slider_live_update: true');
+      if (sb.slider_fill_orientation && sb.slider_fill_orientation !== 'left') {
+        sbLines.push(`slider_fill_orientation: ${sb.slider_fill_orientation}`);
+      }
+      if (sb.slider_value_position && sb.slider_value_position !== 'right') {
+        sbLines.push(`slider_value_position: ${sb.slider_value_position}`);
+      }
+      if (sb.invert_slider_value === true) sbLines.push('invert_slider_value: true');
+    }
 
     if (sb.tap_action && sb.tap_action.action !== 'more-info') {
       sbLines.push('tap_action:');
@@ -242,7 +258,6 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
 
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
 
   if (config.show_name === false) lines.push('show_name: false');
@@ -256,15 +271,10 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
   }
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
   if (config.use_accent_color === true) lines.push('use_accent_color: true');
-  if (config.badge_text) lines.push(`badge_text: ${formatValue(config.badge_text)}`);
-  if (config.badge_color) lines.push(`badge_color: ${formatValue(config.badge_color)}`);
-  if (config.footer_text) lines.push(`footer_text: ${formatValue(config.footer_text)}`);
-  if (config.ripple_effect === true) lines.push('ripple_effect: true');
-  if (config.icon_size !== undefined) lines.push(`icon_size: ${config.icon_size}`);
-  if (config.name_weight && config.name_weight !== 'normal') lines.push(`name_weight: ${config.name_weight}`);
-  if (config.glow_effect) lines.push(`glow_effect: ${formatValue(config.glow_effect)}`);
-  if (config.background_gradient) lines.push(`background_gradient: ${formatValue(config.background_gradient)}`);
   if (config.icon_animation) lines.push(`icon_animation: ${formatValue(config.icon_animation)}`);
+
+  // Note: badge, footer text, icon size, name weight, glow and gradient are
+  // compiled into the styles option (Bubble Card has no top-level keys for them)
   
   // Note: card_animation and icon_animation_type are handled as CSS in styles, not as direct properties
   if (config.card_layout && config.card_layout !== 'normal') {
@@ -289,6 +299,22 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
     if (config.relative_slide === true) lines.push('relative_slide: true');
     if (config.read_only_slider === true) lines.push('read_only_slider: true');
     if (config.slider_live_update === true) lines.push('slider_live_update: true');
+    if (config.slider_fill_orientation && config.slider_fill_orientation !== 'left') {
+      lines.push(`slider_fill_orientation: ${config.slider_fill_orientation}`);
+    }
+    if (config.slider_value_position && config.slider_value_position !== 'right') {
+      lines.push(`slider_value_position: ${config.slider_value_position}`);
+    }
+    if (config.invert_slider_value === true) lines.push('invert_slider_value: true');
+    if (config.light_slider_type && config.light_slider_type !== 'brightness') {
+      lines.push(`light_slider_type: ${config.light_slider_type}`);
+    }
+    if (config.light_slider_type === 'hue' && config.hue_force_saturation === true) {
+      lines.push('hue_force_saturation: true');
+      if (config.hue_force_saturation_value !== undefined) {
+        lines.push(`hue_force_saturation_value: ${config.hue_force_saturation_value}`);
+      }
+    }
     if (config.allow_light_slider_to_0 === true) lines.push('allow_light_slider_to_0: true');
     if (config.light_transition === true) {
       lines.push('light_transition: true');
@@ -296,7 +322,6 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
         lines.push(`light_transition_time: ${config.light_transition_time}`);
       }
     }
-    if (config.show_slider_value === true) lines.push('show_slider_value: true');
   }
 
   if (config.button_action) {
@@ -328,13 +353,16 @@ function generateButtonYaml(config: BubbleButtonConfig): string {
     lines.push(generateActionYaml(config.hold_action, 1));
   }
 
+  if (config.footer_mode === true) lines.push('footer_mode: true');
+  if (config.footer_full_width === true) lines.push('footer_full_width: true');
   addSubButtonsToYaml(lines, config.sub_button);
   addModules(lines, config.modules);
-  
-  // Add animations to styles if configured
+
+  // Add animations and visual effects to styles if configured
   let finalStyles = config.styles || '';
   finalStyles = addAnimationStyles(finalStyles, config);
-  
+  finalStyles = addVisualEffectStyles(finalStyles, config);
+
   addStylesToYaml(lines, finalStyles);
 
   return lines.join('\n');
@@ -377,7 +405,56 @@ function addAnimationStyles(existingStyles: string, config: BubbleButtonConfig):
   if (animationCss) {
     return existingStyles ? `${existingStyles}\n${animationCss}` : animationCss;
   }
-  
+
+  return existingStyles;
+}
+
+// ============================================
+// VISUAL EFFECT STYLES HELPER
+// ============================================
+
+const NAME_WEIGHT_MAP: Record<string, string> = {
+  normal: '400',
+  medium: '500',
+  bold: '700',
+};
+
+function escapeCssContent(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function addVisualEffectStyles(existingStyles: string, config: BubbleButtonConfig): string {
+  let css = '';
+
+  if (config.icon_size !== undefined) {
+    css += `.bubble-icon {\n  --mdc-icon-size: ${config.icon_size}px;\n}\n`;
+  }
+
+  if (config.name_weight && config.name_weight !== 'normal') {
+    css += `.bubble-name {\n  font-weight: ${NAME_WEIGHT_MAP[config.name_weight] || config.name_weight};\n}\n`;
+  }
+
+  if (config.glow_effect) {
+    css += `.bubble-button-card-container {\n  box-shadow: 0 0 15px ${config.glow_effect};\n}\n`;
+  }
+
+  if (config.background_gradient) {
+    css += `.bubble-button-card-container {\n  background: ${config.background_gradient} !important;\n}\n`;
+  }
+
+  if (config.badge_text) {
+    const badgeColor = config.badge_color || 'var(--accent-color)';
+    css += `.bubble-button-card-container::after {\n  content: "${escapeCssContent(config.badge_text)}";\n  position: absolute;\n  top: -6px;\n  right: -6px;\n  background: ${badgeColor};\n  color: #fff;\n  border-radius: 10px;\n  padding: 2px 8px;\n  font-size: 11px;\n  z-index: 2;\n}\n`;
+  }
+
+  if (config.footer_text) {
+    css += `.bubble-button-card-container::before {\n  content: "${escapeCssContent(config.footer_text)}";\n  position: absolute;\n  bottom: 2px;\n  left: 0;\n  right: 0;\n  text-align: center;\n  font-size: 10px;\n  opacity: 0.7;\n  pointer-events: none;\n  z-index: 2;\n}\n`;
+  }
+
+  if (css) {
+    return existingStyles ? `${existingStyles}\n${css}` : css;
+  }
+
   return existingStyles;
 }
 
@@ -423,7 +500,6 @@ function generatePopUpYaml(config: BubblePopUpConfig): string {
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
   if (config.entity) lines.push(`entity: ${config.entity}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
 
   if (config.auto_close) lines.push(`auto_close: ${config.auto_close}`);
@@ -440,6 +516,18 @@ function generatePopUpYaml(config: BubblePopUpConfig): string {
   if (config.hide_backdrop === true) lines.push('hide_backdrop: true');
   if (config.background_update === true) lines.push('background_update: true');
   if (config.show_header === true) lines.push('show_header: true');
+  if (config.popup_style && config.popup_style !== 'bubble') lines.push(`popup_style: ${config.popup_style}`);
+  if (config.popup_mode && config.popup_mode !== 'default') lines.push(`popup_mode: ${config.popup_mode}`);
+  if ((config.popup_mode === 'fit-content' || config.popup_mode === 'adaptive-dialog') && config.with_bottom_offset === true) {
+    lines.push('with_bottom_offset: true');
+  }
+  if (config.popup_mode === 'centered' && config.full_width_on_mobile === true) {
+    lines.push('full_width_on_mobile: true');
+  }
+  if (config.performance_mode && config.performance_mode !== 'default') lines.push(`performance_mode: ${config.performance_mode}`);
+  if (config.show_previous_button === true) lines.push('show_previous_button: true');
+  if (config.show_close_button === false) lines.push('show_close_button: false');
+  if (config.buttons_position && config.buttons_position !== 'right') lines.push(`buttons_position: ${config.buttons_position}`);
 
   if (config.trigger_entity) {
     lines.push(`trigger_entity: ${config.trigger_entity}`);
@@ -509,7 +597,6 @@ function generateCoverYaml(config: BubbleCoverConfig): string {
 
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
 
   if (config.show_name === false) lines.push('show_name: false');
@@ -569,6 +656,15 @@ function generateCoverYaml(config: BubbleCoverConfig): string {
     }
   }
 
+  if (config.main_buttons_position && config.main_buttons_position !== 'default') {
+    lines.push(`main_buttons_position: ${config.main_buttons_position}`);
+  }
+  if (config.main_buttons_full_width === true) lines.push('main_buttons_full_width: true');
+  if (config.main_buttons_alignment && config.main_buttons_alignment !== 'end') {
+    lines.push(`main_buttons_alignment: ${config.main_buttons_alignment}`);
+  }
+  if (config.footer_mode === true) lines.push('footer_mode: true');
+  if (config.footer_full_width === true) lines.push('footer_full_width: true');
   addSubButtonsToYaml(lines, config.sub_button);
   addModules(lines, config.modules);
   addStylesToYaml(lines, config.styles);
@@ -589,7 +685,6 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
 
   if (config.show_name === false) lines.push('show_name: false');
@@ -612,15 +707,6 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
   if (config.cover_background === true) lines.push('cover_background: true');
   if (config.columns && config.columns !== 1) {
     lines.push(`columns: ${config.columns}`);
-  }
-
-  if (config.source_list && config.source_list.length > 0) {
-    lines.push('source_list:');
-    config.source_list.forEach(source => lines.push(`  - ${formatValue(source)}`));
-  }
-  if (config.sound_mode_list && config.sound_mode_list.length > 0) {
-    lines.push('sound_mode_list:');
-    config.sound_mode_list.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
   }
 
   if (config.hide) {
@@ -673,6 +759,15 @@ function generateMediaPlayerYaml(config: BubbleMediaPlayerConfig): string {
     }
   }
 
+  if (config.main_buttons_position && config.main_buttons_position !== 'default') {
+    lines.push(`main_buttons_position: ${config.main_buttons_position}`);
+  }
+  if (config.main_buttons_full_width === true) lines.push('main_buttons_full_width: true');
+  if (config.main_buttons_alignment && config.main_buttons_alignment !== 'end') {
+    lines.push(`main_buttons_alignment: ${config.main_buttons_alignment}`);
+  }
+  if (config.footer_mode === true) lines.push('footer_mode: true');
+  if (config.footer_full_width === true) lines.push('footer_full_width: true');
   addSubButtonsToYaml(lines, config.sub_button);
   addModules(lines, config.modules);
   addStylesToYaml(lines, config.styles);
@@ -693,7 +788,6 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
 
   if (config.show_name === false) lines.push('show_name: false');
@@ -702,7 +796,6 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
 
   if (config.hide_target_temp_low === true) lines.push('hide_target_temp_low: true');
   if (config.hide_target_temp_high === true) lines.push('hide_target_temp_high: true');
-  if (config.dual_setpoint === true) lines.push('dual_setpoint: true');
   if (config.state_color === false) lines.push('state_color: false');
   if (config.step !== undefined && config.step !== 1) {
     lines.push(`step: ${config.step}`);
@@ -712,23 +805,6 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
   }
   if (config.max_temp !== undefined) {
     lines.push(`max_temp: ${config.max_temp}`);
-  }
-
-  if (config.hvac_modes && config.hvac_modes.length > 0) {
-    lines.push('hvac_modes:');
-    config.hvac_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-  if (config.preset_modes && config.preset_modes.length > 0) {
-    lines.push('preset_modes:');
-    config.preset_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-  if (config.swing_modes && config.swing_modes.length > 0) {
-    lines.push('swing_modes:');
-    config.swing_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
-  }
-  if (config.fan_modes && config.fan_modes.length > 0) {
-    lines.push('fan_modes:');
-    config.fan_modes.forEach(mode => lines.push(`  - ${formatValue(mode)}`));
   }
 
   if (config.card_layout && config.card_layout !== 'normal') {
@@ -768,6 +844,15 @@ function generateClimateYaml(config: BubbleClimateConfig): string {
     }
   }
 
+  if (config.main_buttons_position && config.main_buttons_position !== 'default') {
+    lines.push(`main_buttons_position: ${config.main_buttons_position}`);
+  }
+  if (config.main_buttons_full_width === true) lines.push('main_buttons_full_width: true');
+  if (config.main_buttons_alignment && config.main_buttons_alignment !== 'end') {
+    lines.push(`main_buttons_alignment: ${config.main_buttons_alignment}`);
+  }
+  if (config.footer_mode === true) lines.push('footer_mode: true');
+  if (config.footer_full_width === true) lines.push('footer_full_width: true');
   addSubButtonsToYaml(lines, config.sub_button);
   addModules(lines, config.modules);
   addStylesToYaml(lines, config.styles);
@@ -788,7 +873,6 @@ function generateSelectYaml(config: BubbleSelectConfig): string {
   if (config.entity) lines.push(`entity: ${config.entity}`);
   if (config.name) lines.push(`name: ${formatValue(config.name)}`);
   if (config.icon) lines.push(`icon: ${config.icon}`);
-  if (config.entity_picture) lines.push(`entity_picture: ${formatValue(config.entity_picture)}`);
   if (config.force_icon === true) lines.push('force_icon: true');
 
   if (config.show_name === false) lines.push('show_name: false');
@@ -823,6 +907,8 @@ function generateSelectYaml(config: BubbleSelectConfig): string {
     lines.push(generateActionYaml(config.hold_action, 1));
   }
 
+  if (config.footer_mode === true) lines.push('footer_mode: true');
+  if (config.footer_full_width === true) lines.push('footer_full_width: true');
   addSubButtonsToYaml(lines, config.sub_button);
   addModules(lines, config.modules);
   addStylesToYaml(lines, config.styles);
@@ -856,6 +942,7 @@ function generateCalendarYaml(config: BubbleCalendarConfig): string {
   }
   if (config.show_end === true) lines.push('show_end: true');
   if (config.show_progress === true) lines.push('show_progress: true');
+  if (config.show_started_events === false) lines.push('show_started_events: false');
   if (config.scrolling_effect === false) lines.push('scrolling_effect: false');
 
   if (config.card_layout && config.card_layout !== 'normal') {

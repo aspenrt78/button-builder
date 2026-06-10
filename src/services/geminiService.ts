@@ -4,22 +4,67 @@ import { ButtonConfig, DEFAULT_CONFIG } from "../types";
 
 const API_KEY_STORAGE_KEY = 'button-builder-gemini-api-key';
 
+// Session-only storage; also purge any key persisted by older versions (issue #3).
+localStorage.removeItem(API_KEY_STORAGE_KEY);
+
 export const getApiKey = (): string | null => {
-  return localStorage.getItem(API_KEY_STORAGE_KEY);
+  return sessionStorage.getItem(API_KEY_STORAGE_KEY);
 };
 
 export const setApiKey = (key: string): void => {
-  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+  sessionStorage.setItem(API_KEY_STORAGE_KEY, key);
 };
 
 export const clearApiKey = (): void => {
-  localStorage.removeItem(API_KEY_STORAGE_KEY);
+  sessionStorage.removeItem(API_KEY_STORAGE_KEY);
 };
 
 export const hasApiKey = (): boolean => {
   const key = getApiKey();
   return !!key && key.length > 0;
 };
+
+export type GeminiErrorCode =
+  | 'API_KEY_REQUIRED'
+  | 'INVALID_API_KEY'
+  | 'RATE_LIMITED'
+  | 'TIMEOUT'
+  | 'PARSE_ERROR'
+  | 'NETWORK'
+  | 'UNKNOWN';
+
+export class GeminiError extends Error {
+  code: GeminiErrorCode;
+  retryable: boolean;
+  userMessage: string;
+
+  constructor(code: GeminiErrorCode, userMessage: string, retryable: boolean) {
+    super(userMessage);
+    this.code = code;
+    this.userMessage = userMessage;
+    this.retryable = retryable;
+  }
+}
+
+const classifyGeminiError = (error: unknown): GeminiError => {
+  if (error instanceof GeminiError) return error;
+  const msg = error instanceof Error ? error.message : String(error);
+  if (/api key not valid|invalid.*api key|401|403|permission/i.test(msg)) {
+    return new GeminiError('INVALID_API_KEY', 'Your Gemini API key was rejected. Check the key and try again.', false);
+  }
+  if (/429|quota|rate limit|resource.*exhausted/i.test(msg)) {
+    return new GeminiError('RATE_LIMITED', 'Gemini rate limit reached. Wait a moment and retry.', true);
+  }
+  if (/timeout|timed out|aborted/i.test(msg)) {
+    return new GeminiError('TIMEOUT', 'The AI request timed out. Retry, or simplify your prompt.', true);
+  }
+  if (/fetch|network|failed to connect|ENOTFOUND/i.test(msg)) {
+    return new GeminiError('NETWORK', 'Could not reach the Gemini API. Check your internet connection and retry.', true);
+  }
+  return new GeminiError('UNKNOWN', 'AI generation failed unexpectedly. Please retry.', true);
+};
+
+const GEMINI_TIMEOUT_MS = 45_000;
 
 const buttonSchema: Schema = {
   type: Type.OBJECT,
@@ -159,7 +204,7 @@ const buttonSchema: Schema = {
 export const generateButtonConfig = async (prompt: string): Promise<Partial<ButtonConfig>> => {
   const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error("API_KEY_REQUIRED");
+    throw new GeminiError('API_KEY_REQUIRED', 'A Gemini API key is required for Magic Build.', false);
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -261,22 +306,34 @@ REMEMBER: You MUST include visual styling! Always set backgroundColor, color, ic
 Generate a fully styled configuration that matches this request. Be creative with colors and effects.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: systemPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: buttonSchema
-      }
-    });
+    const response = await Promise.race([
+      ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: systemPrompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: buttonSchema
+        }
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), GEMINI_TIMEOUT_MS)
+      ),
+    ]);
 
     const text = response.text;
-    if (!text) throw new Error("No response from Gemini");
+    if (!text) {
+      throw new GeminiError('PARSE_ERROR', 'The AI returned an empty response. Please retry.', true);
+    }
 
-    const generated = JSON.parse(text);
+    let generated: Partial<ButtonConfig>;
+    try {
+      generated = JSON.parse(text);
+    } catch {
+      throw new GeminiError('PARSE_ERROR', 'The AI returned an unreadable response. Please retry.', true);
+    }
     return { ...DEFAULT_CONFIG, ...generated };
   } catch (error) {
     console.error("Failed to generate config:", error);
-    throw error;
+    throw classifyGeminiError(error);
   }
 };

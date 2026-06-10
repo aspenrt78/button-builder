@@ -546,10 +546,11 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
 
   const liveEntityState = (mainEntityData?.state || '').toString().toLowerCase();
   const entityCaps = getEntityCapabilities(config.entity, liveEntityState);
-  // Keep simulated ON/OFF preview only for binary entities.
-  // For stateless entities (button/input_button), never simulate ON/OFF because
-  // dashboard state matching uses real state values and would never match "on/off".
-  const canTogglePreviewState = entityCaps.hasOnOffState || (!mainEntityData && !entityCaps.isStateless);
+  // Show the ON/OFF toggle only for binary entities (domains whose real state is 'on'/'off').
+  // Non-binary entities (sensors, covers, etc.) use arbitrary state strings that never match
+  // 'on'/'off', so simulating on/off would mislead the user — especially since the animation
+  // trigger dropdown is locked to 'Always' for those entities anyway.
+  const canTogglePreviewState = entityCaps.hasOnOffState;
   const effectiveEntityState = canTogglePreviewState
     ? simulatedState
     : (liveEntityState || simulatedState || '').toString().toLowerCase();

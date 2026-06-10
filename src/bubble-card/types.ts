@@ -29,6 +29,38 @@ export type BubbleButtonType = 'switch' | 'slider' | 'state' | 'name';
 export type BubbleCardLayout = 'normal' | 'large' | 'large-2-rows' | 'large-sub-buttons-grid';
 
 // ============================================
+// SLIDER & LAYOUT OPTION TYPES
+// ============================================
+
+export type SliderFillOrientation = 'left' | 'right' | 'top' | 'bottom';
+export type SliderValuePosition = 'right' | 'left' | 'center' | 'hidden';
+export type LightSliderType = 'brightness' | 'hue' | 'saturation' | 'white_temp';
+export type SubButtonType = 'default' | 'slider' | 'select';
+export type SubButtonContentLayout = 'icon-left' | 'icon-top' | 'icon-bottom' | 'icon-right';
+export type MainButtonsPosition = 'default' | 'bottom';
+export type MainButtonsAlignment = 'end' | 'center' | 'start' | 'space-between';
+export type PopupStyle = 'bubble' | 'classic';
+export type PopupMode = 'default' | 'fit-content' | 'centered' | 'adaptive-dialog';
+export type PopupButtonsPosition = 'right' | 'left';
+export type PopupPerformanceMode = 'default' | 'performance';
+
+// Shared slider options (button card slider type and slider sub-buttons)
+export interface BubbleSliderOptions {
+  min_value?: number;
+  max_value?: number;
+  step?: number;
+  tap_to_slide?: boolean;
+  read_only_slider?: boolean;
+  slider_live_update?: boolean;
+  slider_fill_orientation?: SliderFillOrientation;
+  slider_value_position?: SliderValuePosition;
+  invert_slider_value?: boolean;
+  light_slider_type?: LightSliderType;
+  hue_force_saturation?: boolean;
+  hue_force_saturation_value?: number;
+}
+
+// ============================================
 // ACTIONS
 // ============================================
 
@@ -64,24 +96,27 @@ export interface BubbleAction {
 // SUB-BUTTONS
 // ============================================
 
-export interface BubbleSubButton {
+export interface BubbleSubButton extends BubbleSliderOptions {
   id: string; // For React key
   entity?: string;
   name?: string;
   icon?: string;
-  visibility?: string; // JS template for conditional visibility
+  sub_button_type?: SubButtonType;
+  select_attribute?: string;
   show_background?: boolean;
   state_background?: boolean;
+  light_background?: boolean;
   show_state?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
+  force_icon?: boolean;
   show_last_changed?: boolean;
   show_last_updated?: boolean;
   show_attribute?: boolean;
   attribute?: string;
-  select_attribute?: string;
-  dropdown?: string[]; // Dropdown options for select entities
-  footer_entity?: string; // Optional footer entity for sub-button
+  scrolling_effect?: boolean;
+  content_layout?: SubButtonContentLayout;
+  hide_when_parent_unavailable?: boolean;
   show_arrow?: boolean;
   tap_action?: BubbleAction;
   double_tap_action?: BubbleAction;
@@ -92,19 +127,18 @@ export interface BubbleSubButton {
 // MAIN CONFIG - BUTTON CARD
 // ============================================
 
-export interface BubbleButtonConfig {
+export interface BubbleButtonConfig extends BubbleSliderOptions {
   // Required
   card_type: 'button';
   modules?: string[];
-  
+
   // Entity & Display
   entity?: string;
   button_type: BubbleButtonType;
   name?: string;
   icon?: string;
-  entity_picture?: string;
   force_icon?: boolean;
-  
+
   // Visibility
   show_name?: boolean;
   show_icon?: boolean;
@@ -118,14 +152,12 @@ export interface BubbleButtonConfig {
   badge_text?: string;
   badge_color?: string;
   footer_text?: string;
-  ripple_effect?: boolean;
-  show_slider_value?: boolean;
   icon_size?: number;
   name_weight?: 'normal' | 'medium' | 'bold';
   glow_effect?: string;
   background_gradient?: string;
   icon_animation?: string; // Legacy CSS animation string
-  
+
   // Animations (from custom button card)
   card_animation?: AnimationType;
   card_animation_trigger?: AnimationTrigger;
@@ -133,7 +165,7 @@ export interface BubbleButtonConfig {
   icon_animation_type?: AnimationType;
   icon_animation_trigger?: AnimationTrigger;
   icon_animation_speed?: string;
-  
+
   // Layout
   card_layout?: BubbleCardLayout;
   rows?: number;
@@ -141,7 +173,7 @@ export interface BubbleButtonConfig {
     rows?: number;
     columns?: number;
   };
-  
+
   // Actions
   tap_action?: BubbleAction;
   double_tap_action?: BubbleAction;
@@ -151,22 +183,18 @@ export interface BubbleButtonConfig {
     double_tap_action?: BubbleAction;
     hold_action?: BubbleAction;
   };
-  
+
   // Sub-buttons
   sub_button?: BubbleSubButton[];
-  
-  // Slider options (when button_type is 'slider')
-  min_value?: number;
-  max_value?: number;
-  step?: number;
-  tap_to_slide?: boolean;
+  footer_mode?: boolean;
+  footer_full_width?: boolean;
+
+  // Slider options (when button_type is 'slider'; shared ones come from BubbleSliderOptions)
   relative_slide?: boolean;
-  read_only_slider?: boolean;
-  slider_live_update?: boolean;
   allow_light_slider_to_0?: boolean;
   light_transition?: boolean;
   light_transition_time?: number;
-  
+
   // Custom styles
   styles?: string;
 }
@@ -208,10 +236,17 @@ export interface BubblePopUpConfig {
   entity?: string;
   name?: string;
   icon?: string;
-  entity_picture?: string;
   force_icon?: boolean;
-  
+
   // Pop-up specific
+  popup_style?: PopupStyle;
+  popup_mode?: PopupMode;
+  with_bottom_offset?: boolean;
+  full_width_on_mobile?: boolean;
+  performance_mode?: PopupPerformanceMode;
+  show_previous_button?: boolean;
+  show_close_button?: boolean;
+  buttons_position?: PopupButtonsPosition;
   auto_close?: number;
   close_on_click?: boolean;
   close_by_clicking_outside?: boolean;
@@ -248,7 +283,6 @@ export interface BubbleCoverConfig {
   modules?: string[];
   entity: string;
   name?: string;
-  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -258,7 +292,7 @@ export interface BubbleCoverConfig {
   show_attribute?: boolean;
   attribute?: string;
   scrolling_effect?: boolean;
-  
+
   // Cover-specific icons
   icon_open?: string;
   icon_close?: string;
@@ -284,6 +318,11 @@ export interface BubbleCoverConfig {
   rows?: number;
   grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
+  footer_mode?: boolean;
+  footer_full_width?: boolean;
+  main_buttons_position?: MainButtonsPosition;
+  main_buttons_full_width?: boolean;
+  main_buttons_alignment?: MainButtonsAlignment;
   styles?: string;
 }
 
@@ -297,7 +336,6 @@ export interface BubbleMediaPlayerConfig {
   entity: string;
   name?: string;
   icon?: string;
-  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -307,17 +345,13 @@ export interface BubbleMediaPlayerConfig {
   show_attribute?: boolean;
   attribute?: string;
   scrolling_effect?: boolean;
-  
+
   // Media player specific
   min_volume?: number;
   max_volume?: number;
   cover_background?: boolean;
   columns?: number;
-  
-  // Media player source options
-  source_list?: string[];
-  sound_mode_list?: string[];
-  
+
   // Hide options
   hide?: {
     play_pause_button?: boolean;
@@ -341,6 +375,11 @@ export interface BubbleMediaPlayerConfig {
   rows?: number;
   grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
+  footer_mode?: boolean;
+  footer_full_width?: boolean;
+  main_buttons_position?: MainButtonsPosition;
+  main_buttons_full_width?: boolean;
+  main_buttons_alignment?: MainButtonsAlignment;
   styles?: string;
 }
 
@@ -354,27 +393,19 @@ export interface BubbleClimateConfig {
   entity: string;
   name?: string;
   icon?: string;
-  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
   show_state?: boolean;
-  
+
   // Climate specific
   hide_target_temp_low?: boolean;
   hide_target_temp_high?: boolean;
-  dual_setpoint?: boolean;
   state_color?: boolean;
   step?: number;
   min_temp?: number;
   max_temp?: number;
-  
-  // Climate mode options
-  hvac_modes?: string[];
-  preset_modes?: string[];
-  swing_modes?: string[];
-  fan_modes?: string[];
-  
+
   // Actions
   tap_action?: BubbleAction;
   double_tap_action?: BubbleAction;
@@ -389,6 +420,11 @@ export interface BubbleClimateConfig {
   rows?: number;
   grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
+  footer_mode?: boolean;
+  footer_full_width?: boolean;
+  main_buttons_position?: MainButtonsPosition;
+  main_buttons_full_width?: boolean;
+  main_buttons_alignment?: MainButtonsAlignment;
   styles?: string;
 }
 
@@ -402,7 +438,6 @@ export interface BubbleSelectConfig {
   entity: string;
   name?: string;
   icon?: string;
-  entity_picture?: string;
   force_icon?: boolean;
   show_name?: boolean;
   show_icon?: boolean;
@@ -412,16 +447,18 @@ export interface BubbleSelectConfig {
   show_attribute?: boolean;
   attribute?: string;
   scrolling_effect?: boolean;
-  
+
   // Actions
   tap_action?: BubbleAction;
   double_tap_action?: BubbleAction;
   hold_action?: BubbleAction;
-  
+
   card_layout?: BubbleCardLayout;
   rows?: number;
   grid_options?: BubbleGridLayout['grid_options'];
   sub_button?: BubbleSubButton[];
+  footer_mode?: boolean;
+  footer_full_width?: boolean;
   styles?: string;
 }
 
@@ -440,6 +477,7 @@ export interface BubbleCalendarConfig {
   limit?: number;
   show_end?: boolean;
   show_progress?: boolean;
+  show_started_events?: boolean;
   scrolling_effect?: boolean;
   
   // Actions

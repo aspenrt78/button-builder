@@ -486,6 +486,18 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
           {expandedIndex === index && (
             <div className="p-3 space-y-3 border-t border-gray-700">
               <ControlInput
+                label="Type"
+                type="select"
+                value={sb.sub_button_type || 'default'}
+                onChange={(v) => updateSubButton(index, { sub_button_type: v })}
+                options={[
+                  { value: 'default', label: 'Default' },
+                  { value: 'slider', label: 'Slider' },
+                  { value: 'select', label: 'Select' },
+                ]}
+              />
+
+              <ControlInput
                 label="Entity"
                 type="text"
                 value={sb.entity}
@@ -508,16 +520,7 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
                   onChange={(v) => updateSubButton(index, { icon: v })}
                 />
               </div>
-              
-              <ControlInput
-                label="Visibility (JS template)"
-                type="text"
-                value={sb.visibility}
-                onChange={(v) => updateSubButton(index, { visibility: v })}
-                placeholder="state === 'on'"
-                hint="JavaScript condition to show/hide sub-button"
-              />
-              
+
               <div className="grid grid-cols-2 gap-2">
                 <ControlInput
                   label="Show Background"
@@ -562,12 +565,49 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
                   onChange={(v) => updateSubButton(index, { show_last_changed: v })}
                 />
                 <ControlInput
+                  label="Force Icon"
+                  type="checkbox"
+                  value={sb.force_icon === true}
+                  onChange={(v) => updateSubButton(index, { force_icon: v })}
+                />
+                <ControlInput
+                  label="Light Background"
+                  type="checkbox"
+                  value={sb.light_background === true}
+                  onChange={(v) => updateSubButton(index, { light_background: v })}
+                />
+                <ControlInput
+                  label="Scrolling Effect"
+                  type="checkbox"
+                  value={sb.scrolling_effect !== false}
+                  onChange={(v) => updateSubButton(index, { scrolling_effect: v })}
+                />
+                <ControlInput
+                  label="Hide if Parent Unavailable"
+                  type="checkbox"
+                  value={sb.hide_when_parent_unavailable === true}
+                  onChange={(v) => updateSubButton(index, { hide_when_parent_unavailable: v })}
+                />
+                <ControlInput
                   label="Show Arrow"
                   type="checkbox"
                   value={sb.show_arrow !== false}
                   onChange={(v) => updateSubButton(index, { show_arrow: v })}
                 />
               </div>
+
+              <ControlInput
+                label="Content Layout"
+                type="select"
+                value={sb.content_layout || 'icon-left'}
+                onChange={(v) => updateSubButton(index, { content_layout: v })}
+                options={[
+                  { value: 'icon-left', label: 'Icon Left' },
+                  { value: 'icon-top', label: 'Icon Top' },
+                  { value: 'icon-bottom', label: 'Icon Bottom' },
+                  { value: 'icon-right', label: 'Icon Right' },
+                ]}
+              />
               
               {sb.show_attribute && (
                 <ControlInput
@@ -579,36 +619,38 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
                 />
               )}
               
-              <ControlInput
-                label="Select Attribute"
-                type="text"
-                value={sb.select_attribute}
-                onChange={(v) => updateSubButton(index, { select_attribute: v })}
-                placeholder="source"
-                hint="For select entities - shows current value"
-              />
-              
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400 font-medium">Dropdown Options (comma-separated)</label>
-                <input
+              {sb.sub_button_type === 'select' && (
+                <ControlInput
+                  label="Select Attribute"
                   type="text"
-                  className="w-full px-2 py-1.5 text-sm bg-gray-700 border border-gray-600 rounded outline-none focus:border-cyan-500"
-                  value={(sb.dropdown || []).join(', ')}
-                  onChange={(e) => updateSubButton(index, { dropdown: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                  placeholder="option1, option2, option3"
+                  value={sb.select_attribute}
+                  onChange={(v) => updateSubButton(index, { select_attribute: v })}
+                  placeholder="source list"
+                  hint="e.g. hvac modes, preset modes, fan modes, source list, sound mode list, options"
                 />
-                <span className="text-xs text-gray-500">For select entities - creates dropdown menu</span>
-              </div>
-              
-              <ControlInput
-                label="Footer Entity"
-                type="text"
-                value={sb.footer_entity}
-                onChange={(v) => updateSubButton(index, { footer_entity: v })}
-                placeholder="sensor.additional_info"
-                hint="Optional entity to display in footer"
-              />
-              
+              )}
+
+              {sb.sub_button_type === 'slider' && (
+                <div className="space-y-2 pt-2 border-t border-gray-700">
+                  <p className="text-xs text-gray-400 font-medium">Slider Options</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <ControlInput label="Min" type="number" value={sb.min_value ?? 0} onChange={(v) => updateSubButton(index, { min_value: v })} />
+                    <ControlInput label="Max" type="number" value={sb.max_value ?? 100} onChange={(v) => updateSubButton(index, { max_value: v })} />
+                    <ControlInput label="Step" type="number" value={sb.step ?? 1} onChange={(v) => updateSubButton(index, { step: v })} step={0.1} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <ControlInput label="Tap to Slide" type="checkbox" value={sb.tap_to_slide === true} onChange={(v) => updateSubButton(index, { tap_to_slide: v })} />
+                    <ControlInput label="Read Only" type="checkbox" value={sb.read_only_slider === true} onChange={(v) => updateSubButton(index, { read_only_slider: v })} />
+                    <ControlInput label="Live Update" type="checkbox" value={sb.slider_live_update === true} onChange={(v) => updateSubButton(index, { slider_live_update: v })} />
+                    <ControlInput label="Invert Value" type="checkbox" value={sb.invert_slider_value === true} onChange={(v) => updateSubButton(index, { invert_slider_value: v })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <ControlInput label="Fill Orientation" type="select" value={sb.slider_fill_orientation || 'left'} onChange={(v) => updateSubButton(index, { slider_fill_orientation: v })} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'top', label: 'Top' }, { value: 'bottom', label: 'Bottom' }]} />
+                    <ControlInput label="Value Position" type="select" value={sb.slider_value_position || 'right'} onChange={(v) => updateSubButton(index, { slider_value_position: v })} options={[{ value: 'right', label: 'Right' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'hidden', label: 'Hidden' }]} />
+                  </div>
+                </div>
+              )}
+
               {/* Sub-button Actions */}
               <div className="pt-2 border-t border-gray-700 space-y-2">
                 <p className="text-xs text-gray-400 font-medium">Actions</p>
@@ -636,6 +678,50 @@ function SubButtonEditor({ subButtons, onChange }: SubButtonEditorProps) {
         Add Sub-button
       </button>
     </div>
+  );
+}
+
+// ============================================
+// MAIN BUTTONS OPTIONS (cover / media-player / climate)
+// ============================================
+
+interface MainButtonsSectionProps {
+  config: any;
+  updateConfig: (key: string, value: any) => void;
+}
+
+function MainButtonsSection({ config, updateConfig }: MainButtonsSectionProps) {
+  return (
+    <Section title="Main Buttons" icon={<Layout size={14} />} defaultOpen={false}>
+      <ControlInput
+        label="Position"
+        type="select"
+        value={config.main_buttons_position || 'default'}
+        onChange={(v) => updateConfig('main_buttons_position', v)}
+        options={[
+          { value: 'default', label: 'Default' },
+          { value: 'bottom', label: 'Bottom' },
+        ]}
+      />
+      <ControlInput
+        label="Alignment"
+        type="select"
+        value={config.main_buttons_alignment || 'end'}
+        onChange={(v) => updateConfig('main_buttons_alignment', v)}
+        options={[
+          { value: 'end', label: 'End' },
+          { value: 'center', label: 'Center' },
+          { value: 'start', label: 'Start' },
+          { value: 'space-between', label: 'Space Between' },
+        ]}
+      />
+      <ControlInput
+        label="Full Width"
+        type="checkbox"
+        value={config.main_buttons_full_width}
+        onChange={(v) => updateConfig('main_buttons_full_width', v)}
+      />
+    </Section>
   );
 }
 
@@ -1934,6 +2020,7 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
   const hasEntity = isButton || isCover || isMediaPlayer || isClimate || isSelect;
   const hasNameIcon = !isHorizontalStack && !isEmptyColumn;
   const hasSubButtons = isButton || isSeparator || isCover || isMediaPlayer || isClimate || isSelect || isCalendar;
+  const supportsFooterMode = isButton || isCover || isMediaPlayer || isClimate || isSelect;
   const hasLayout = isButton || isSeparator || isCover || isMediaPlayer || isClimate || isSelect || isCalendar;
   const hasVisibility = isButton || isCover || isMediaPlayer || isClimate || isSelect;
   const hasActions = isButton || isCover || isMediaPlayer || isClimate || isSelect;
@@ -2020,13 +2107,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               />
             </div>
             <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
-            <ControlInput
               label="Force Icon (override entity picture)"
               type="checkbox"
               value={(config as any).force_icon}
@@ -2084,7 +2164,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Effects" icon={<Sparkles size={14} />} defaultOpen={false}>
-            <ControlInput label="Ripple Effect" type="checkbox" value={(config as any).ripple_effect} onChange={(v) => updateConfig('ripple_effect', v)} />
             <ControlInput label="Glow Effect" type="color" value={(config as any).glow_effect || ''} onChange={(v) => updateConfig('glow_effect', v)} hint="Adds soft outer glow" />
             <ControlInput label="Background Gradient" type="text" value={(config as any).background_gradient || ''} onChange={(v) => updateConfig('background_gradient', v)} placeholder="linear-gradient(135deg, #1e1e2f, #0f172a)" />
             
@@ -2191,8 +2270,21 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
                 <ControlInput label="Read Only" type="checkbox" value={(config as any).read_only_slider} onChange={(v) => updateConfig('read_only_slider', v)} />
                 <ControlInput label="Allow 0 for Lights" type="checkbox" value={(config as any).allow_light_slider_to_0} onChange={(v) => updateConfig('allow_light_slider_to_0', v)} />
                 <ControlInput label="Light Transition" type="checkbox" value={(config as any).light_transition} onChange={(v) => updateConfig('light_transition', v)} />
-                <ControlInput label="Show Slider Value" type="checkbox" value={(config as any).show_slider_value} onChange={(v) => updateConfig('show_slider_value', v)} />
+                <ControlInput label="Invert Value" type="checkbox" value={(config as any).invert_slider_value} onChange={(v) => updateConfig('invert_slider_value', v)} />
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <ControlInput label="Fill Orientation" type="select" value={(config as any).slider_fill_orientation || 'left'} onChange={(v) => updateConfig('slider_fill_orientation', v)} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'top', label: 'Top' }, { value: 'bottom', label: 'Bottom' }]} />
+                <ControlInput label="Value Position" type="select" value={(config as any).slider_value_position || 'right'} onChange={(v) => updateConfig('slider_value_position', v)} options={[{ value: 'right', label: 'Right' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'hidden', label: 'Hidden' }]} />
+              </div>
+              <ControlInput label="Light Slider Type" type="select" value={(config as any).light_slider_type || 'brightness'} onChange={(v) => updateConfig('light_slider_type', v)} options={[{ value: 'brightness', label: 'Brightness' }, { value: 'hue', label: 'Hue' }, { value: 'saturation', label: 'Saturation' }, { value: 'white_temp', label: 'White Temperature' }]} hint="Light entities only" />
+              {(config as any).light_slider_type === 'hue' && (
+                <>
+                  <ControlInput label="Force Saturation" type="checkbox" value={(config as any).hue_force_saturation} onChange={(v) => updateConfig('hue_force_saturation', v)} />
+                  {(config as any).hue_force_saturation && (
+                    <ControlInput label="Force Saturation Value" type="range" value={(config as any).hue_force_saturation_value ?? 100} onChange={(v) => updateConfig('hue_force_saturation_value', v)} min={0} max={100} step={1} />
+                  )}
+                </>
+              )}
               {(config as any).light_transition && (
                 <ControlInput label="Transition Time (ms)" type="range" value={(config as any).light_transition_time || 500} onChange={(v) => updateConfig('light_transition_time', v)} min={0} max={2000} step={100} />
               )}
@@ -2212,6 +2304,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 
@@ -2263,6 +2361,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 
@@ -2305,9 +2409,21 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
             <ControlInput label="Close by Clicking Outside" type="checkbox" value={(config as any).close_by_clicking_outside !== false} onChange={(v) => updateConfig('close_by_clicking_outside', v)} />
             <ControlInput label="Show Header" type="checkbox" value={(config as any).show_header} onChange={(v) => updateConfig('show_header', v)} />
             <ControlInput label="Background Update" type="checkbox" value={(config as any).background_update} onChange={(v) => updateConfig('background_update', v)} />
+            <ControlInput label="Performance Mode" type="select" value={(config as any).performance_mode || 'default'} onChange={(v) => updateConfig('performance_mode', v)} options={[{ value: 'default', label: 'Default' }, { value: 'performance', label: 'Performance' }]} hint="Reduces visual effects on slower devices" />
+            <ControlInput label="Show Previous Button" type="checkbox" value={(config as any).show_previous_button} onChange={(v) => updateConfig('show_previous_button', v)} />
+            <ControlInput label="Show Close Button" type="checkbox" value={(config as any).show_close_button !== false} onChange={(v) => updateConfig('show_close_button', v)} />
+            <ControlInput label="Buttons Position" type="select" value={(config as any).buttons_position || 'right'} onChange={(v) => updateConfig('buttons_position', v)} options={[{ value: 'right', label: 'Right' }, { value: 'left', label: 'Left' }]} />
           </Section>
 
           <Section title="Appearance" icon={<Palette size={14} />} defaultOpen={false}>
+            <ControlInput label="Pop-up Style" type="select" value={(config as any).popup_style || 'bubble'} onChange={(v) => updateConfig('popup_style', v)} options={[{ value: 'bubble', label: 'Bubble' }, { value: 'classic', label: 'Classic' }]} />
+            <ControlInput label="Pop-up Mode" type="select" value={(config as any).popup_mode || 'default'} onChange={(v) => updateConfig('popup_mode', v)} options={[{ value: 'default', label: 'Default' }, { value: 'fit-content', label: 'Fit Content' }, { value: 'centered', label: 'Centered' }, { value: 'adaptive-dialog', label: 'Adaptive Dialog' }]} />
+            {((config as any).popup_mode === 'fit-content' || (config as any).popup_mode === 'adaptive-dialog') && (
+              <ControlInput label="Bottom Offset" type="checkbox" value={(config as any).with_bottom_offset} onChange={(v) => updateConfig('with_bottom_offset', v)} />
+            )}
+            {(config as any).popup_mode === 'centered' && (
+              <ControlInput label="Full Width on Mobile" type="checkbox" value={(config as any).full_width_on_mobile} onChange={(v) => updateConfig('full_width_on_mobile', v)} />
+            )}
             <ControlInput label="Width (Desktop)" type="text" value={(config as any).width_desktop || '540px'} onChange={(v) => updateConfig('width_desktop', v)} placeholder="540px" />
             <ControlInput label="Margin" type="text" value={(config as any).margin || '7px'} onChange={(v) => updateConfig('margin', v)} placeholder="7px" />
             <ControlInput label="Margin Top (Mobile)" type="text" value={(config as any).margin_top_mobile} onChange={(v) => updateConfig('margin_top_mobile', v)} placeholder="0px" />
@@ -2362,13 +2478,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           <Section title="Entity & Display" icon={<Blinds size={14} />} defaultOpen={true}>
             <ControlInput label="Entity (required)" type="text" value={(config as any).entity || ''} onChange={(v) => updateConfig('entity', v)} placeholder="cover.living_room_blinds" hint="Cover entity ID" />
             <ControlInput label="Name" type="text" value={(config as any).name || ''} onChange={(v) => updateConfig('name', v)} placeholder="Living Room Blinds" />
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
           </Section>
 
@@ -2396,6 +2505,8 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
             <ControlInput label="Stop Service" type="text" value={(config as any).stop_service} onChange={(v) => updateConfig('stop_service', v)} placeholder="cover.stop_cover" />
             <ControlInput label="Close Service" type="text" value={(config as any).close_service} onChange={(v) => updateConfig('close_service', v)} placeholder="cover.close_cover" />
           </Section>
+
+          <MainButtonsSection config={config as any} updateConfig={updateConfig} />
 
           <Section title="Visibility" icon={<Eye size={14} />} defaultOpen={false}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -2453,6 +2564,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 
@@ -2474,13 +2591,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <label className="text-xs text-gray-400 font-medium">Icon</label>
               <IconPicker value={(config as any).icon || ''} onChange={(v) => updateConfig('icon', v)} />
             </div>
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
             <ControlInput label="Cover Background" type="checkbox" value={(config as any).cover_background !== false} onChange={(v) => updateConfig('cover_background', v)} />
           </Section>
@@ -2508,6 +2618,8 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <ControlInput label="Hide Power" type="checkbox" value={(config as any).hide?.power_button} onChange={(v) => updateConfig('hide', { ...(config as any).hide, power_button: v })} />
             </div>
           </Section>
+
+          <MainButtonsSection config={config as any} updateConfig={updateConfig} />
 
           <Section title="Visibility" icon={<Eye size={14} />} defaultOpen={false}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -2553,6 +2665,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 
@@ -2574,13 +2692,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <label className="text-xs text-gray-400 font-medium">Icon</label>
               <IconPicker value={(config as any).icon || ''} onChange={(v) => updateConfig('icon', v)} />
             </div>
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
             <ControlInput label="State Color" type="checkbox" value={(config as any).state_color !== false} onChange={(v) => updateConfig('state_color', v)} />
           </Section>
@@ -2592,11 +2703,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <ControlInput label="Step" type="number" value={(config as any).step ?? 0.5} onChange={(v) => updateConfig('step', v)} step={0.5} />
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <ControlInput label="Dual Setpoint Mode" type="checkbox" value={(config as any).dual_setpoint} onChange={(v) => updateConfig('dual_setpoint', v)} />
               <ControlInput label="Hide Target Low" type="checkbox" value={(config as any).hide_target_temp_low} onChange={(v) => updateConfig('hide_target_temp_low', v)} />
               <ControlInput label="Hide Target High" type="checkbox" value={(config as any).hide_target_temp_high} onChange={(v) => updateConfig('hide_target_temp_high', v)} />
             </div>
           </Section>
+
+          <MainButtonsSection config={config as any} updateConfig={updateConfig} />
 
           <Section title="Visibility" icon={<Eye size={14} />} defaultOpen={false}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -2646,6 +2758,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 
@@ -2667,13 +2785,6 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
               <label className="text-xs text-gray-400 font-medium">Icon</label>
               <IconPicker value={(config as any).icon || ''} onChange={(v) => updateConfig('icon', v)} />
             </div>
-            <ControlInput
-              label="Entity Picture URL (optional)"
-              type="text"
-              value={(config as any).entity_picture || ''}
-              onChange={(v) => updateConfig('entity_picture', v)}
-              placeholder="https://example.com/image.jpg"
-            />
             <ControlInput label="Force Icon" type="checkbox" value={(config as any).force_icon} onChange={(v) => updateConfig('force_icon', v)} />
           </Section>
 
@@ -2726,6 +2837,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 
@@ -2750,6 +2867,7 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
             <ControlInput label="Event Limit" type="number" value={(config as any).limit ?? 5} onChange={(v) => updateConfig('limit', v)} min={1} max={20} hint="Maximum events to show" />
             <ControlInput label="Show End Time" type="checkbox" value={(config as any).show_end !== false} onChange={(v) => updateConfig('show_end', v)} />
             <ControlInput label="Show Progress" type="checkbox" value={(config as any).show_progress !== false} onChange={(v) => updateConfig('show_progress', v)} />
+            <ControlInput label="Show Started Events" type="checkbox" value={(config as any).show_started_events !== false} onChange={(v) => updateConfig('show_started_events', v)} />
             <ControlInput label="Scrolling Effect" type="checkbox" value={(config as any).scrolling_effect} onChange={(v) => updateConfig('scrolling_effect', v)} />
           </Section>
 
@@ -2807,6 +2925,12 @@ export function BubbleConfigPanel({ config, updateConfig, setConfig }: ConfigPan
           </Section>
 
           <Section title="Sub-buttons" icon={<Sparkles size={14} />} defaultOpen={false} badge={(config as any).sub_button?.length || undefined}>
+            {supportsFooterMode && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 mb-1 border-b border-gray-700">
+                <ControlInput label="Footer Mode" type="checkbox" value={(config as any).footer_mode} onChange={(v) => updateConfig('footer_mode', v)} />
+                <ControlInput label="Footer Full Width" type="checkbox" value={(config as any).footer_full_width} onChange={(v) => updateConfig('footer_full_width', v)} />
+              </div>
+            )}
             <SubButtonEditor subButtons={(config as any).sub_button || []} onChange={(subs) => updateConfig('sub_button', subs)} />
           </Section>
 

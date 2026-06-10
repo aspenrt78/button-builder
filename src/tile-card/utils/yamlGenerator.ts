@@ -100,7 +100,18 @@ export function generateTileCardYaml(config: TileCardConfig): string {
   if (config.features_position && config.features_position !== DEFAULT_TILE_CONFIG.features_position) {
     lines.push(`features_position: ${config.features_position}`);
   }
-  
+
+  // Grid options (sections-view sizing)
+  if (config.grid_options && (config.grid_options.rows !== undefined || config.grid_options.columns !== undefined)) {
+    lines.push('grid_options:');
+    if (config.grid_options.rows !== undefined) {
+      lines.push(`  rows: ${config.grid_options.rows}`);
+    }
+    if (config.grid_options.columns !== undefined) {
+      lines.push(`  columns: ${config.grid_options.columns}`);
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -109,41 +120,73 @@ export function generateTileCardYaml(config: TileCardConfig): string {
  */
 function generateActionYaml(actionName: string, action: TileAction): string[] {
   const lines: string[] = [];
-  
+
   lines.push(`${actionName}:`);
   lines.push(`  action: ${action.action}`);
-  
+
   if (action.navigation_path) {
     lines.push(`  navigation_path: ${action.navigation_path}`);
   }
-  
+
+  if (action.navigation_replace) {
+    lines.push(`  navigation_replace: ${action.navigation_replace}`);
+  }
+
   if (action.url_path) {
     lines.push(`  url_path: ${action.url_path}`);
   }
-  
-  if (action.service) {
-    lines.push(`  service: ${action.service}`);
+
+  if (action.perform_action) {
+    lines.push(`  perform_action: ${action.perform_action}`);
   }
-  
+
+  if (action.pipeline_id) {
+    lines.push(`  pipeline_id: ${action.pipeline_id}`);
+  }
+
+  if (action.start_listening) {
+    lines.push(`  start_listening: ${action.start_listening}`);
+  }
+
   if (action.data) {
     lines.push('  data:');
     Object.entries(action.data).forEach(([key, value]) => {
       lines.push(`    ${key}: ${JSON.stringify(value)}`);
     });
   }
-  
+
   if (action.target) {
-    lines.push('  target:');
-    if (action.target.entity_id) {
-      if (Array.isArray(action.target.entity_id)) {
-        lines.push('    entity_id:');
-        action.target.entity_id.forEach(id => lines.push(`      - ${id}`));
+    const targetLines: string[] = [];
+    (['entity_id', 'device_id', 'area_id'] as const).forEach(key => {
+      const value = action.target?.[key];
+      if (!value) return;
+      if (Array.isArray(value)) {
+        if (value.length === 0) return;
+        if (value.length === 1) {
+          targetLines.push(`    ${key}: ${value[0]}`);
+        } else {
+          targetLines.push(`    ${key}:`);
+          value.forEach(id => targetLines.push(`      - ${id}`));
+        }
       } else {
-        lines.push(`    entity_id: ${action.target.entity_id}`);
+        targetLines.push(`    ${key}: ${value}`);
       }
+    });
+    if (targetLines.length > 0) {
+      lines.push('  target:');
+      lines.push(...targetLines);
     }
   }
-  
+
+  if (action.confirmation) {
+    if (typeof action.confirmation === 'object' && action.confirmation.text) {
+      lines.push('  confirmation:');
+      lines.push(`    text: ${action.confirmation.text}`);
+    } else {
+      lines.push('  confirmation: true');
+    }
+  }
+
   return lines;
 }
 
@@ -185,6 +228,22 @@ function generateFeatureYaml(feature: TileFeature): string[] {
       if (feature.preset_modes) {
         lines.push('    preset_modes:');
         feature.preset_modes.forEach(mode => lines.push(`      - ${mode}`));
+      }
+      break;
+
+    case 'climate-swing-modes':
+      if (feature.style) lines.push(`    style: ${feature.style}`);
+      if (feature.swing_modes && feature.swing_modes.length > 0) {
+        lines.push('    swing_modes:');
+        feature.swing_modes.forEach(mode => lines.push(`      - ${mode}`));
+      }
+      break;
+
+    case 'climate-swing-horizontal-modes':
+      if (feature.style) lines.push(`    style: ${feature.style}`);
+      if (feature.swing_horizontal_modes && feature.swing_horizontal_modes.length > 0) {
+        lines.push('    swing_horizontal_modes:');
+        feature.swing_horizontal_modes.forEach(mode => lines.push(`      - ${mode}`));
       }
       break;
       
@@ -234,6 +293,13 @@ function generateFeatureYaml(feature: TileFeature): string[] {
         });
       }
       break;
+
+    case 'select-options':
+      if (feature.options && feature.options.length > 0) {
+        lines.push('    options:');
+        feature.options.forEach(option => lines.push(`      - ${option}`));
+      }
+      break;
       
     case 'numeric-input':
       if (feature.style) lines.push(`    style: ${feature.style}`);
@@ -260,10 +326,48 @@ function generateFeatureYaml(feature: TileFeature): string[] {
       if (feature.detail !== undefined) lines.push(`    detail: ${feature.detail}`);
       break;
       
+    case 'media-player-playback':
+      if (feature.controls && feature.controls.length > 0) {
+        lines.push('    controls:');
+        feature.controls.forEach(control => lines.push(`      - ${control}`));
+      }
+      break;
+
+    case 'media-player-volume-slider':
+      if (feature.show_mute_button !== undefined) lines.push(`    show_mute_button: ${feature.show_mute_button}`);
+      break;
+
     case 'media-player-volume-buttons':
       if (feature.step) lines.push(`    step: ${feature.step}`);
+      if (feature.show_mute_button !== undefined) lines.push(`    show_mute_button: ${feature.show_mute_button}`);
       break;
-      
+
+    case 'media-player-sound-mode':
+      if (feature.sound_modes && feature.sound_modes.length > 0) {
+        lines.push('    sound_modes:');
+        feature.sound_modes.forEach(mode => lines.push(`      - ${mode}`));
+      }
+      break;
+
+    case 'media-player-source':
+      if (feature.sources && feature.sources.length > 0) {
+        lines.push('    sources:');
+        feature.sources.forEach(source => lines.push(`      - ${source}`));
+      }
+      break;
+
+    case 'temperature-forecast':
+    case 'precipitation-forecast':
+      if (feature.forecast_type) lines.push(`    forecast_type: ${feature.forecast_type}`);
+      if (feature.type === 'precipitation-forecast' && feature.precipitation_type) {
+        lines.push(`    precipitation_type: ${feature.precipitation_type}`);
+      }
+      if (feature.days_to_show !== undefined) lines.push(`    days_to_show: ${feature.days_to_show}`);
+      if (feature.hours_to_show !== undefined) lines.push(`    hours_to_show: ${feature.hours_to_show}`);
+      if (feature.color) lines.push(`    color: ${feature.color}`);
+      if (feature.show_labels !== undefined) lines.push(`    show_labels: ${feature.show_labels}`);
+      break;
+
     case 'area-controls':
       if (feature.controls) {
         lines.push('    controls:');

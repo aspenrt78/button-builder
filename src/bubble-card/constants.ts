@@ -26,16 +26,34 @@ export const DEFAULT_SUB_BUTTON: BubbleSubButton = {
   entity: '',
   name: '',
   icon: '',
+  sub_button_type: 'default',
+  select_attribute: '',
   show_background: true,
   state_background: true,
+  light_background: false,
   show_state: false,
   show_name: false,
   show_icon: true,
+  force_icon: false,
   show_last_changed: false,
   show_last_updated: false,
   show_attribute: false,
   attribute: '',
+  scrolling_effect: true,
+  content_layout: 'icon-left',
+  hide_when_parent_unavailable: false,
   show_arrow: true,
+
+  // Slider sub-button options
+  min_value: 0,
+  max_value: 100,
+  step: 1,
+  tap_to_slide: false,
+  read_only_slider: false,
+  slider_live_update: false,
+  slider_fill_orientation: 'left',
+  slider_value_position: 'right',
+  invert_slider_value: false,
 };
 
 // ============================================
@@ -63,8 +81,6 @@ export const DEFAULT_BUBBLE_BUTTON_CONFIG: BubbleButtonConfig = {
   badge_text: '',
   badge_color: '',
   footer_text: '',
-  ripple_effect: false,
-  show_slider_value: false,
   icon_size: 24,
   name_weight: 'medium',
   glow_effect: '',
@@ -93,8 +109,10 @@ export const DEFAULT_BUBBLE_BUTTON_CONFIG: BubbleButtonConfig = {
   
   // Sub-buttons
   sub_button: [],
+  footer_mode: false,
+  footer_full_width: false,
   modules: [],
-  
+
   // Slider options
   min_value: 0,
   max_value: 100,
@@ -103,6 +121,12 @@ export const DEFAULT_BUBBLE_BUTTON_CONFIG: BubbleButtonConfig = {
   relative_slide: false,
   read_only_slider: false,
   slider_live_update: false,
+  slider_fill_orientation: 'left',
+  slider_value_position: 'right',
+  invert_slider_value: false,
+  light_slider_type: 'brightness',
+  hue_force_saturation: false,
+  hue_force_saturation_value: 100,
   allow_light_slider_to_0: false,
   light_transition: false,
   light_transition_time: 500,

@@ -10,10 +10,13 @@ import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateAppearanceConfig, 
 import { generateYaml } from './utils/yamlGenerator';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, Save, Trash2, AlertTriangle, Pencil } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, AlertTriangle } from 'lucide-react';
 import { hasOnOffState } from './utils/entityCapabilities';
 import { checkButtonBuilderEnvironment, ButtonBuilderEnvironmentReport } from './services/dashboardService';
 import { APP_VERSION_LABEL } from './version';
+import { cloneSnapshot, useToast, Toast, useResetConfirm, SaveRecordMetadata } from './shared/libraryUtils';
+import { SaveRecordModal } from './shared/SaveRecordModal';
+import { LibraryModal } from './shared/LibraryModal';
 
 export type PresetCondition = 'always' | 'on' | 'off';
 
@@ -30,8 +33,6 @@ const STORAGE_KEY = 'button-builder-config';
 const CUSTOM_PRESETS_STORAGE_KEY = 'button-builder-custom-presets';
 const SAVED_BUTTONS_STORAGE_KEY = 'button-builder-saved-buttons';
 
-const cloneSnapshot = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
-
 const deriveButtonName = (config: ButtonConfig, fallbackIndex?: number): string => {
   const fromName = config.name.trim();
   if (fromName) return fromName;
@@ -40,23 +41,10 @@ const deriveButtonName = (config: ButtonConfig, fallbackIndex?: number): string 
   return `Button ${fallbackIndex ?? 1}`;
 };
 
-interface SaveButtonMetadata {
-  name: string;
-  folder: string;
-  tags: string[];
-}
-
 type SaveModalState =
-  | { mode: 'current' }
-  | { mode: 'queued'; buttonId: string }
+  | { mode: 'current'; initialName: string; initialFolder: string; initialTags: string }
+  | { mode: 'queued'; buttonId: string; initialName: string; initialFolder: string; initialTags: string }
   | null;
-
-const parseTagInput = (raw: string): string[] =>
-  raw
-    .split(',')
-    .map(tag => tag.trim())
-    .filter(Boolean)
-    .filter((tag, index, all) => all.findIndex(item => item.toLowerCase() === tag.toLowerCase()) === index);
 
 const loadSavedConfig = (): ButtonConfig => {
   try {
@@ -157,21 +145,14 @@ export const ButtonCardApp: React.FC = () => {
   const [savedButtons, setSavedButtons] = useState<SavedButtonRecord[]>(loadSavedButtons);
   const [queuedButtons, setQueuedButtons] = useState<SavedButtonRecord[]>([]);
   const [showButtonLibrary, setShowButtonLibrary] = useState(false);
-  const [folderFilter, setFolderFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState('');
   const [environmentReport, setEnvironmentReport] = useState<ButtonBuilderEnvironmentReport | null>(null);
   const [showRequirementsPrompt, setShowRequirementsPrompt] = useState(false);
   const [saveModalState, setSaveModalState] = useState<SaveModalState>(null);
-  const [saveNameInput, setSaveNameInput] = useState('');
-  const [saveFolderInput, setSaveFolderInput] = useState('');
-  const [saveTagsInput, setSaveTagsInput] = useState('');
-  const [editingSavedButtonId, setEditingSavedButtonId] = useState<string | null>(null);
-  const [editingNameInput, setEditingNameInput] = useState('');
-  const [editingFolderInput, setEditingFolderInput] = useState('');
-  const [editingTagsInput, setEditingTagsInput] = useState('');
   const [useAutoDarkMode, setUseAutoDarkMode] = useState<boolean>(true);
   const [onStateAppearance, setOnStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
   const [offStateAppearance, setOffStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
+  const { toastMessage, showToast } = useToast();
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   const [historyPast, setHistoryPast] = useState<ButtonConfig[]>([]);
   const [historyFuture, setHistoryFuture] = useState<ButtonConfig[]>([]);
@@ -184,8 +165,18 @@ export const ButtonCardApp: React.FC = () => {
   const canRedo = historyFuture.length > 0;
   const availablePresets = useMemo(() => [...PRESETS, ...customPresets], [customPresets]);
 
-  const handleUndo = useCallback(() => {
+  // Mutable refs holding the latest undo/redo logic so that useCallback can
+  // use empty deps (stable references) and the keyboard listener is only
+  // registered once, even as historyPast / historyFuture / config change.
+  const undoImplRef = useRef<() => void>(() => {});
+  const redoImplRef = useRef<() => void>(() => {});
+
+  undoImplRef.current = () => {
     if (historyPast.length === 0) return;
+    if (historyDebounceRef.current) {
+      clearTimeout(historyDebounceRef.current);
+      historyDebounceRef.current = null;
+    }
     isUndoRedoRef.current = true;
     const previous = historyPast[historyPast.length - 1];
     setHistoryPast(prev => prev.slice(0, -1));
@@ -193,10 +184,14 @@ export const ButtonCardApp: React.FC = () => {
     setConfigInternal(previous);
     lastSavedConfigRef.current = previous;
     setTimeout(() => { isUndoRedoRef.current = false; }, 0);
-  }, [historyPast, config]);
+  };
 
-  const handleRedo = useCallback(() => {
+  redoImplRef.current = () => {
     if (historyFuture.length === 0) return;
+    if (historyDebounceRef.current) {
+      clearTimeout(historyDebounceRef.current);
+      historyDebounceRef.current = null;
+    }
     isUndoRedoRef.current = true;
     const next = historyFuture[0];
     setHistoryFuture(prev => prev.slice(1));
@@ -204,8 +199,12 @@ export const ButtonCardApp: React.FC = () => {
     setConfigInternal(next);
     lastSavedConfigRef.current = next;
     setTimeout(() => { isUndoRedoRef.current = false; }, 0);
-  }, [historyFuture, config]);
+  };
 
+  const handleUndo = useCallback(() => undoImplRef.current(), []);
+  const handleRedo = useCallback(() => redoImplRef.current(), []);
+
+  // Keyboard listener registered once — stable because handleUndo/handleRedo never change.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -221,6 +220,24 @@ export const ButtonCardApp: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo]);
+
+  // Clear any pending timers when the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+    };
+  }, []);
+
+  // Warn before closing if there are unsaved session-queue items.
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (queuedButtons.length > 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [queuedButtons.length]);
 
   const isApplyingPresetRef = useRef(false);
 
@@ -262,12 +279,17 @@ export const ButtonCardApp: React.FC = () => {
     });
   };
 
+  // Debounced autosave — avoids a synchronous localStorage write on every keypress.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    } catch (e) {
-      console.warn('Failed to save config:', e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        setLastSavedAt(Date.now());
+      } catch (e) {
+        console.warn('Failed to save config:', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
   }, [config]);
 
   useEffect(() => {
@@ -286,6 +308,7 @@ export const ButtonCardApp: React.FC = () => {
     }
   }, [savedButtons]);
 
+  // Only re-check when the entity changes, not on every config keypress.
   useEffect(() => {
     let cancelled = false;
     const timeout = setTimeout(() => {
@@ -306,7 +329,8 @@ export const ButtonCardApp: React.FC = () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [config]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.entity]);
 
   const configWithPresetConditions = useMemo(() => {
     const supportsBinaryPresetConditions = hasOnOffState(config.entity);
@@ -355,7 +379,7 @@ export const ButtonCardApp: React.FC = () => {
     }
 
     const mainStyle: StateStyleConfig = {
-      id: `preset-main-${Date.now()}`,
+      id: `preset-main-${presetCondition}`,
       operator: 'equals',
       value: presetCondition,
       name: '',
@@ -382,7 +406,7 @@ export const ButtonCardApp: React.FC = () => {
     if (secondaryPreset) {
       const oppositeState = presetCondition === 'on' ? 'off' : 'on';
       const secondaryStyle: StateStyleConfig = {
-        id: `preset-secondary-${Date.now()}`,
+        id: `preset-secondary-${oppositeState}`,
         operator: 'equals',
         value: oppositeState,
         name: '',
@@ -433,7 +457,7 @@ export const ButtonCardApp: React.FC = () => {
 
     const createStateStyle = (appearance: Partial<StateAppearanceConfig>, stateValue: 'on' | 'off'): StateStyleConfig => {
       return {
-        id: `state-appearance-${stateValue}-${Date.now()}`,
+        id: `state-appearance-${stateValue}`,
         operator: 'equals',
         value: stateValue,
         name: '',
@@ -496,7 +520,7 @@ export const ButtonCardApp: React.FC = () => {
 
   const yamlOutput = useMemo(() => generateYaml(finalConfig), [finalConfig]);
 
-  const createButtonRecord = (metadata?: Partial<SaveButtonMetadata>): SavedButtonRecord => {
+  const createButtonRecord = (metadata?: Partial<SaveRecordMetadata>): SavedButtonRecord => {
     const timestamp = Date.now();
     return {
       id: `button-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
@@ -529,10 +553,7 @@ export const ButtonCardApp: React.FC = () => {
 
   const handleSaveCurrentButton = (): boolean => {
     const suggestedName = deriveButtonName(config, savedButtons.length + 1);
-    setSaveNameInput(suggestedName);
-    setSaveFolderInput('');
-    setSaveTagsInput('');
-    setSaveModalState({ mode: 'current' });
+    setSaveModalState({ mode: 'current', initialName: suggestedName, initialFolder: '', initialTags: '' });
     return true;
   };
 
@@ -563,24 +584,17 @@ export const ButtonCardApp: React.FC = () => {
   const handleSaveQueuedButton = (buttonId: string) => {
     const queued = queuedButtons.find((button) => button.id === buttonId);
     if (!queued) return;
-    setSaveNameInput(queued.name);
-    setSaveFolderInput(queued.folder);
-    setSaveTagsInput(queued.tags.join(', '));
-    setSaveModalState({ mode: 'queued', buttonId });
+    setSaveModalState({
+      mode: 'queued',
+      buttonId,
+      initialName: queued.name,
+      initialFolder: queued.folder,
+      initialTags: queued.tags.join(', '),
+    });
   };
 
-  const handleConfirmSaveModal = () => {
+  const handleConfirmSaveModal = (metadata: SaveRecordMetadata) => {
     if (!saveModalState) {
-      return;
-    }
-
-    const metadata: SaveButtonMetadata = {
-      name: saveNameInput.trim(),
-      folder: saveFolderInput.trim(),
-      tags: parseTagInput(saveTagsInput),
-    };
-
-    if (!metadata.name) {
       return;
     }
 
@@ -608,83 +622,34 @@ export const ButtonCardApp: React.FC = () => {
     }
 
     setSaveModalState(null);
+    showToast(`"${metadata.name}" saved to library`);
   };
 
-  const handleStartEditSavedButton = (button: SavedButtonRecord) => {
-    setEditingSavedButtonId(button.id);
-    setEditingNameInput(button.name);
-    setEditingFolderInput(button.folder);
-    setEditingTagsInput(button.tags.join(', '));
-  };
-
-  const handleCancelEditSavedButton = () => {
-    setEditingSavedButtonId(null);
-    setEditingNameInput('');
-    setEditingFolderInput('');
-    setEditingTagsInput('');
-  };
-
-  const handleCommitEditSavedButton = (buttonId: string) => {
-    const nextName = editingNameInput.trim();
-    if (!nextName) {
-      return;
-    }
-
+  const handleCommitEditSavedButton = (buttonId: string, metadata: SaveRecordMetadata) => {
     setSavedButtons((prev) => prev.map((button) => (
       button.id === buttonId
         ? {
             ...button,
-            name: nextName,
-            folder: editingFolderInput.trim(),
-            tags: parseTagInput(editingTagsInput),
+            name: metadata.name,
+            folder: metadata.folder,
+            tags: metadata.tags,
             updatedAt: Date.now(),
           }
         : button
     )));
-    handleCancelEditSavedButton();
   };
 
-  const availableFolders = useMemo(() => {
-    const folders = Array.from(new Set(savedButtons.map(button => button.folder.trim()).filter(Boolean)));
-    return folders.sort((a, b) => a.localeCompare(b));
-  }, [savedButtons]);
-
-  const filteredSavedButtons = useMemo(() => {
-    const normalizedTagFilter = tagFilter.trim().toLowerCase();
-    return savedButtons.filter((button) => {
-      const matchesFolder = folderFilter === 'all' || button.folder === folderFilter;
-      const matchesTag = !normalizedTagFilter || button.tags.some(tag => tag.toLowerCase().includes(normalizedTagFilter));
-      return matchesFolder && matchesTag;
-    });
-  }, [folderFilter, savedButtons, tagFilter]);
-
-  const groupedSavedButtons = useMemo(() => {
-    const groups = new Map<string, SavedButtonRecord[]>();
-    filteredSavedButtons.forEach((button) => {
-      const folder = button.folder.trim() || 'Unfiled';
-      const existing = groups.get(folder) || [];
-      existing.push(button);
-      groups.set(folder, existing);
-    });
-
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([folder, buttons]) => ({ folder, buttons }));
-  }, [filteredSavedButtons]);
-
-  const handleReset = () => {
-    if (confirm('Reset all settings to defaults?')) {
-      setConfig(DEFAULT_CONFIG);
-      setActivePreset(null);
-      setPresetCondition('always');
-      setOffStatePreset(null);
-      setOnStatePreset(null);
-      setUseAutoDarkMode(true);
-      setOnStateAppearance({});
-      setOffStateAppearance({});
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  };
+  const { resetConfirmPending, handleReset } = useResetConfirm(() => {
+    setConfig(DEFAULT_CONFIG);
+    setActivePreset(null);
+    setPresetCondition('always');
+    setOffStatePreset(null);
+    setOnStatePreset(null);
+    setUseAutoDarkMode(true);
+    setOnStateAppearance({});
+    setOffStateAppearance({});
+    localStorage.removeItem(STORAGE_KEY);
+  });
 
   const handleApplyPreset = (preset: Preset, forState?: 'on' | 'off') => {
     const supportsBinaryPresetConditions = hasOnOffState(config.entity);
@@ -810,6 +775,11 @@ export const ButtonCardApp: React.FC = () => {
             <span className="px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400">
               {APP_VERSION_LABEL}
             </span>
+            {lastSavedAt && (
+              <span className="hidden md:inline text-[10px] text-gray-600 tabular-nums">
+                Saved {new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            )}
           </div>
         </div>
 
@@ -840,9 +810,9 @@ export const ButtonCardApp: React.FC = () => {
             <Upload size={14} />
             Import
           </button>
-          <button onClick={handleReset} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Reset to defaults">
+          <button onClick={handleReset} className={`flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm font-medium transition-all ${resetConfirmPending ? 'bg-red-600 border-red-500 text-white hover:bg-red-500' : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'}`} title={resetConfirmPending ? 'Click again to confirm reset' : 'Reset to defaults'}>
             <RotateCcw size={14} />
-            Reset
+            {resetConfirmPending ? 'Confirm Reset?' : 'Reset'}
           </button>
           <button onClick={() => setIsMagicOpen(true)} className="flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-medium transition-all group">
             <Wand2 size={14} className="group-hover:rotate-12 transition-transform" />
@@ -865,6 +835,16 @@ export const ButtonCardApp: React.FC = () => {
             <Upload size={18} className="text-blue-400" />
             <span>Import YAML</span>
           </button>
+          <div className="flex gap-2">
+            <button onClick={() => { handleUndo(); setMobileMenuOpen(false); }} disabled={!canUndo} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              <Undo2 size={18} className="text-gray-400" />
+              <span className="text-sm">Undo</span>
+            </button>
+            <button onClick={() => { handleRedo(); setMobileMenuOpen(false); }} disabled={!canRedo} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              <Redo2 size={18} className="text-gray-400" />
+              <span className="text-sm">Redo</span>
+            </button>
+          </div>
           <button onClick={() => { setShowRequirementsPrompt(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
             <AlertTriangle size={18} className="text-amber-400" />
             <span>Check Setup</span>
@@ -873,9 +853,9 @@ export const ButtonCardApp: React.FC = () => {
             <FolderOpen size={18} className="text-emerald-400" />
             <span>Button Library</span>
           </button>
-          <button onClick={() => { handleReset(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
-            <RotateCcw size={18} className="text-gray-400" />
-            <span>Reset to Defaults</span>
+          <button onClick={() => { handleReset(); if (resetConfirmPending) setMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left ${resetConfirmPending ? 'bg-red-700' : 'bg-gray-800'}`}>
+            <RotateCcw size={18} className={resetConfirmPending ? 'text-white' : 'text-gray-400'} />
+            <span>{resetConfirmPending ? 'Confirm Reset?' : 'Reset to Defaults'}</span>
           </button>
         </div>
       )}
@@ -1048,170 +1028,29 @@ export const ButtonCardApp: React.FC = () => {
       )}
 
       {showButtonLibrary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-gray-900 w-full max-w-4xl rounded-xl border border-gray-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FolderOpen size={20} className="text-emerald-400" />
-                Button Library
-              </h3>
-              <button onClick={() => setShowButtonLibrary(false)} className="text-gray-400 hover:text-white">
-                ×
-              </button>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6 p-6 overflow-y-auto">
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Session Queue</h4>
-                  {queuedButtons.length > 0 && (
-                    <button onClick={() => setQueuedButtons([])} className="text-xs text-gray-400 hover:text-white">
-                      Clear Queue
-                    </button>
-                  )}
-                </div>
-                {queuedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    Queue buttons from the YAML panel to export a batch in one go.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {queuedButtons.map((button) => (
-                      <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
-                        <div>
-                          <div className="text-sm font-medium text-white">{button.name}</div>
-                          <div className="text-xs text-gray-500">Queued for this session</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded">Load</button>
-                          <button onClick={() => handleSaveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded"><Save size={12} /> Save</button>
-                          <button onClick={() => handleRemoveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Remove</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Saved Buttons</h4>
-                  <div className="text-xs text-gray-500">Stored in browser</div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
-                    <option value="all">All folders</option>
-                    {availableFolders.map((folder) => (
-                      <option key={folder} value={folder}>{folder}</option>
-                    ))}
-                  </select>
-                  <input type="text" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Filter by tag" className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                </div>
-                {savedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    Save buttons to revisit and export them later.
-                  </div>
-                ) : filteredSavedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    No saved buttons match the current folder/tag filters.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groupedSavedButtons.map(({ folder, buttons }) => (
-                      <div key={folder} className="space-y-3">
-                        <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950/90 px-3 py-2 backdrop-blur-sm">
-                          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-300">{folder}</div>
-                          <div className="text-[11px] text-gray-500">{buttons.length} saved</div>
-                        </div>
-                        {buttons.map((button) => {
-                          const isEditing = editingSavedButtonId === button.id;
-                          return (
-                            <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
-                              {isEditing ? (
-                                <div className="space-y-3">
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <input type="text" value={editingNameInput} onChange={(e) => setEditingNameInput(e.target.value)} placeholder="Button name" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                    <input type="text" value={editingFolderInput} onChange={(e) => setEditingFolderInput(e.target.value)} placeholder="Folder" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                  </div>
-                                  <input type="text" value={editingTagsInput} onChange={(e) => setEditingTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                  <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleCommitEditSavedButton(button.id)} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded">Save Details</button>
-                                    <button onClick={handleCancelEditSavedButton} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded">Cancel</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <div>
-                                    <div className="text-sm font-medium text-white">{button.name}</div>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                      {button.folder && (
-                                        <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-[10px] text-blue-300 uppercase tracking-wide">
-                                          {button.folder}
-                                        </span>
-                                      )}
-                                      {button.tags.map((tag) => (
-                                        <span key={tag} className="px-2 py-0.5 rounded-full bg-gray-700 text-[10px] text-gray-200">
-                                          #{tag}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <div className="text-xs text-gray-500">Updated {new Date(button.updatedAt).toLocaleString()}</div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded">Load</button>
-                                    <button onClick={() => handleStartEditSavedButton(button)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Pencil size={12} /> Edit</button>
-                                    <button onClick={() => handleDeleteSavedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Delete</button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          </div>
-        </div>
+        <LibraryModal
+          queuedRecords={queuedButtons}
+          savedRecords={savedButtons}
+          exportFilenamePrefix="button-card"
+          onClose={() => setShowButtonLibrary(false)}
+          onLoad={handleLoadButtonRecord}
+          onSaveQueued={handleSaveQueuedButton}
+          onRemoveQueued={handleRemoveQueuedButton}
+          onClearQueue={() => setQueuedButtons([])}
+          onDelete={handleDeleteSavedButton}
+          onCommitEdit={handleCommitEditSavedButton}
+        />
       )}
 
       {saveModalState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Save size={20} className="text-emerald-400" />
-                Save Button
-              </h3>
-              <button onClick={() => setSaveModalState(null)} className="text-gray-400 hover:text-white">
-                ×
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-300">
-                Save this button with a name, optional folder, and tags so it is easy to find later.
-              </p>
-              <div className="space-y-3">
-                <input type="text" value={saveNameInput} onChange={(e) => setSaveNameInput(e.target.value)} placeholder="Button name" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
-                <input type="text" value={saveFolderInput} onChange={(e) => setSaveFolderInput(e.target.value)} placeholder="Folder (optional)" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
-                <input type="text" value={saveTagsInput} onChange={(e) => setSaveTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
-              </div>
-            </div>
-
-            <div className="p-6 bg-gray-800/50 flex justify-end gap-3">
-              <button onClick={() => setSaveModalState(null)} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
-                Cancel
-              </button>
-              <button onClick={handleConfirmSaveModal} disabled={!saveNameInput.trim()} className="inline-flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                <Save size={16} />
-                Save Button
-              </button>
-            </div>
-          </div>
-        </div>
+        <SaveRecordModal
+          initialName={saveModalState.initialName}
+          initialFolder={saveModalState.initialFolder}
+          initialTags={saveModalState.initialTags}
+          existingNames={savedButtons.map((button) => button.name)}
+          onConfirm={handleConfirmSaveModal}
+          onClose={() => setSaveModalState(null)}
+        />
       )}
 
       {isImportOpen && (
@@ -1253,6 +1092,8 @@ export const ButtonCardApp: React.FC = () => {
           </div>
         </div>
       )}
+
+      <Toast message={toastMessage} />
     </div>
   );
 };

@@ -7,9 +7,10 @@ export interface ButtonStyle {
 
 export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat' | 'flip' | 'wobble' | 'breathe' | 'ripple';
 export type AnimationTrigger = 'always' | 'on' | 'off';
-export type ActionType = 'none' | 'toggle' | 'more-info' | 'call-service' | 'perform-action' | 'navigate' | 'url' | 'assist' | 'fire-dom-event' | 'javascript' | 'multi-actions' | 'toast';
+export type ActionType = 'none' | 'toggle' | 'more-info' | 'call-service' | 'perform-action' | 'navigate' | 'url' | 'assist' | 'fire-dom-event' | 'javascript';
 export type LockUnlockType = 'tap' | 'hold' | 'double_tap';
-export type StateOperator = 'equals' | 'not_equals' | 'above' | 'below' | 'regex' | 'template' | 'default';
+export type StateOperator = 'equals' | 'not_equals' | 'above' | 'above_equal' | 'below' | 'below_equal' | 'regex' | 'template' | 'default';
+export type TooltipPlacement = 'top' | 'top-start' | 'top-end' | 'right' | 'right-start' | 'right-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end';
 
 export interface CustomField {
   name: string;
@@ -56,10 +57,13 @@ export interface ProtectConfig {
 export interface TooltipConfig {
   enabled: boolean;
   content: string;
-  position: 'top' | 'bottom' | 'left' | 'right';
+  position: TooltipPlacement;
+  delay: number;
+  hideDelay: number;
 }
 
 export interface ToastConfig {
+  enabled: boolean;
   message: string;
   duration: number;
   dismissable: boolean;
@@ -259,6 +263,7 @@ export interface ButtonConfig {
   // Styles
   colorType: 'card' | 'icon' | 'blank-card' | 'label-card';
   colorAuto: boolean;
+  colorAutoNoTemperature: boolean;
   backgroundColor: string;
   backgroundColorOpacity: number;
   color: string;
@@ -322,22 +327,40 @@ export interface ButtonConfig {
   tapAction: ActionType;
   tapActionData: string;
   tapActionNavigation: string;
+  tapActionNavigationReplace: boolean;
   tapActionJavascript: string;
   tapActionToast: ToastConfig;
-  
+  tapActionConfirmation: boolean;
+  tapActionConfirmationText: string;
+  tapActionEntity: string;
+  tapActionPipelineId: string;
+  tapActionStartListening: boolean;
+
   holdAction: ActionType;
   holdActionData: string;
   holdActionNavigation: string;
+  holdActionNavigationReplace: boolean;
   holdActionJavascript: string;
   holdActionRepeat: number;
   holdActionRepeatLimit: number;
   holdActionToast: ToastConfig;
-  
+  holdActionConfirmation: boolean;
+  holdActionConfirmationText: string;
+  holdActionEntity: string;
+  holdActionPipelineId: string;
+  holdActionStartListening: boolean;
+
   doubleTapAction: ActionType;
   doubleTapActionData: string;
   doubleTapActionNavigation: string;
+  doubleTapActionNavigationReplace: boolean;
   doubleTapActionJavascript: string;
   doubleTapActionToast: ToastConfig;
+  doubleTapActionConfirmation: boolean;
+  doubleTapActionConfirmationText: string;
+  doubleTapActionEntity: string;
+  doubleTapActionPipelineId: string;
+  doubleTapActionStartListening: boolean;
   
   // Momentary Actions (press/release)
   pressAction: ActionType;
@@ -424,31 +447,28 @@ export interface ButtonConfig {
   tooltipStyles: string;
   
   // Advanced Trigger Options
-  triggerEntity: string;
-  triggersUpdate: string[];
-  
+  // (trigger_entity / triggers_update removed — not valid button-card options)
+
   // Live Stream
   liveStreamFitMode: string;
-  
-  // Timing
-  holdTime: number;
-  
+
   // Haptic
   hapticFeedback: string;
   
   // Spinner Template
   spinnerTemplate: string;
-  
-  // Conditional Display
+
+  // Conditional Display (card-level conditions)
   conditionalEntity: string;
   conditionalState: string;
-  conditionalOperator: string;
-  
+  conditionalOperator: StateOperator;
+
   // Threshold-based Color Alerts
   thresholdColor: ThresholdColorConfig;
 }
 
 export const DEFAULT_TOAST_CONFIG: ToastConfig = {
+  enabled: false,
   message: '',
   duration: 3000,
   dismissable: true,
@@ -476,6 +496,8 @@ export const DEFAULT_TOOLTIP_CONFIG: TooltipConfig = {
   enabled: false,
   content: '',
   position: 'top',
+  delay: 0,
+  hideDelay: 0,
 };
 
 export interface SavedButtonRecord {
@@ -543,6 +565,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   
   colorType: 'card',
   colorAuto: false,
+  colorAutoNoTemperature: false,
   backgroundColor: '#1c1c1c',
   backgroundColorOpacity: 100,
   color: '#ffffff',
@@ -601,22 +624,40 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   tapAction: 'toggle',
   tapActionData: '',
   tapActionNavigation: '',
+  tapActionNavigationReplace: false,
   tapActionJavascript: '',
   tapActionToast: { ...DEFAULT_TOAST_CONFIG },
-  
+  tapActionConfirmation: false,
+  tapActionConfirmationText: '',
+  tapActionEntity: '',
+  tapActionPipelineId: '',
+  tapActionStartListening: false,
+
   holdAction: 'more-info',
   holdActionData: '',
   holdActionNavigation: '',
+  holdActionNavigationReplace: false,
   holdActionJavascript: '',
   holdActionRepeat: 0,
   holdActionRepeatLimit: 0,
   holdActionToast: { ...DEFAULT_TOAST_CONFIG },
-  
+  holdActionConfirmation: false,
+  holdActionConfirmationText: '',
+  holdActionEntity: '',
+  holdActionPipelineId: '',
+  holdActionStartListening: false,
+
   doubleTapAction: 'none',
   doubleTapActionData: '',
   doubleTapActionNavigation: '',
+  doubleTapActionNavigationReplace: false,
   doubleTapActionJavascript: '',
   doubleTapActionToast: { ...DEFAULT_TOAST_CONFIG },
+  doubleTapActionConfirmation: false,
+  doubleTapActionConfirmationText: '',
+  doubleTapActionEntity: '',
+  doubleTapActionPipelineId: '',
+  doubleTapActionStartListening: false,
   
   // Momentary Actions
   pressAction: 'none',
@@ -693,27 +734,20 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   lockStyles: '',
   tooltipStyles: '',
   
-  // Advanced Trigger Options
-  triggerEntity: '',
-  triggersUpdate: [],
-  
   // Live Stream
   liveStreamFitMode: '',
-  
-  // Timing
-  holdTime: 500,
-  
+
   // Haptic
   hapticFeedback: '',
-  
+
   // Spinner Template
   spinnerTemplate: '',
-  
+
   // Conditional Display
   conditionalEntity: '',
   conditionalState: '',
-  conditionalOperator: 'equals',
-  
+  conditionalOperator: 'equals' as StateOperator,
+
   // Threshold-based Color Alerts
   thresholdColor: { ...DEFAULT_THRESHOLD_CONFIG },
 };

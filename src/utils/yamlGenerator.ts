@@ -115,8 +115,14 @@ const buildStateConditionTemplate = (stateStyle: StateStyleConfig, cardEntityId:
     case 'above':
       comparisonExpr = `Number.parseFloat(String(val)) > Number.parseFloat('${escapedValue}')`;
       break;
+    case 'above_equal':
+      comparisonExpr = `Number.parseFloat(String(val)) >= Number.parseFloat('${escapedValue}')`;
+      break;
     case 'below':
       comparisonExpr = `Number.parseFloat(String(val)) < Number.parseFloat('${escapedValue}')`;
+      break;
+    case 'below_equal':
+      comparisonExpr = `Number.parseFloat(String(val)) <= Number.parseFloat('${escapedValue}')`;
       break;
     case 'regex':
       comparisonExpr = `new RegExp(${JSON.stringify(rawValue)}).test(String(val))`;
@@ -166,18 +172,31 @@ const generateThresholdColorTemplate = (config: ThresholdColorConfig): string =>
   }
 };
 
+// Optional per-action extras (toast, confirmation, sound, haptic, etc.)
+interface ActionExtras {
+  javascript?: string;
+  toast?: ToastConfig;
+  repeatMs?: number;
+  repeatLimit?: number;
+  confirmation?: boolean;
+  confirmationText?: string;
+  entityOverride?: string;
+  navigationReplace?: boolean;
+  sound?: string;
+  haptic?: string;
+  pipelineId?: string;
+  startListening?: boolean;
+}
+
 // Helper to generate action YAML
 const generateActionYaml = (
   actionType: string,
   actionData: string,
   actionNavigation: string,
-  actionJavascript?: string,
-  actionToast?: ToastConfig,
-  repeatMs?: number,
-  repeatLimit?: number
+  extras: ActionExtras = {}
 ): string => {
   let yaml = `  action: ${actionType}\n`;
-  
+
   if ((actionType === 'call-service' || actionType === 'perform-action') && actionData) {
     try {
       const data = JSON.parse(actionData);
@@ -204,36 +223,72 @@ const generateActionYaml = (
       yaml += `  # Invalid JSON in action_data\n`;
     }
   }
-  
+
+  if ((actionType === 'more-info' || actionType === 'toggle') && extras.entityOverride) {
+    yaml += `  entity: ${extras.entityOverride}\n`;
+  }
+
   if (actionType === 'navigate' && actionNavigation) {
     yaml += `  navigation_path: ${actionNavigation}\n`;
+    if (extras.navigationReplace) {
+      yaml += `  navigation_replace: true\n`;
+    }
   }
-  
+
   if (actionType === 'url' && actionNavigation) {
     yaml += `  url_path: ${actionNavigation}\n`;
   }
-  
-  if (actionType === 'javascript' && actionJavascript) {
-    yaml += `  code: |\n    ${actionJavascript.split('\n').join('\n    ')}\n`;
-  }
-  
-  if (actionType === 'toast' && actionToast) {
-    yaml += `  message: "${actionToast.message}"\n`;
-    if (actionToast.duration !== 3000) {
-      yaml += `  duration: ${actionToast.duration}\n`;
+
+  if (actionType === 'assist') {
+    if (extras.pipelineId && extras.pipelineId !== 'last_used') {
+      yaml += `  pipeline_id: ${extras.pipelineId}\n`;
     }
-    if (actionToast.dismissable === false) {
-      yaml += `  dismissable: false\n`;
+    if (extras.startListening) {
+      yaml += `  start_listening: true\n`;
     }
   }
-  
-  if (repeatMs && repeatMs > 0) {
-    yaml += `  repeat: ${repeatMs}\n`;
-    if (repeatLimit && repeatLimit > 0) {
-      yaml += `  repeat_limit: ${repeatLimit}\n`;
+
+  if (actionType === 'javascript' && extras.javascript) {
+    yaml += `  javascript: |\n    ${extras.javascript.split('\n').join('\n    ')}\n`;
+  }
+
+  if (extras.repeatMs && extras.repeatMs > 0) {
+    yaml += `  repeat: ${extras.repeatMs}\n`;
+    if (extras.repeatLimit && extras.repeatLimit > 0) {
+      yaml += `  repeat_limit: ${extras.repeatLimit}\n`;
     }
   }
-  
+
+  if (actionType !== 'none') {
+    if (extras.confirmation) {
+      if (extras.confirmationText) {
+        yaml += `  confirmation:\n`;
+        yaml += `    text: "${extras.confirmationText}"\n`;
+      } else {
+        yaml += `  confirmation: true\n`;
+      }
+    }
+
+    if (extras.toast?.enabled && extras.toast.message) {
+      yaml += `  toast:\n`;
+      yaml += `    message: "${extras.toast.message}"\n`;
+      if (extras.toast.duration !== 3000) {
+        yaml += `    duration: ${extras.toast.duration}\n`;
+      }
+      if (extras.toast.dismissable === false) {
+        yaml += `    dismissable: false\n`;
+      }
+    }
+
+    if (extras.sound) {
+      yaml += `  sound: ${extras.sound}\n`;
+    }
+
+    if (extras.haptic) {
+      yaml += `  haptic: ${extras.haptic}\n`;
+    }
+  }
+
   return yaml;
 };
 
@@ -331,19 +386,6 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `entity: ${config.entity}\n`;
   }
 
-  // Trigger Entity
-  if (config.triggerEntity) {
-    yaml += `trigger_entity: ${config.triggerEntity}\n`;
-  }
-
-  // Triggers Update (array of entities)
-  if (config.triggersUpdate && config.triggersUpdate.length > 0) {
-    yaml += `triggers_update:\n`;
-    config.triggersUpdate.forEach(entity => {
-      yaml += `  - ${entity}\n`;
-    });
-  }
-
   // Units override
   if (config.units) {
     yaml += `units: "${config.units}"\n`;
@@ -434,7 +476,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       yaml += `live_stream_aspect_ratio: ${config.liveStreamAspectRatio}\n`;
     }
     if (config.liveStreamFitMode) {
-      yaml += `live_stream_fit: ${config.liveStreamFitMode}\n`;
+      yaml += `live_stream_fit_mode: ${config.liveStreamFitMode}\n`;
     }
   }
 
@@ -449,7 +491,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
 
   if (config.colorAuto) {
-    yaml += `color: auto\n`;
+    yaml += `color: ${config.colorAutoNoTemperature ? 'auto-no-temperature' : 'auto'}\n`;
   }
   
   if (config.aspectRatio) {
@@ -504,7 +546,13 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `tooltip:\n`;
     yaml += `  content: "${config.tooltip.content}"\n`;
     if (config.tooltip.position !== 'top') {
-      yaml += `  position: ${config.tooltip.position}\n`;
+      yaml += `  placement: ${config.tooltip.position}\n`;
+    }
+    if (config.tooltip.delay > 0) {
+      yaml += `  delay: ${config.tooltip.delay}\n`;
+    }
+    if (config.tooltip.hideDelay > 0) {
+      yaml += `  hide_delay: ${config.tooltip.hideDelay}\n`;
     }
   }
 
@@ -536,9 +584,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
 
   // Hold Time
-  if (config.holdTime !== 500) {
-    yaml += `hold_time: ${config.holdTime}\n`;
-  }
+  // (hold_time removed — not a valid button-card option)
 
   // Update Timer
   if (config.updateTimer > 0) {
@@ -552,7 +598,7 @@ export const generateYaml = (config: ButtonConfig): string => {
 
   // Disable Keyboard
   if (config.disableKeyboard) {
-    yaml += `disable_keyboard: true\n`;
+    yaml += `disable_kbd: true\n`;
   }
 
   // Normalize actions for entity domains that don't support toggle.
@@ -596,14 +642,19 @@ export const generateYaml = (config: ButtonConfig): string => {
     normalizedTap.actionType,
     normalizedTap.actionData,
     config.tapActionNavigation,
-    config.tapActionJavascript,
-    config.tapActionToast
+    {
+      javascript: config.tapActionJavascript,
+      toast: config.tapActionToast,
+      confirmation: config.tapActionConfirmation,
+      confirmationText: config.tapActionConfirmationText,
+      entityOverride: config.tapActionEntity,
+      navigationReplace: config.tapActionNavigationReplace,
+      pipelineId: config.tapActionPipelineId,
+      startListening: config.tapActionStartListening,
+      sound: config.tapActionSound,
+      haptic: config.hapticFeedback,
+    }
   );
-  // Haptic: use per-action if set, otherwise use global haptic
-  const tapHaptic = config.tapActionSound || config.hapticFeedback;
-  if (tapHaptic) {
-    yaml += `  haptic: ${tapHaptic}\n`;
-  }
 
   // Actions - Hold
   yaml += `hold_action:\n`;
@@ -611,15 +662,21 @@ export const generateYaml = (config: ButtonConfig): string => {
     normalizedHold.actionType,
     normalizedHold.actionData,
     config.holdActionNavigation,
-    config.holdActionJavascript,
-    config.holdActionToast,
-    config.holdActionRepeat,
-    config.holdActionRepeatLimit
+    {
+      javascript: config.holdActionJavascript,
+      toast: config.holdActionToast,
+      repeatMs: config.holdActionRepeat,
+      repeatLimit: config.holdActionRepeatLimit,
+      confirmation: config.holdActionConfirmation,
+      confirmationText: config.holdActionConfirmationText,
+      entityOverride: config.holdActionEntity,
+      navigationReplace: config.holdActionNavigationReplace,
+      pipelineId: config.holdActionPipelineId,
+      startListening: config.holdActionStartListening,
+      sound: config.holdActionSound,
+      haptic: config.hapticFeedback,
+    }
   );
-  const holdHaptic = config.holdActionSound || config.hapticFeedback;
-  if (holdHaptic) {
-    yaml += `  haptic: ${holdHaptic}\n`;
-  }
 
   // Actions - Double Tap
   yaml += `double_tap_action:\n`;
@@ -627,13 +684,19 @@ export const generateYaml = (config: ButtonConfig): string => {
     normalizedDoubleTap.actionType,
     normalizedDoubleTap.actionData,
     config.doubleTapActionNavigation,
-    config.doubleTapActionJavascript,
-    config.doubleTapActionToast
+    {
+      javascript: config.doubleTapActionJavascript,
+      toast: config.doubleTapActionToast,
+      confirmation: config.doubleTapActionConfirmation,
+      confirmationText: config.doubleTapActionConfirmationText,
+      entityOverride: config.doubleTapActionEntity,
+      navigationReplace: config.doubleTapActionNavigationReplace,
+      pipelineId: config.doubleTapActionPipelineId,
+      startListening: config.doubleTapActionStartListening,
+      sound: config.doubleTapActionSound,
+      haptic: config.hapticFeedback,
+    }
   );
-  const doubleTapHaptic = config.doubleTapActionSound || config.hapticFeedback;
-  if (doubleTapHaptic) {
-    yaml += `  haptic: ${doubleTapHaptic}\n`;
-  }
 
   // Momentary Actions - Press
   if (config.pressAction !== 'none') {
@@ -642,7 +705,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       normalizedPress.actionType,
       normalizedPress.actionData,
       config.pressActionNavigation,
-      config.pressActionJavascript
+      { javascript: config.pressActionJavascript }
     );
   }
 
@@ -653,7 +716,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       normalizedRelease.actionType,
       normalizedRelease.actionData,
       config.releaseActionNavigation,
-      config.releaseActionJavascript
+      { javascript: config.releaseActionJavascript }
     );
   }
 
@@ -664,7 +727,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       normalizedIconTap.actionType,
       normalizedIconTap.actionData,
       config.iconTapActionNavigation,
-      config.iconTapActionJavascript
+      { javascript: config.iconTapActionJavascript }
     );
   }
 
@@ -674,7 +737,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       normalizedIconHold.actionType,
       normalizedIconHold.actionData,
       config.iconHoldActionNavigation,
-      config.iconHoldActionJavascript
+      { javascript: config.iconHoldActionJavascript }
     );
   }
 
@@ -684,7 +747,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       normalizedIconDoubleTap.actionType,
       normalizedIconDoubleTap.actionData,
       config.iconDoubleTapActionNavigation,
-      config.iconDoubleTapActionJavascript
+      { javascript: config.iconDoubleTapActionJavascript }
     );
   }
 
@@ -722,8 +785,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Protect (PIN/Password)
   if (config.protect.enabled) {
     yaml += `protect:\n`;
-    yaml += `  type: ${config.protect.type}\n`;
-    yaml += `  code: "${config.protect.value}"\n`;
+    yaml += `  ${config.protect.type === 'password' ? 'password' : 'pin'}: "${config.protect.value}"\n`;
     if (config.protect.failureMessage) {
       yaml += `  failure_message: "${config.protect.failureMessage}"\n`;
     }
@@ -1271,8 +1333,14 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
       } else if (stateStyle.operator === 'above') {
         yaml += `    operator: '>'\n`;
         yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
+      } else if (stateStyle.operator === 'above_equal') {
+        yaml += `    operator: '>='\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       } else if (stateStyle.operator === 'below') {
         yaml += `    operator: '<'\n`;
+        yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
+      } else if (stateStyle.operator === 'below_equal') {
+        yaml += `    operator: '<='\n`;
         yaml += `    value: ${quoteYamlSingle(stateStyle.value || '')}\n`;
       } else if (stateStyle.operator === 'not_equals') {
         yaml += `    operator: '!='\n`;

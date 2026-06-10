@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2, Gauge, GitBranch } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Target, Grid3X3, Palette, Sparkles, MousePointer, Settings, Type, Layout, ToggleRight, Droplets, BoxSelect, Activity, Hand, AlertCircle, Lock, Shield, MessageSquare, Code, Layers, Variable as VariableIcon, Wand2, Gauge, GitBranch, Search, X } from 'lucide-react';
 
 // ============= NAVIGATION TYPES =============
 export type SectionId = 
@@ -95,28 +95,49 @@ interface NavHeaderProps {
   nav: NavState;
   goBack: () => void;
   activePreset?: { name: string } | null;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
-export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset }) => {
-  const currentCategory = nav.level !== 'categories' 
-    ? CATEGORIES.find(c => c.id === nav.categoryId) 
+export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset, searchQuery = '', onSearchChange }) => {
+  const currentCategory = nav.level !== 'categories'
+    ? CATEGORIES.find(c => c.id === nav.categoryId)
     : null;
-  const currentSection = nav.level === 'content' 
+  const currentSection = nav.level === 'content'
     ? currentCategory?.sections.find(s => s.id === nav.sectionId)
     : null;
 
   if (nav.level === 'categories') {
     return (
-      <div className="p-4 border-b border-gray-800 shrink-0 bg-gray-900">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Layers size={18} className="text-blue-500" />
-          Editor
+      <div className="border-b border-gray-800 shrink-0 bg-gray-900">
+        <div className="px-4 pt-4 pb-3 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Layers size={18} className="text-blue-500" />
+            Editor
+          </h2>
           {activePreset && (
             <span className="text-xs font-normal text-purple-400 ml-auto">
               {activePreset.name}
             </span>
           )}
-        </h2>
+        </div>
+        {onSearchChange && (
+          <div className="px-3 pb-3 relative">
+            <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search settings…"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-8 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+            {searchQuery && (
+              <button onClick={() => onSearchChange('')} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -207,11 +228,64 @@ export const SectionList: React.FC<SectionListProps> = ({ categoryId, onSelect }
   );
 };
 
+interface SearchResultsProps {
+  query: string;
+  onSelect: (categoryId: CategoryId, sectionId: SectionId) => void;
+}
+
+export const SearchResults: React.FC<SearchResultsProps> = ({ query, onSelect }) => {
+  const normalizedQuery = query.trim().toLowerCase();
+  const results = CATEGORIES.flatMap((cat) =>
+    cat.sections
+      .filter((sec) => sec.label.toLowerCase().includes(normalizedQuery) || cat.label.toLowerCase().includes(normalizedQuery))
+      .map((sec) => ({ category: cat, section: sec }))
+  );
+
+  if (results.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-500 text-sm px-4 py-8">
+        No sections match "{query}"
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {results.map(({ category, section }) => {
+        const Icon = section.icon;
+        const CatIcon = category.icon;
+        return (
+          <button
+            key={section.id}
+            onClick={() => onSelect(category.id, section.id)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/50 border-b border-gray-800 transition-colors group"
+          >
+            <Icon size={18} className="text-gray-500 group-hover:text-blue-400 shrink-0 transition-colors" />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm text-gray-300 group-hover:text-white block">{section.label}</span>
+              <span className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
+                <CatIcon size={10} />
+                {category.label}
+              </span>
+            </div>
+            <ChevronRight size={14} className="text-gray-600 group-hover:text-gray-400 shrink-0" />
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 // Hook for navigation state management
 export function useNavigation() {
   const [nav, setNav] = useState<NavState>({ level: 'categories' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const goBack = () => {
+    if (searchQuery) {
+      setSearchQuery('');
+      return;
+    }
     if (nav.level === 'content') {
       setNav({ level: 'sections', categoryId: nav.categoryId });
     } else if (nav.level === 'sections') {
@@ -229,5 +303,10 @@ export function useNavigation() {
     }
   };
 
-  return { nav, goBack, selectCategory, selectSection };
+  const selectFromSearch = (categoryId: CategoryId, sectionId: SectionId) => {
+    setSearchQuery('');
+    setNav({ level: 'content', categoryId, sectionId });
+  };
+
+  return { nav, goBack, selectCategory, selectSection, selectFromSearch, searchQuery, setSearchQuery };
 }

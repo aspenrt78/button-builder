@@ -643,6 +643,35 @@ function parseStyleString(style: string): { property: string; value: string } | 
   return { property, value };
 }
 
+const ANIMATION_NAME_MAP: Array<[string, string]> = [
+  ['flash', 'flash'],
+  ['pulse', 'pulse'],
+  ['jiggle', 'jiggle'],
+  ['shake', 'shake'],
+  ['bounce', 'bounce'],
+  ['blink', 'blink'],
+  ['glow', 'glow'],
+  ['float', 'float'],
+  ['swing', 'swing'],
+  ['rubberBand', 'rubberBand'],
+  ['rubber', 'rubberBand'],
+  ['tada', 'tada'],
+  ['heartbeat', 'heartbeat'],
+  ['flip', 'flip'],
+  ['wobble', 'wobble'],
+  ['breathe', 'breathe'],
+  ['ripple', 'ripple'],
+  ['spin', 'spin'],
+  ['rotate', 'spin'],
+];
+
+function parseAnimationName(value: string): string | null {
+  for (const [keyword, name] of ANIMATION_NAME_MAP) {
+    if (value.includes(keyword)) return name;
+  }
+  return null;
+}
+
 /**
  * Map a card style to config properties
  */
@@ -780,32 +809,13 @@ function mapCardStyle(
       }
       break;
       
-    case 'animation':
-      // Parse animation name
-      if (value.includes('flash')) config.cardAnimation = 'flash';
-      else if (value.includes('pulse')) config.cardAnimation = 'pulse';
-      else if (value.includes('jiggle')) config.cardAnimation = 'jiggle';
-      else if (value.includes('shake')) config.cardAnimation = 'shake';
-      else if (value.includes('bounce')) config.cardAnimation = 'bounce';
-      else if (value.includes('blink')) config.cardAnimation = 'blink';
-      else if (value.includes('spin') || value.includes('rotate')) config.cardAnimation = 'spin';
-      else if (value.includes('glow')) config.cardAnimation = 'glow';
-      else if (value.includes('float')) config.cardAnimation = 'float';
-      else if (value.includes('swing')) config.cardAnimation = 'swing';
-      else if (value.includes('rubberBand') || value.includes('rubber')) config.cardAnimation = 'rubberBand';
-      else if (value.includes('tada')) config.cardAnimation = 'tada';
-      else if (value.includes('heartbeat')) config.cardAnimation = 'heartbeat';
-      else if (value.includes('flip')) config.cardAnimation = 'flip';
-      else if (value.includes('wobble')) config.cardAnimation = 'wobble';
-      else if (value.includes('breathe')) config.cardAnimation = 'breathe';
-      else if (value.includes('ripple')) config.cardAnimation = 'ripple';
-      
-      // Try to extract speed
+    case 'animation': {
+      const animName = parseAnimationName(value);
+      if (animName) config.cardAnimation = animName as any;
       const speedMatch = value.match(/(\d+(?:\.\d+)?s)/);
-      if (speedMatch) {
-        config.cardAnimationSpeed = speedMatch[1];
-      }
+      if (speedMatch) config.cardAnimationSpeed = speedMatch[1];
       break;
+    }
       
     default:
       // Store unrecognized styles in extraStyles
@@ -933,25 +943,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
             } else if (parsed.property === 'border-color') {
               customState.borderColor = parsed.value;
             } else if (parsed.property === 'animation') {
-              // Parse animation type
-              if (parsed.value.includes('flash')) customState.cardAnimation = 'flash';
-              else if (parsed.value.includes('pulse')) customState.cardAnimation = 'pulse';
-              else if (parsed.value.includes('jiggle')) customState.cardAnimation = 'jiggle';
-              else if (parsed.value.includes('shake')) customState.cardAnimation = 'shake';
-              else if (parsed.value.includes('bounce')) customState.cardAnimation = 'bounce';
-              else if (parsed.value.includes('blink')) customState.cardAnimation = 'blink';
-              else if (parsed.value.includes('spin') || parsed.value.includes('rotate')) customState.cardAnimation = 'spin';
-              else if (parsed.value.includes('glow')) customState.cardAnimation = 'glow';
-              else if (parsed.value.includes('float')) customState.cardAnimation = 'float';
-              else if (parsed.value.includes('swing')) customState.cardAnimation = 'swing';
-              else if (parsed.value.includes('rubberBand') || parsed.value.includes('rubber')) customState.cardAnimation = 'rubberBand';
-              else if (parsed.value.includes('tada')) customState.cardAnimation = 'tada';
-              else if (parsed.value.includes('heartbeat')) customState.cardAnimation = 'heartbeat';
-              else if (parsed.value.includes('flip')) customState.cardAnimation = 'flip';
-              else if (parsed.value.includes('wobble')) customState.cardAnimation = 'wobble';
-              else if (parsed.value.includes('breathe')) customState.cardAnimation = 'breathe';
-              else if (parsed.value.includes('ripple')) customState.cardAnimation = 'ripple';
-
+              const animName = parseAnimationName(parsed.value);
+              if (animName) customState.cardAnimation = animName as any;
               const speedMatch = parsed.value.match(/(\d+(?:\.\d+)?s)/);
               if (speedMatch) customState.cardAnimationSpeed = speedMatch[1];
             }
@@ -965,24 +958,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
             if (parsed.property === 'color') {
               customState.iconColor = parsed.value;
             } else if (parsed.property === 'animation') {
-              if (parsed.value.includes('flash')) customState.iconAnimation = 'flash';
-              else if (parsed.value.includes('pulse')) customState.iconAnimation = 'pulse';
-              else if (parsed.value.includes('jiggle')) customState.iconAnimation = 'jiggle';
-              else if (parsed.value.includes('shake')) customState.iconAnimation = 'shake';
-              else if (parsed.value.includes('bounce')) customState.iconAnimation = 'bounce';
-              else if (parsed.value.includes('blink')) customState.iconAnimation = 'blink';
-              else if (parsed.value.includes('spin') || parsed.value.includes('rotate')) customState.iconAnimation = 'spin';
-              else if (parsed.value.includes('glow')) customState.iconAnimation = 'glow';
-              else if (parsed.value.includes('float')) customState.iconAnimation = 'float';
-              else if (parsed.value.includes('swing')) customState.iconAnimation = 'swing';
-              else if (parsed.value.includes('rubberBand') || parsed.value.includes('rubber')) customState.iconAnimation = 'rubberBand';
-              else if (parsed.value.includes('tada')) customState.iconAnimation = 'tada';
-              else if (parsed.value.includes('heartbeat')) customState.iconAnimation = 'heartbeat';
-              else if (parsed.value.includes('flip')) customState.iconAnimation = 'flip';
-              else if (parsed.value.includes('wobble')) customState.iconAnimation = 'wobble';
-              else if (parsed.value.includes('breathe')) customState.iconAnimation = 'breathe';
-              else if (parsed.value.includes('ripple')) customState.iconAnimation = 'ripple';
-
+              const animName = parseAnimationName(parsed.value);
+              if (animName) customState.iconAnimation = animName as any;
               const speedMatch = parsed.value.match(/(\d+(?:\.\d+)?s)/);
               if (speedMatch) customState.iconAnimationSpeed = speedMatch[1];
             }
@@ -1029,24 +1006,58 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
   }
 }
 
+// Matches "domain.object_id" — domain is letters/digits/underscores, same for object_id.
+const ENTITY_ID_RE = /^[a-z_][a-z0-9_]*\.[a-z0-9_]+$/;
+
+// One declaration per line: "property: value". Braces, @-rules, HTML and
+// script-bearing values are rejected so imported YAML can't inject selectors
+// or executable CSS into the preview.
+const CSS_PROPERTY_RE = /^-?[a-zA-Z][a-zA-Z0-9-]*$/;
+const CSS_DANGEROUS_VALUE_RE = /[{}<>]|@import|expression\s*\(|javascript\s*:|behavior\s*:|-moz-binding/i;
+
+const sanitizeStyleBlock = (block: string): string => {
+  return block
+    .split('\n')
+    .map(line => line.trim().replace(/;$/, ''))
+    .filter(line => {
+      if (!line) return false;
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) return false;
+      const property = line.substring(0, colonIndex).trim();
+      const value = line.substring(colonIndex + 1).trim();
+      return CSS_PROPERTY_RE.test(property) && !CSS_DANGEROUS_VALUE_RE.test(value);
+    })
+    .join('\n');
+};
+
+const FREEFORM_STYLE_FIELDS = [
+  'extraStyles', 'entityPictureStyles', 'gridStyles',
+  'lockStyles', 'tooltipStyles', 'imgCellStyles',
+] as const;
+
 /**
  * Validate and sanitize imported config
  */
 export const validateImportedConfig = (config: Partial<ButtonConfig>): Partial<ButtonConfig> => {
   const validated = { ...config };
-  
+
+  // Ensure entity looks like a valid HA entity_id (domain.object_id)
+  if (validated.entity && !ENTITY_ID_RE.test(validated.entity)) {
+    delete validated.entity;
+  }
+
   // Ensure layout is valid
   const validLayouts = ['vertical', 'icon_name_state2nd', 'icon_name_state', 'icon_state_name2nd', 'icon_state', 'name_state', 'icon_label'];
   if (validated.layout && !validLayouts.includes(validated.layout)) {
     delete validated.layout;
   }
-  
+
   // Ensure colorType is valid
   const validColorTypes = ['card', 'icon', 'blank-card', 'label-card'];
   if (validated.colorType && !validColorTypes.includes(validated.colorType)) {
     delete validated.colorType;
   }
-  
+
   // Ensure opacity values are in range
   if (validated.backgroundColorOpacity !== undefined) {
     validated.backgroundColorOpacity = Math.max(0, Math.min(100, validated.backgroundColorOpacity));
@@ -1054,6 +1065,48 @@ export const validateImportedConfig = (config: Partial<ButtonConfig>): Partial<B
   if (validated.cardOpacity !== undefined) {
     validated.cardOpacity = Math.max(0, Math.min(100, validated.cardOpacity));
   }
-  
+
+  // Validate hex color fields — remove values that aren't valid hex colors
+  const hexColorRe = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
+  const colorFields = [
+    'backgroundColor', 'color', 'iconColor', 'nameColor', 'stateColor',
+    'labelColor', 'borderColor', 'shadowColor', 'stateOnColor', 'stateOffColor',
+    'gradientColor1', 'gradientColor2', 'gradientColor3',
+  ] as const;
+  for (const field of colorFields) {
+    const val = (validated as any)[field];
+    if (val && typeof val === 'string' && !hexColorRe.test(val)) {
+      delete (validated as any)[field];
+    }
+  }
+
+  // Validate stateStyles operators
+  if (Array.isArray(validated.stateStyles)) {
+    const validOperators = ['equals', 'not_equals', 'above', 'below', 'regex', 'template', 'default'];
+    validated.stateStyles = validated.stateStyles.filter(
+      (s) => s && typeof s === 'object' && validOperators.includes(s.operator)
+    );
+    for (const s of validated.stateStyles) {
+      if (typeof s.styles === 'string' && s.styles) {
+        s.styles = sanitizeStyleBlock(s.styles);
+      }
+    }
+  }
+
+  // Sanitize free-form CSS blocks
+  for (const field of FREEFORM_STYLE_FIELDS) {
+    const val = (validated as any)[field];
+    if (val && typeof val === 'string') {
+      (validated as any)[field] = sanitizeStyleBlock(val);
+    }
+  }
+  if (Array.isArray(validated.customFields)) {
+    for (const field of validated.customFields) {
+      if (field && typeof field.styles === 'string' && field.styles) {
+        field.styles = sanitizeStyleBlock(field.styles);
+      }
+    }
+  }
+
   return validated;
 };

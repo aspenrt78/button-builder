@@ -65,6 +65,7 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
   const [entities, setEntities] = useState<EntityInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAllDomains, setShowAllDomains] = useState(false);
+  const [connectionFailed, setConnectionFailed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,8 +90,10 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
     try {
       const data = await haService.getEntities();
       setEntities(data);
+      setConnectionFailed(haService.connectionFailed);
     } catch (error) {
       console.error('Failed to load entities:', error);
+      setConnectionFailed(true);
     } finally {
       setLoading(false);
     }
@@ -182,7 +185,15 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
           {label}
         </label>
       )}
-      
+
+      {connectionFailed && (
+        <div className="mb-1.5 flex items-center gap-1.5 rounded px-2 py-1 bg-yellow-900/40 border border-yellow-700/50 text-yellow-300 text-[10px]">
+          <span>⚠</span>
+          <span>Couldn't connect to Home Assistant — enter entity ID manually.</span>
+          <button onClick={loadEntities} className="ml-auto underline hover:text-yellow-100 shrink-0">Retry</button>
+        </div>
+      )}
+
       <div className="relative">
         <input
           type="text"

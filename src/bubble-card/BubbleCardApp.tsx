@@ -24,13 +24,17 @@ import {
   CARD_TYPE_OPTIONS,
 } from './constants';
 import { generateBubbleYaml } from './utils/yamlGenerator';
-import { validateBubbleCard } from './utils/validation';
+import { parseBubbleCardYaml, mergeBubbleConfig } from './utils/yamlImporter';
 import { BUBBLE_PRESETS } from './presets';
 import { BubbleConfigPanel } from './components/ConfigPanel';
 import { BubblePreview } from './components/Preview';
 import { BubbleYamlViewer } from './components/YamlViewer';
-import { Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Undo2, Redo2, FolderOpen, Save, Trash2, Pencil } from 'lucide-react';
+import { Eye, RotateCcw, Upload, Settings, Code, Menu, X, Sparkles, Copy, Undo2, Redo2, FolderOpen } from 'lucide-react';
 import { APP_VERSION_LABEL } from '../version';
+import { cloneSnapshot, useToast, Toast, useResetConfirm, SaveRecordMetadata } from '../shared/libraryUtils';
+import { SaveRecordModal } from '../shared/SaveRecordModal';
+import { LibraryModal } from '../shared/LibraryModal';
+import { checkBubbleCardEnvironment } from '../services/dashboardService';
 
 const DEFAULT_SEPARATOR_CONFIG: BubbleSeparatorConfig = {
   card_type: 'separator',
@@ -53,6 +57,14 @@ const DEFAULT_POPUP_CONFIG: BubblePopUpConfig = {
   name: '',
   icon: '',
   entity: '',
+  popup_style: 'bubble',
+  popup_mode: 'default',
+  with_bottom_offset: false,
+  full_width_on_mobile: false,
+  performance_mode: 'default',
+  show_previous_button: false,
+  show_close_button: true,
+  buttons_position: 'right',
   auto_close: undefined,
   close_on_click: false,
   close_by_clicking_outside: true,
@@ -94,6 +106,9 @@ const DEFAULT_COVER_CONFIG: BubbleCoverConfig = {
   open_service: '',
   stop_service: '',
   close_service: '',
+  main_buttons_position: 'default',
+  main_buttons_full_width: false,
+  main_buttons_alignment: 'end',
   card_layout: 'normal',
   rows: 1,
   grid_options: {
@@ -101,6 +116,8 @@ const DEFAULT_COVER_CONFIG: BubbleCoverConfig = {
     columns: 3,
   },
   sub_button: [],
+  footer_mode: false,
+  footer_full_width: false,
   modules: [],
   styles: '',
 };
@@ -130,6 +147,9 @@ const DEFAULT_MEDIA_PLAYER_CONFIG: BubbleMediaPlayerConfig = {
     next_button: false,
     power_button: false,
   },
+  main_buttons_position: 'default',
+  main_buttons_full_width: false,
+  main_buttons_alignment: 'end',
   card_layout: 'normal',
   rows: 1,
   grid_options: {
@@ -137,6 +157,8 @@ const DEFAULT_MEDIA_PLAYER_CONFIG: BubbleMediaPlayerConfig = {
     columns: 3,
   },
   sub_button: [],
+  footer_mode: false,
+  footer_full_width: false,
   modules: [],
   styles: '',
 };
@@ -156,6 +178,9 @@ const DEFAULT_CLIMATE_CONFIG: BubbleClimateConfig = {
   step: 0.5,
   min_temp: 16,
   max_temp: 30,
+  main_buttons_position: 'default',
+  main_buttons_full_width: false,
+  main_buttons_alignment: 'end',
   card_layout: 'normal',
   rows: 1,
   grid_options: {
@@ -163,6 +188,8 @@ const DEFAULT_CLIMATE_CONFIG: BubbleClimateConfig = {
     columns: 3,
   },
   sub_button: [],
+  footer_mode: false,
+  footer_full_width: false,
   modules: [],
   styles: '',
 };
@@ -188,6 +215,8 @@ const DEFAULT_SELECT_CONFIG: BubbleSelectConfig = {
     columns: 3,
   },
   sub_button: [],
+  footer_mode: false,
+  footer_full_width: false,
   modules: [],
   styles: '',
 };
@@ -199,6 +228,7 @@ const DEFAULT_CALENDAR_CONFIG: BubbleCalendarConfig = {
   limit: 5,
   show_end: true,
   show_progress: true,
+  show_started_events: true,
   scrolling_effect: true,
   card_layout: 'normal',
   rows: 1,
@@ -263,8 +293,6 @@ function loadSavedConfig(): BubbleConfig {
 
 const SAVED_BUBBLE_BUTTONS_STORAGE_KEY = 'bubble-card-builder-saved-buttons';
 
-const cloneSnapshot = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
-
 const deriveBubbleName = (config: BubbleConfig, fallbackIndex?: number): string => {
   const name = 'name' in config && typeof config.name === 'string' ? config.name.trim() : '';
   if (name) return name;
@@ -273,23 +301,10 @@ const deriveBubbleName = (config: BubbleConfig, fallbackIndex?: number): string 
   return `Bubble Card ${fallbackIndex ?? 1}`;
 };
 
-interface SaveBubbleMetadata {
-  name: string;
-  folder: string;
-  tags: string[];
-}
-
 type SaveModalState =
-  | { mode: 'current' }
-  | { mode: 'queued'; buttonId: string }
+  | { mode: 'current'; initialName: string; initialFolder: string; initialTags: string }
+  | { mode: 'queued'; buttonId: string; initialName: string; initialFolder: string; initialTags: string }
   | null;
-
-const parseTagInput = (raw: string): string[] =>
-  raw
-    .split(',')
-    .map(tag => tag.trim())
-    .filter(Boolean)
-    .filter((tag, index, all) => all.findIndex(item => item.toLowerCase() === tag.toLowerCase()) === index);
 
 const loadSavedButtons = (): SavedBubbleRecord[] => {
   try {
@@ -324,7 +339,7 @@ export function BubbleCardApp() {
   const [activePreset, setActivePreset] = useState<BubblePreset | null>(null);
   const [simulatedState, setSimulatedState] = useState<'on' | 'off'>('on');
 
-  const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
+  const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml' | 'presets'>('preview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -333,16 +348,10 @@ export function BubbleCardApp() {
   const [savedButtons, setSavedButtons] = useState<SavedBubbleRecord[]>(loadSavedButtons);
   const [queuedButtons, setQueuedButtons] = useState<SavedBubbleRecord[]>([]);
   const [showButtonLibrary, setShowButtonLibrary] = useState(false);
-  const [folderFilter, setFolderFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState('');
   const [saveModalState, setSaveModalState] = useState<SaveModalState>(null);
-  const [saveNameInput, setSaveNameInput] = useState('');
-  const [saveFolderInput, setSaveFolderInput] = useState('');
-  const [saveTagsInput, setSaveTagsInput] = useState('');
-  const [editingSavedButtonId, setEditingSavedButtonId] = useState<string | null>(null);
-  const [editingNameInput, setEditingNameInput] = useState('');
-  const [editingFolderInput, setEditingFolderInput] = useState('');
-  const [editingTagsInput, setEditingTagsInput] = useState('');
+  const { toastMessage, showToast } = useToast();
+  const [bubbleCardMissing, setBubbleCardMissing] = useState(false);
+  const [envBannerDismissed, setEnvBannerDismissed] = useState(false);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedCardType, setSelectedCardType] = useState<BubbleCardType | 'all'>('all');
@@ -427,7 +436,7 @@ export function BubbleCardApp() {
 
   const yamlOutput = useMemo(() => generateBubbleYaml(config), [config]);
 
-  const createButtonRecord = (metadata?: Partial<SaveBubbleMetadata>): SavedBubbleRecord => {
+  const createButtonRecord = (metadata?: Partial<SaveRecordMetadata>): SavedBubbleRecord => {
     const timestamp = Date.now();
     return {
       id: `bubble-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
@@ -442,40 +451,16 @@ export function BubbleCardApp() {
     };
   };
 
-  const availableFolders = useMemo(() => {
-    const folders = Array.from(new Set(savedButtons.map(button => button.folder.trim()).filter(Boolean)));
-    return folders.sort((a, b) => a.localeCompare(b));
-  }, [savedButtons]);
-
-  const filteredSavedButtons = useMemo(() => {
-    const normalizedTagFilter = tagFilter.trim().toLowerCase();
-    return savedButtons.filter((button) => {
-      const matchesFolder = folderFilter === 'all' || button.folder === folderFilter;
-      const matchesTag = !normalizedTagFilter || button.tags.some(tag => tag.toLowerCase().includes(normalizedTagFilter));
-      return matchesFolder && matchesTag;
-    });
-  }, [folderFilter, savedButtons, tagFilter]);
-
-  const groupedSavedButtons = useMemo(() => {
-    const groups = new Map<string, SavedBubbleRecord[]>();
-    filteredSavedButtons.forEach((button) => {
-      const folder = button.folder.trim() || 'Unfiled';
-      const existing = groups.get(folder) || [];
-      existing.push(button);
-      groups.set(folder, existing);
-    });
-
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([folder, buttons]) => ({ folder, buttons }));
-  }, [filteredSavedButtons]);
-
+  // Debounced autosave — avoids a synchronous localStorage write on every keypress.
   useEffect(() => {
-    try {
-      localStorage.setItem(BUBBLE_STORAGE_KEY, JSON.stringify(config));
-    } catch (e) {
-      console.warn('Failed to save Bubble config:', e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(BUBBLE_STORAGE_KEY, JSON.stringify(config));
+      } catch (e) {
+        console.warn('Failed to save Bubble config:', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
   }, [config]);
 
   useEffect(() => {
@@ -485,6 +470,29 @@ export function BubbleCardApp() {
       console.warn('Failed to save Bubble library:', e);
     }
   }, [savedButtons]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (queuedButtons.length > 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [queuedButtons.length]);
+
+  // One-time environment check: warn if the bubble-card resource is missing in HA.
+  useEffect(() => {
+    let cancelled = false;
+    checkBubbleCardEnvironment().then((report) => {
+      if (cancelled) return;
+      const missing = report.requirements.some(
+        (req) => req.id === 'bubble-card' && req.status === 'missing'
+      );
+      setBubbleCardMissing(missing);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const filteredPresets = useMemo(() => {
     return BUBBLE_PRESETS.filter(preset => {
@@ -525,17 +533,18 @@ export function BubbleCardApp() {
     isApplyingPresetRef.current = false;
   };
 
-  const handleReset = () => {
-    if (confirm('Reset all settings to defaults?')) {
-      setConfigInternal(DEFAULT_BUBBLE_BUTTON_CONFIG);
-      setActivePreset(null);
-      localStorage.removeItem(BUBBLE_STORAGE_KEY);
-    }
-  };
+  const { resetConfirmPending, handleReset } = useResetConfirm(() => {
+    setConfigInternal(DEFAULT_BUBBLE_BUTTON_CONFIG);
+    setActivePreset(null);
+    setHistoryPast([]);
+    setHistoryFuture([]);
+    lastSavedConfigRef.current = DEFAULT_BUBBLE_BUTTON_CONFIG;
+    localStorage.removeItem(BUBBLE_STORAGE_KEY);
+  });
 
   const handleDuplicate = () => {
-    const duplicated = JSON.parse(JSON.stringify(config));
-    if (duplicated.name) {
+    const duplicated = structuredClone(config);
+    if ('name' in duplicated && duplicated.name) {
       duplicated.name = `${duplicated.name} (Copy)`;
     }
     setConfigInternal(duplicated);
@@ -548,10 +557,12 @@ export function BubbleCardApp() {
   };
 
   const handleSaveCurrentButton = (): boolean => {
-    setSaveNameInput(deriveBubbleName(config, savedButtons.length + 1));
-    setSaveFolderInput('');
-    setSaveTagsInput('');
-    setSaveModalState({ mode: 'current' });
+    setSaveModalState({
+      mode: 'current',
+      initialName: deriveBubbleName(config, savedButtons.length + 1),
+      initialFolder: '',
+      initialTags: '',
+    });
     return true;
   };
 
@@ -575,22 +586,17 @@ export function BubbleCardApp() {
     const queued = queuedButtons.find((button) => button.id === buttonId);
     if (!queued) return;
 
-    setSaveNameInput(queued.name);
-    setSaveFolderInput(queued.folder);
-    setSaveTagsInput(queued.tags.join(', '));
-    setSaveModalState({ mode: 'queued', buttonId });
+    setSaveModalState({
+      mode: 'queued',
+      buttonId,
+      initialName: queued.name,
+      initialFolder: queued.folder,
+      initialTags: queued.tags.join(', '),
+    });
   };
 
-  const handleConfirmSaveModal = () => {
+  const handleConfirmSaveModal = (metadata: SaveRecordMetadata) => {
     if (!saveModalState) return;
-
-    const metadata: SaveBubbleMetadata = {
-      name: saveNameInput.trim(),
-      folder: saveFolderInput.trim(),
-      tags: parseTagInput(saveTagsInput),
-    };
-
-    if (!metadata.name) return;
 
     if (saveModalState.mode === 'current') {
       setSavedButtons((prev) => [createButtonRecord(metadata), ...prev]);
@@ -614,38 +620,21 @@ export function BubbleCardApp() {
     }
 
     setSaveModalState(null);
+    showToast(`"${metadata.name}" saved to library`);
   };
 
-  const handleStartEditSavedButton = (button: SavedBubbleRecord) => {
-    setEditingSavedButtonId(button.id);
-    setEditingNameInput(button.name);
-    setEditingFolderInput(button.folder);
-    setEditingTagsInput(button.tags.join(', '));
-  };
-
-  const handleCancelEditSavedButton = () => {
-    setEditingSavedButtonId(null);
-    setEditingNameInput('');
-    setEditingFolderInput('');
-    setEditingTagsInput('');
-  };
-
-  const handleCommitEditSavedButton = (buttonId: string) => {
-    const nextName = editingNameInput.trim();
-    if (!nextName) return;
-
+  const handleCommitEditSavedButton = (buttonId: string, metadata: SaveRecordMetadata) => {
     setSavedButtons((prev) => prev.map((button) => (
       button.id === buttonId
         ? {
             ...button,
-            name: nextName,
-            folder: editingFolderInput.trim(),
-            tags: parseTagInput(editingTagsInput),
+            name: metadata.name,
+            folder: metadata.folder,
+            tags: metadata.tags,
             updatedAt: Date.now(),
           }
         : button
     )));
-    handleCancelEditSavedButton();
   };
 
   const updateConfig = <K extends keyof BubbleConfig>(key: K, value: any) => {
@@ -655,14 +644,16 @@ export function BubbleCardApp() {
   const handleImportYaml = () => {
     setImportError('');
     try {
-      if (!importYaml.includes('bubble-card') && !importYaml.includes('card_type')) {
-        setImportError('This doesn\'t look like Bubble Card YAML. Make sure it includes card_type.');
-        return;
-      }
-
-      setImportError('YAML import coming soon! For now, use the visual builder.');
+      const parsed = parseBubbleCardYaml(importYaml);
+      const merged = mergeBubbleConfig(getDefaultConfigForType(parsed.card_type), parsed);
+      setConfig(merged);
+      setActivePreset(null);
+      setIsImportOpen(false);
+      setImportYaml('');
+      showToast('Bubble Card YAML imported');
     } catch (e: any) {
-      setImportError(`Failed to parse YAML: ${e.message}`);
+      console.error('Bubble YAML import error:', e);
+      setImportError(e.message || 'Failed to parse YAML. Please check the format.');
     }
   };
 
@@ -721,9 +712,9 @@ export function BubbleCardApp() {
             <Copy size={14} />
             Duplicate
           </button>
-          <button onClick={handleReset} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Reset to defaults">
+          <button onClick={handleReset} className={`flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm font-medium transition-all ${resetConfirmPending ? 'bg-red-600 border-red-500 text-white hover:bg-red-500' : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'}`} title={resetConfirmPending ? 'Click again to confirm reset' : 'Reset to defaults'}>
             <RotateCcw size={14} />
-            Reset
+            {resetConfirmPending ? 'Confirm Reset?' : 'Reset'}
           </button>
         </div>
 
@@ -731,6 +722,52 @@ export function BubbleCardApp() {
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </header>
+
+      {mobileMenuOpen && (
+        <div className="md:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
+          <button onClick={() => { setIsImportOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
+            <Upload size={18} className="text-cyan-400" />
+            <span>Import YAML</span>
+          </button>
+          <div className="flex gap-2">
+            <button onClick={() => { handleUndo(); setMobileMenuOpen(false); }} disabled={!canUndo} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              <Undo2 size={18} className="text-gray-400" />
+              <span className="text-sm">Undo</span>
+            </button>
+            <button onClick={() => { handleRedo(); setMobileMenuOpen(false); }} disabled={!canRedo} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              <Redo2 size={18} className="text-gray-400" />
+              <span className="text-sm">Redo</span>
+            </button>
+          </div>
+          <button onClick={() => { setShowButtonLibrary(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
+            <FolderOpen size={18} className="text-emerald-400" />
+            <span>Bubble Library</span>
+          </button>
+          <button onClick={() => { handleDuplicate(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
+            <Copy size={18} className="text-gray-400" />
+            <span>Duplicate Card</span>
+          </button>
+          <button onClick={() => { handleReset(); if (resetConfirmPending) setMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left ${resetConfirmPending ? 'bg-red-700' : 'bg-gray-800'}`}>
+            <RotateCcw size={18} className={resetConfirmPending ? 'text-white' : 'text-gray-400'} />
+            <span>{resetConfirmPending ? 'Confirm Reset?' : 'Reset to Defaults'}</span>
+          </button>
+        </div>
+      )}
+
+      {bubbleCardMissing && !envBannerDismissed && (
+        <div className="shrink-0 px-4 py-2 bg-amber-900/40 border-b border-amber-700/50 flex items-center gap-3 text-sm text-amber-200">
+          <span>⚠</span>
+          <span className="flex-1">
+            The <span className="font-semibold">Bubble Card</span> custom card doesn't appear to be installed in Home Assistant — generated YAML won't render until it is.
+          </span>
+          <a href="https://github.com/Clooos/Bubble-Card" target="_blank" rel="noreferrer" className="shrink-0 underline hover:text-amber-100">
+            Install via HACS
+          </a>
+          <button onClick={() => setEnvBannerDismissed(true)} className="shrink-0 text-amber-400 hover:text-amber-100" title="Dismiss">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
         <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden" style={{ contain: 'strict' }}>
@@ -830,135 +867,176 @@ export function BubbleCardApp() {
         </section>
       </main>
 
+      <main className="md:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {mobileTab === 'preview' && (
+            <div className="h-full bg-[#0a0a0a] relative flex flex-col">
+              <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
+              <div className="flex-1 relative overflow-auto z-0 flex items-center justify-center p-6">
+                <BubblePreview config={config} simulatedState={simulatedState} onSimulatedStateChange={setSimulatedState} />
+              </div>
+            </div>
+          )}
+
+          {mobileTab === 'config' && (
+            <div className="h-full overflow-y-auto bg-gray-900">
+              <div className="p-4 border-b border-gray-800">
+                <label className="text-xs text-gray-400 font-medium mb-2 block">Card Type</label>
+                <select value={currentCardType} onChange={(e) => handleCardTypeChange(e.target.value as BubbleCardType)} className="w-full bg-gray-800 text-white text-sm px-3 py-2.5 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none cursor-pointer">
+                  {CARD_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1.5">
+                  {CARD_TYPE_OPTIONS.find(o => o.value === currentCardType)?.description}
+                </p>
+              </div>
+              <BubbleConfigPanel config={config as BubbleButtonConfig} updateConfig={updateConfig} setConfig={setConfig as React.Dispatch<React.SetStateAction<BubbleButtonConfig>>} />
+            </div>
+          )}
+
+          {mobileTab === 'yaml' && (
+            <div className="h-full overflow-hidden bg-[#111] p-3">
+              <BubbleYamlViewer yaml={yamlOutput} sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
+            </div>
+          )}
+
+          {mobileTab === 'presets' && (
+            <div className="h-full flex flex-col bg-[#111]">
+              <div className="p-3 border-b border-gray-800 space-y-2 shrink-0">
+                <input type="text" placeholder="Search presets..." value={presetSearch} onChange={(e) => setPresetSearch(e.target.value)} className="w-full bg-gray-900 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none" />
+                <div className="flex gap-2">
+                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="flex-1 bg-gray-900 text-white text-sm px-2 py-1.5 rounded border border-gray-700 focus:border-cyan-500">
+                    <option value="all">All Categories</option>
+                    <option value="basic">Basic</option>
+                    <option value="slider">Sliders</option>
+                    <option value="state">State Display</option>
+                    <option value="sub-buttons">Sub-buttons</option>
+                    <option value="media">Media</option>
+                    <option value="climate">Climate</option>
+                    <option value="cover">Cover</option>
+                    <option value="custom">Custom Styles</option>
+                  </select>
+                  <select value={selectedCardType} onChange={(e) => setSelectedCardType(e.target.value as BubbleCardType | 'all')} className="flex-1 bg-gray-900 text-white text-sm px-2 py-1.5 rounded border border-gray-700 focus:border-cyan-500">
+                    <option value="all">All Types</option>
+                    {CARD_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {filteredPresets.map((preset, index) => (
+                  <button key={index} onClick={() => { handleApplyPreset(preset); setMobileTab('preview'); }} className={`w-full text-left p-3 rounded-lg transition-all ${activePreset?.name === preset.name ? 'bg-cyan-600/20 border-cyan-500/50 ring-1 ring-cyan-500/30' : 'bg-gray-900 hover:bg-gray-800 border-gray-700'} border`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">{preset.name}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 uppercase tracking-wide">
+                        {preset.cardType}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{preset.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <nav className="shrink-0 border-t border-gray-800 bg-gray-900 flex">
+          <button onClick={() => setMobileTab('preview')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'preview' ? 'text-cyan-400 bg-cyan-500/10' : 'text-gray-500'}`}>
+            <Eye size={20} />
+            <span className="text-[10px] font-medium">Preview</span>
+          </button>
+          <button onClick={() => setMobileTab('config')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'config' ? 'text-cyan-400 bg-cyan-500/10' : 'text-gray-500'}`}>
+            <Settings size={20} />
+            <span className="text-[10px] font-medium">Configure</span>
+          </button>
+          <button onClick={() => setMobileTab('presets')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'presets' ? 'text-cyan-400 bg-cyan-500/10' : 'text-gray-500'}`}>
+            <Sparkles size={20} />
+            <span className="text-[10px] font-medium">Presets</span>
+          </button>
+          <button onClick={() => setMobileTab('yaml')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'yaml' ? 'text-cyan-400 bg-cyan-500/10' : 'text-gray-500'}`}>
+            <Code size={20} />
+            <span className="text-[10px] font-medium">YAML</span>
+          </button>
+        </nav>
+      </main>
+
       {showButtonLibrary && (
+        <LibraryModal
+          title="Bubble Library"
+          itemNoun="bubble card"
+          queuedRecords={queuedButtons}
+          savedRecords={savedButtons}
+          loadAccentClass="bg-cyan-600 hover:bg-cyan-500"
+          emptyQueueText="Queue bubble cards from the YAML panel to keep a working set for this session."
+          emptySavedText="Save bubble cards to revisit and reuse them later."
+          exportFilenamePrefix="bubble-card"
+          onClose={() => setShowButtonLibrary(false)}
+          onLoad={handleLoadButtonRecord}
+          onSaveQueued={handleSaveQueuedButton}
+          onRemoveQueued={handleRemoveQueuedButton}
+          onClearQueue={() => setQueuedButtons([])}
+          onDelete={handleDeleteSavedButton}
+          onCommitEdit={handleCommitEditSavedButton}
+        />
+      )}
+
+      {saveModalState && (
+        <SaveRecordModal
+          title="Save Bubble Card"
+          description="Save this bubble card with a name, optional folder, and tags so it is easy to find later."
+          itemNoun="bubble card"
+          initialName={saveModalState.initialName}
+          initialFolder={saveModalState.initialFolder}
+          initialTags={saveModalState.initialTags}
+          existingNames={savedButtons.map((button) => button.name)}
+          onConfirm={handleConfirmSaveModal}
+          onClose={() => setSaveModalState(null)}
+        />
+      )}
+
+      {isImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-gray-900 w-full max-w-4xl rounded-xl border border-gray-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="bg-gray-900 w-full max-w-lg rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FolderOpen size={20} className="text-emerald-400" />
-                Bubble Library
+                <Upload size={20} className="text-cyan-400" />
+                Import YAML
               </h3>
-              <button onClick={() => setShowButtonLibrary(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => { setIsImportOpen(false); setImportError(''); }} className="text-gray-400 hover:text-white">
                 ×
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6 p-6 overflow-y-auto">
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Session Queue</h4>
-                  {queuedButtons.length > 0 && (
-                    <button onClick={() => setQueuedButtons([])} className="text-xs text-gray-400 hover:text-white">
-                      Clear Queue
-                    </button>
-                  )}
-                </div>
-                {queuedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    Queue bubble cards from the YAML panel to keep a working set for this session.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {queuedButtons.map((button) => (
-                      <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
-                        <div>
-                          <div className="text-sm font-medium text-white">{button.name}</div>
-                          <div className="text-xs text-gray-500">Queued for this session</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded">Load</button>
-                          <button onClick={() => handleSaveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded"><Save size={12} /> Save</button>
-                          <button onClick={() => handleRemoveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Remove</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+            <div className="p-6 space-y-4">
+              <p className="text-gray-300 text-sm">
+                Paste your existing Bubble Card YAML configuration below to import settings.
+              </p>
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Saved Bubble Cards</h4>
-                  <div className="text-xs text-gray-500">Stored in browser</div>
+              <textarea value={importYaml} onChange={(e) => setImportYaml(e.target.value)} placeholder="type: custom:bubble-card&#10;card_type: button&#10;entity: light.living_room&#10;name: Living Room..." className="w-full h-48 bg-black/50 border border-gray-700 rounded-lg p-4 text-white font-mono text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none resize-none placeholder-gray-600" />
+
+              {importError && (
+                <div className="p-3 bg-red-900/20 border border-red-800 rounded-lg">
+                  <p className="text-red-400 text-xs">{importError}</p>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
-                    <option value="all">All folders</option>
-                    {availableFolders.map((folder) => (
-                      <option key={folder} value={folder}>{folder}</option>
-                    ))}
-                  </select>
-                  <input type="text" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Filter by tag" className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                </div>
-                {savedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    Save bubble cards to revisit and reuse them later.
-                  </div>
-                ) : filteredSavedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    No saved bubble cards match the current folder or tag filters.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groupedSavedButtons.map(({ folder, buttons }) => (
-                      <div key={folder} className="space-y-3">
-                        <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950/90 px-3 py-2 backdrop-blur-sm">
-                          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-300">{folder}</div>
-                          <div className="text-[11px] text-gray-500">{buttons.length} saved</div>
-                        </div>
-                        {buttons.map((button) => {
-                          const isEditing = editingSavedButtonId === button.id;
-                          return (
-                            <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
-                              {isEditing ? (
-                                <div className="space-y-3">
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <input type="text" value={editingNameInput} onChange={(e) => setEditingNameInput(e.target.value)} placeholder="Card name" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                    <input type="text" value={editingFolderInput} onChange={(e) => setEditingFolderInput(e.target.value)} placeholder="Folder" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                  </div>
-                                  <input type="text" value={editingTagsInput} onChange={(e) => setEditingTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                  <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleCommitEditSavedButton(button.id)} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded">Save Details</button>
-                                    <button onClick={handleCancelEditSavedButton} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded">Cancel</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <div>
-                                    <div className="text-sm font-medium text-white">{button.name}</div>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                      {button.folder && (
-                                        <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 text-[10px] text-cyan-300 uppercase tracking-wide">
-                                          {button.folder}
-                                        </span>
-                                      )}
-                                      {button.tags.map((tag) => (
-                                        <span key={tag} className="px-2 py-0.5 rounded-full bg-gray-700 text-[10px] text-gray-200">
-                                          #{tag}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <div className="text-xs text-gray-500">Updated {new Date(button.updatedAt).toLocaleString()}</div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded">Load</button>
-                                    <button onClick={() => handleStartEditSavedButton(button)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Pencil size={12} /> Edit</button>
-                                    <button onClick={() => handleDeleteSavedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Delete</button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+              )}
+            </div>
+
+            <div className="p-6 bg-gray-800/50 flex justify-end gap-3">
+              <button onClick={() => { setIsImportOpen(false); setImportError(''); }} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
+                Cancel
+              </button>
+              <button onClick={handleImportYaml} disabled={!importYaml.trim()} className="flex items-center gap-2 px-6 py-2 bg-cyan-600 text-white rounded-lg font-medium hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                <Upload size={16} />
+                Import
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <Toast message={toastMessage} />
     </div>
   );
 }

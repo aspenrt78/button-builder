@@ -61,29 +61,32 @@ const getHass = (): any | null => {
 };
 
 /**
- * Call Home Assistant WebSocket API
+ * Call Home Assistant WebSocket API — retries once on transient failure.
  */
 const callHassWS = async (type: string, data?: any): Promise<any | null> => {
   const hass = getHass();
-  
-  if (!hass) {
-    return null;
-  }
-  
-  try {
-    if (typeof hass.callWS === 'function') {
-      return await hass.callWS({ type, ...data });
+  if (!hass) return null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      if (typeof hass.callWS === 'function') {
+        return await hass.callWS({ type, ...data });
+      }
+      if (hass.connection?.sendMessagePromise) {
+        return await hass.connection.sendMessagePromise({ type, ...data });
+      }
+      return null;
+    } catch (error) {
+      if (attempt === 0) {
+        console.debug('[ButtonBuilder] WebSocket call failed, retrying once:', error);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } else {
+        console.debug('[ButtonBuilder] WebSocket call failed after retry:', error);
+        return null;
+      }
     }
-    
-    if (hass.connection?.sendMessagePromise) {
-      return await hass.connection.sendMessagePromise({ type, ...data });
-    }
-    
-    return null;
-  } catch (error) {
-    console.debug('[ButtonBuilder] WebSocket call failed:', error);
-    return null;
   }
+  return null;
 };
 
 // Get auth token from parent HA frame (works on mobile app)
@@ -106,10 +109,11 @@ const getParentHassAuth = (): Promise<string | null> => {
 
     window.addEventListener('message', handleMessage);
 
-    // Request auth from parent frame
+    // Request auth from parent frame — target the known HA origin when accessible.
     try {
       if (window.parent !== window) {
-        window.parent.postMessage({ type: 'request_auth' }, '*');
+        const targetOrigin = canAccessParent() ? window.parent.location.origin : '*';
+        window.parent.postMessage({ type: 'request_auth' }, targetOrigin);
         console.log('[ButtonBuilder] Requested auth from parent frame');
       } else {
         clearTimeout(timeout);
@@ -125,15 +129,11 @@ const getParentHassAuth = (): Promise<string | null> => {
   });
 };
 
-// Try to extract token from URL (some HA setups pass it)
-const getTokenFromUrl = (): string | null => {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('auth_token') || params.get('token') || null;
-  } catch {
-    return null;
-  }
-};
+// Tokens must look like a JWT (three base64url segments) before we trust them as
+// bearer tokens — refresh tokens and arbitrary strings are rejected. Tokens are
+// never read from URL params (they leak into history/access logs).
+const isLikelyAccessToken = (token: string): boolean =>
+  /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token);
 
 const ENTITY_CACHE_KEY = 'button-builder-entity-cache';
 const ENTITY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -148,11 +148,13 @@ class HomeAssistantService {
   private entities: EntityInfo[] = [];
   private fetchAttempted: boolean = false;
   private authToken: string | null = null;
+  private authInitPromise: Promise<void> | null = null;
+  /** True when every fetch method failed and no cached entities exist. */
+  public connectionFailed: boolean = false;
 
   constructor() {
     this.isDevEnv = Boolean(IS_DEV_ENV);
     this.initAuth();
-    // Load cached entities on init
     this.loadCachedEntities();
   }
 
@@ -185,16 +187,18 @@ class HomeAssistantService {
     }
   }
 
-  private async initAuth(): Promise<void> {
-    // Try to get auth token early
-    this.authToken = getTokenFromUrl() || this.getLocalStorageToken();
-    
-    if (!this.authToken) {
-      const parentToken = await getParentHassAuth();
-      if (parentToken) {
-        this.authToken = parentToken;
+  private initAuth(): Promise<void> {
+    if (this.authInitPromise) return this.authInitPromise;
+    this.authInitPromise = (async () => {
+      this.authToken = this.getLocalStorageToken();
+      if (!this.authToken) {
+        const parentToken = await getParentHassAuth();
+        if (parentToken) {
+          this.authToken = parentToken;
+        }
       }
-    }
+    })();
+    return this.authInitPromise;
   }
 
   async getEntities(): Promise<EntityInfo[]> {
@@ -208,18 +212,19 @@ class HomeAssistantService {
     // Always try to fetch if we haven't yet
     if (!this.fetchAttempted) {
       this.fetchAttempted = true;
-      
-      // Wait a bit for auth to initialize if needed
+
+      // Await auth before fetching (reuses the promise started in the constructor)
       if (!this.authToken) {
-        await new Promise(resolve => setTimeout(resolve, 500));
         await this.initAuth();
       }
-      
+
       const fetched = await this.fetchEntitiesFromHA();
       if (fetched.length > 0) {
+        this.connectionFailed = false;
         this.cacheEntities(fetched);
         return fetched;
       }
+      this.connectionFailed = this.entities.length === 0 && !this.isDevEnv;
     } else if (this.entities.length > 0) {
       return this.entities;
     }
@@ -397,14 +402,15 @@ class HomeAssistantService {
         // Try parsing as JSON
         try {
           const parsed = JSON.parse(stored);
-          const token = parsed?.access_token || parsed?.token || parsed?.refresh_token || parsed?.hassUrl;
-          if (token && typeof token === 'string' && token.length > 20) {
+          // Only access tokens are usable as Bearer tokens; never hassUrl or refresh_token.
+          const token = parsed?.access_token || parsed?.token;
+          if (token && typeof token === 'string' && isLikelyAccessToken(token)) {
             console.log(`[ButtonBuilder] Found token in localStorage.${key}`);
             return token;
           }
         } catch {
           // Not JSON, might be raw token
-          if (stored.length > 20 && !stored.startsWith('{')) {
+          if (isLikelyAccessToken(stored)) {
             console.log(`[ButtonBuilder] Found raw token in localStorage.${key}`);
             return stored;
           }

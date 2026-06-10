@@ -7,13 +7,17 @@ import { ConfigPanel } from './components/ConfigPanel';
 import { Preview } from './components/Preview';
 import { YamlViewer } from './components/YamlViewer';
 import { generateTileCardYaml } from './utils/yamlGenerator';
-import { FileDown, FileUp, FolderOpen, Save, Trash2, Pencil } from 'lucide-react';
+import { parseTileCardYaml } from './utils/yamlImporter';
+import { TILE_PRESETS, TILE_PRESET_CATEGORIES, TilePreset, applyTilePreset } from './presets';
+import { FileDown, FileUp, FolderOpen, Eye, Settings, Code, Sparkles, Undo2, Redo2, X } from 'lucide-react';
 import { APP_VERSION_LABEL } from '../version';
+import { cloneSnapshot, useToast, Toast, useResetConfirm, SaveRecordMetadata } from '../shared/libraryUtils';
+import { SaveRecordModal } from '../shared/SaveRecordModal';
+import { LibraryModal } from '../shared/LibraryModal';
+import { useConfigHistory } from '../shared/useConfigHistory';
 
 const STORAGE_KEY = 'tile-card-config';
 const SAVED_TILE_BUTTONS_STORAGE_KEY = 'tile-card-builder-saved-buttons';
-
-const cloneSnapshot = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
 const deriveTileName = (config: TileCardConfig, fallbackIndex?: number): string => {
   const name = config.name?.trim();
@@ -23,23 +27,10 @@ const deriveTileName = (config: TileCardConfig, fallbackIndex?: number): string 
   return `Tile Card ${fallbackIndex ?? 1}`;
 };
 
-interface SaveTileMetadata {
-  name: string;
-  folder: string;
-  tags: string[];
-}
-
 type SaveModalState =
-  | { mode: 'current' }
-  | { mode: 'queued'; buttonId: string }
+  | { mode: 'current'; initialName: string; initialFolder: string; initialTags: string }
+  | { mode: 'queued'; buttonId: string; initialName: string; initialFolder: string; initialTags: string }
   | null;
-
-const parseTagInput = (raw: string): string[] =>
-  raw
-    .split(',')
-    .map(tag => tag.trim())
-    .filter(Boolean)
-    .filter((tag, index, all) => all.findIndex(item => item.toLowerCase() === tag.toLowerCase()) === index);
 
 const loadSavedConfig = (): TileCardConfig => {
   try {
@@ -80,28 +71,36 @@ const loadSavedButtons = (): SavedTileRecord[] => {
 };
 
 export const TileCardApp: React.FC = () => {
-  const [config, setConfig] = useState<TileCardConfig>(loadSavedConfig);
-  const [yamlCode, setYamlCode] = useState('');
+  const { config, setConfig, replaceConfig, undo, redo, canUndo, canRedo } = useConfigHistory<TileCardConfig>(loadSavedConfig);
   const [savedButtons, setSavedButtons] = useState<SavedTileRecord[]>(loadSavedButtons);
   const [queuedButtons, setQueuedButtons] = useState<SavedTileRecord[]>([]);
   const [showButtonLibrary, setShowButtonLibrary] = useState(false);
-  const [folderFilter, setFolderFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState('');
   const [saveModalState, setSaveModalState] = useState<SaveModalState>(null);
-  const [saveNameInput, setSaveNameInput] = useState('');
-  const [saveFolderInput, setSaveFolderInput] = useState('');
-  const [saveTagsInput, setSaveTagsInput] = useState('');
-  const [editingSavedButtonId, setEditingSavedButtonId] = useState<string | null>(null);
-  const [editingNameInput, setEditingNameInput] = useState('');
-  const [editingFolderInput, setEditingFolderInput] = useState('');
-  const [editingTagsInput, setEditingTagsInput] = useState('');
+  const { toastMessage, showToast } = useToast();
 
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importYaml, setImportYaml] = useState('');
+  const [importError, setImportError] = useState('');
+
+  const [showPresets, setShowPresets] = useState(false);
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetCategory, setPresetCategory] = useState<string>('all');
+  const [activePresetName, setActivePresetName] = useState<string | null>(null);
+
+  const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml' | 'presets'>('preview');
+
+  const yamlCode = useMemo(() => generateTileCardYaml(config), [config]);
+
+  // Debounced autosave — avoids a synchronous localStorage write on every keypress.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    } catch (e) {
-      console.warn('Failed to save tile card config:', e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      } catch (e) {
+        console.warn('Failed to save tile card config:', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
   }, [config]);
 
   useEffect(() => {
@@ -113,11 +112,16 @@ export const TileCardApp: React.FC = () => {
   }, [savedButtons]);
 
   useEffect(() => {
-    const yaml = generateTileCardYaml(config);
-    setYamlCode(yaml);
-  }, [config]);
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (queuedButtons.length > 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [queuedButtons.length]);
 
-  const createButtonRecord = (metadata?: Partial<SaveTileMetadata>): SavedTileRecord => {
+  const createButtonRecord = (metadata?: Partial<SaveRecordMetadata>): SavedTileRecord => {
     const timestamp = Date.now();
     return {
       id: `tile-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
@@ -131,46 +135,46 @@ export const TileCardApp: React.FC = () => {
     };
   };
 
-  const availableFolders = useMemo(() => {
-    const folders = Array.from(new Set(savedButtons.map(button => button.folder.trim()).filter(Boolean)));
-    return folders.sort((a, b) => a.localeCompare(b));
-  }, [savedButtons]);
-
-  const filteredSavedButtons = useMemo(() => {
-    const normalizedTagFilter = tagFilter.trim().toLowerCase();
-    return savedButtons.filter((button) => {
-      const matchesFolder = folderFilter === 'all' || button.folder === folderFilter;
-      const matchesTag = !normalizedTagFilter || button.tags.some(tag => tag.toLowerCase().includes(normalizedTagFilter));
-      return matchesFolder && matchesTag;
+  const filteredPresets = useMemo(() => {
+    const query = presetSearch.trim().toLowerCase();
+    return TILE_PRESETS.filter(preset => {
+      const matchesCategory = presetCategory === 'all' || preset.category === presetCategory;
+      const matchesSearch = !query ||
+        preset.name.toLowerCase().includes(query) ||
+        preset.description.toLowerCase().includes(query);
+      return matchesCategory && matchesSearch;
     });
-  }, [folderFilter, savedButtons, tagFilter]);
+  }, [presetSearch, presetCategory]);
 
-  const groupedSavedButtons = useMemo(() => {
-    const groups = new Map<string, SavedTileRecord[]>();
-    filteredSavedButtons.forEach((button) => {
-      const folder = button.folder.trim() || 'Unfiled';
-      const existing = groups.get(folder) || [];
-      existing.push(button);
-      groups.set(folder, existing);
-    });
-
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([folder, buttons]) => ({ folder, buttons }));
-  }, [filteredSavedButtons]);
+  const handleApplyPreset = (preset: TilePreset) => {
+    setConfig(applyTilePreset(preset));
+    setActivePresetName(preset.name);
+    showToast(`"${preset.name}" preset applied`);
+  };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(config, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    const exportFileDefaultName = 'tile-card-config.json';
-
+    const dataUri = 'data:text/yaml;charset=utf-8,' + encodeURIComponent(yamlCode);
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.setAttribute('download', 'tile-card.yaml');
     linkElement.click();
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportYaml = () => {
+    setImportError('');
+    try {
+      const parsed = parseTileCardYaml(importYaml);
+      setConfig(parsed);
+      setActivePresetName(null);
+      setIsImportOpen(false);
+      setImportYaml('');
+      showToast('Tile card YAML imported');
+    } catch (e: any) {
+      setImportError(e.message || 'Failed to parse YAML. Please check the format.');
+    }
+  };
+
+  const handleImportJsonFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -179,6 +183,8 @@ export const TileCardApp: React.FC = () => {
       try {
         const imported = JSON.parse(e.target?.result as string);
         setConfig({ ...DEFAULT_TILE_CONFIG, ...imported });
+        setActivePresetName(null);
+        showToast('Config imported');
       } catch (err) {
         console.error('Failed to import config:', err);
         alert('Failed to import config file');
@@ -187,11 +193,11 @@ export const TileCardApp: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const handleReset = () => {
-    if (confirm('Reset to default configuration?')) {
-      setConfig({ ...DEFAULT_TILE_CONFIG });
-    }
-  };
+  const { resetConfirmPending, handleReset } = useResetConfirm(() => {
+    replaceConfig({ ...DEFAULT_TILE_CONFIG });
+    setActivePresetName(null);
+    localStorage.removeItem(STORAGE_KEY);
+  });
 
   const handleQueueCurrentButton = (): boolean => {
     setQueuedButtons((prev) => [createButtonRecord(), ...prev]);
@@ -199,15 +205,18 @@ export const TileCardApp: React.FC = () => {
   };
 
   const handleSaveCurrentButton = (): boolean => {
-    setSaveNameInput(deriveTileName(config, savedButtons.length + 1));
-    setSaveFolderInput('');
-    setSaveTagsInput('');
-    setSaveModalState({ mode: 'current' });
+    setSaveModalState({
+      mode: 'current',
+      initialName: deriveTileName(config, savedButtons.length + 1),
+      initialFolder: '',
+      initialTags: '',
+    });
     return true;
   };
 
   const handleLoadButtonRecord = (record: SavedTileRecord) => {
-    setConfig(cloneSnapshot(record.config));
+    replaceConfig(cloneSnapshot(record.config));
+    setActivePresetName(null);
     setShowButtonLibrary(false);
   };
 
@@ -223,22 +232,17 @@ export const TileCardApp: React.FC = () => {
     const queued = queuedButtons.find((button) => button.id === buttonId);
     if (!queued) return;
 
-    setSaveNameInput(queued.name);
-    setSaveFolderInput(queued.folder);
-    setSaveTagsInput(queued.tags.join(', '));
-    setSaveModalState({ mode: 'queued', buttonId });
+    setSaveModalState({
+      mode: 'queued',
+      buttonId,
+      initialName: queued.name,
+      initialFolder: queued.folder,
+      initialTags: queued.tags.join(', '),
+    });
   };
 
-  const handleConfirmSaveModal = () => {
+  const handleConfirmSaveModal = (metadata: SaveRecordMetadata) => {
     if (!saveModalState) return;
-
-    const metadata: SaveTileMetadata = {
-      name: saveNameInput.trim(),
-      folder: saveFolderInput.trim(),
-      tags: parseTagInput(saveTagsInput),
-    };
-
-    if (!metadata.name) return;
 
     if (saveModalState.mode === 'current') {
       setSavedButtons((prev) => [createButtonRecord(metadata), ...prev]);
@@ -262,39 +266,51 @@ export const TileCardApp: React.FC = () => {
     }
 
     setSaveModalState(null);
+    showToast(`"${metadata.name}" saved to library`);
   };
 
-  const handleStartEditSavedButton = (button: SavedTileRecord) => {
-    setEditingSavedButtonId(button.id);
-    setEditingNameInput(button.name);
-    setEditingFolderInput(button.folder);
-    setEditingTagsInput(button.tags.join(', '));
-  };
-
-  const handleCancelEditSavedButton = () => {
-    setEditingSavedButtonId(null);
-    setEditingNameInput('');
-    setEditingFolderInput('');
-    setEditingTagsInput('');
-  };
-
-  const handleCommitEditSavedButton = (buttonId: string) => {
-    const nextName = editingNameInput.trim();
-    if (!nextName) return;
-
+  const handleCommitEditSavedButton = (buttonId: string, metadata: SaveRecordMetadata) => {
     setSavedButtons((prev) => prev.map((button) => (
       button.id === buttonId
         ? {
             ...button,
-            name: nextName,
-            folder: editingFolderInput.trim(),
-            tags: parseTagInput(editingTagsInput),
+            name: metadata.name,
+            folder: metadata.folder,
+            tags: metadata.tags,
             updatedAt: Date.now(),
           }
         : button
     )));
-    handleCancelEditSavedButton();
   };
+
+  const presetsPanel = (
+    <div className="h-full flex flex-col bg-[#111]">
+      <div className="p-3 border-b border-gray-800 space-y-2 shrink-0">
+        <input type="text" placeholder="Search presets..." value={presetSearch} onChange={(e) => setPresetSearch(e.target.value)} className="w-full bg-gray-900 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none" />
+        <select value={presetCategory} onChange={(e) => setPresetCategory(e.target.value)} className="w-full bg-gray-900 text-white text-sm px-2 py-1.5 rounded border border-gray-700 focus:border-emerald-500">
+          {TILE_PRESET_CATEGORIES.map(cat => (
+            <option key={cat.value} value={cat.value}>{cat.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {filteredPresets.map((preset) => (
+          <button key={preset.name} onClick={() => handleApplyPreset(preset)} className={`w-full text-left p-3 rounded-lg transition-all border ${activePresetName === preset.name ? 'bg-emerald-600/20 border-emerald-500/50 ring-1 ring-emerald-500/30' : 'bg-gray-900 hover:bg-gray-800 border-gray-700'}`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">{preset.name}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 uppercase tracking-wide">
+                {preset.category}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{preset.description}</p>
+          </button>
+        ))}
+        {filteredPresets.length === 0 && (
+          <div className="text-center text-gray-500 text-sm py-8">No presets match your search.</div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-full w-full flex flex-col bg-black text-white overflow-hidden">
@@ -306,29 +322,37 @@ export const TileCardApp: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1 mr-1">
+            <button onClick={undo} disabled={!canUndo} className="p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-800" title="Undo (Ctrl+Z)">
+              <Undo2 size={16} className="text-gray-400" />
+            </button>
+            <button onClick={redo} disabled={!canRedo} className="p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-800" title="Redo (Ctrl+Y)">
+              <Redo2 size={16} className="text-gray-400" />
+            </button>
+          </div>
           <button onClick={() => setShowButtonLibrary(true)} className="flex items-center gap-2 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors" title="Open tile library">
             <FolderOpen size={14} />
-            Library
+            <span className="hidden sm:inline">Library</span>
             {(queuedButtons.length + savedButtons.length) > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-gray-700 text-[10px] text-gray-200">
                 {queuedButtons.length + savedButtons.length}
               </span>
             )}
           </button>
-          <label className="cursor-pointer p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Import Config">
+          <button onClick={() => { setIsImportOpen(true); setImportError(''); }} className="p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Import YAML">
             <FileUp size={16} className="text-gray-400" />
-            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-          </label>
-          <button onClick={handleExport} className="p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Export Config">
+          </button>
+          <button onClick={handleExport} className="p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Export card YAML for HA dashboard">
             <FileDown size={16} className="text-gray-400" />
           </button>
-          <button onClick={handleReset} className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-            Reset
+          <button onClick={handleReset} className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${resetConfirmPending ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-gray-800 hover:bg-gray-700'}`}>
+            {resetConfirmPending ? 'Confirm?' : 'Reset'}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      {/* Desktop layout */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
         <div className="w-80 border-r border-gray-800 bg-gray-950 overflow-y-auto">
           <ConfigPanel config={config} setConfig={setConfig} />
         </div>
@@ -337,177 +361,152 @@ export const TileCardApp: React.FC = () => {
           <Preview config={config} />
         </div>
 
-        <div className="w-96 border-l border-gray-800 bg-gray-950 overflow-hidden">
-          <YamlViewer yaml={yamlCode} sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
+        <div className="w-96 border-l border-gray-800 bg-gray-950 flex flex-col overflow-hidden">
+          <div className="flex border-b border-gray-800 shrink-0">
+            <button onClick={() => setShowPresets(false)} className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${!showPresets ? 'bg-gray-800 text-white border-b-2 border-emerald-500' : 'text-gray-400 hover:text-white'}`}>
+              <Code size={14} />
+              YAML
+            </button>
+            <button onClick={() => setShowPresets(true)} className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${showPresets ? 'bg-gray-800 text-white border-b-2 border-emerald-500' : 'text-gray-400 hover:text-white'}`}>
+              <Sparkles size={14} />
+              Presets ({TILE_PRESETS.length})
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {showPresets ? presetsPanel : (
+              <YamlViewer yaml={yamlCode} sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
+            )}
+          </div>
         </div>
       </div>
 
-      {showButtonLibrary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-gray-900 w-full max-w-4xl rounded-xl border border-gray-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FolderOpen size={20} className="text-emerald-400" />
-                Tile Library
-              </h3>
-              <button onClick={() => setShowButtonLibrary(false)} className="text-gray-400 hover:text-white">
-                ×
-              </button>
+      {/* Mobile layout */}
+      <div className="md:hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {mobileTab === 'preview' && (
+            <div className="h-full bg-gray-900 overflow-y-auto">
+              <Preview config={config} />
             </div>
-
-            <div className="grid md:grid-cols-2 gap-6 p-6 overflow-y-auto">
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Session Queue</h4>
-                  {queuedButtons.length > 0 && (
-                    <button onClick={() => setQueuedButtons([])} className="text-xs text-gray-400 hover:text-white">
-                      Clear Queue
-                    </button>
-                  )}
-                </div>
-                {queuedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    Queue tile cards from the YAML panel to keep a working set for this session.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {queuedButtons.map((button) => (
-                      <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
-                        <div>
-                          <div className="text-sm font-medium text-white">{button.name}</div>
-                          <div className="text-xs text-gray-500">Queued for this session</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded">Load</button>
-                          <button onClick={() => handleSaveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded"><Save size={12} /> Save</button>
-                          <button onClick={() => handleRemoveQueuedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Remove</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Saved Tile Cards</h4>
-                  <div className="text-xs text-gray-500">Stored in browser</div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white">
-                    <option value="all">All folders</option>
-                    {availableFolders.map((folder) => (
-                      <option key={folder} value={folder}>{folder}</option>
-                    ))}
-                  </select>
-                  <input type="text" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="Filter by tag" className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                </div>
-                {savedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    Save tile cards to revisit and reuse them later.
-                  </div>
-                ) : filteredSavedButtons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
-                    No saved tile cards match the current folder or tag filters.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groupedSavedButtons.map(({ folder, buttons }) => (
-                      <div key={folder} className="space-y-3">
-                        <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950/90 px-3 py-2 backdrop-blur-sm">
-                          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-300">{folder}</div>
-                          <div className="text-[11px] text-gray-500">{buttons.length} saved</div>
-                        </div>
-                        {buttons.map((button) => {
-                          const isEditing = editingSavedButtonId === button.id;
-                          return (
-                            <div key={button.id} className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
-                              {isEditing ? (
-                                <div className="space-y-3">
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <input type="text" value={editingNameInput} onChange={(e) => setEditingNameInput(e.target.value)} placeholder="Card name" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                    <input type="text" value={editingFolderInput} onChange={(e) => setEditingFolderInput(e.target.value)} placeholder="Folder" className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                  </div>
-                                  <input type="text" value={editingTagsInput} onChange={(e) => setEditingTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500" />
-                                  <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleCommitEditSavedButton(button.id)} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded">Save Details</button>
-                                    <button onClick={handleCancelEditSavedButton} className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded">Cancel</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <div>
-                                    <div className="text-sm font-medium text-white">{button.name}</div>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                      {button.folder && (
-                                        <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-[10px] text-blue-300 uppercase tracking-wide">
-                                          {button.folder}
-                                        </span>
-                                      )}
-                                      {button.tags.map((tag) => (
-                                        <span key={tag} className="px-2 py-0.5 rounded-full bg-gray-700 text-[10px] text-gray-200">
-                                          #{tag}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <div className="text-xs text-gray-500">Updated {new Date(button.updatedAt).toLocaleString()}</div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleLoadButtonRecord(button)} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded">Load</button>
-                                    <button onClick={() => handleStartEditSavedButton(button)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Pencil size={12} /> Edit</button>
-                                    <button onClick={() => handleDeleteSavedButton(button.id)} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded"><Trash2 size={12} /> Delete</button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+          )}
+          {mobileTab === 'config' && (
+            <div className="h-full overflow-y-auto bg-gray-950">
+              <ConfigPanel config={config} setConfig={setConfig} />
             </div>
-          </div>
+          )}
+          {mobileTab === 'yaml' && (
+            <div className="h-full overflow-hidden bg-gray-950">
+              <YamlViewer yaml={yamlCode} sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
+            </div>
+          )}
+          {mobileTab === 'presets' && presetsPanel}
         </div>
+
+        <nav className="shrink-0 border-t border-gray-800 bg-gray-900 flex">
+          <button onClick={() => setMobileTab('preview')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'preview' ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-500'}`}>
+            <Eye size={20} />
+            <span className="text-[10px] font-medium">Preview</span>
+          </button>
+          <button onClick={() => setMobileTab('config')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'config' ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-500'}`}>
+            <Settings size={20} />
+            <span className="text-[10px] font-medium">Configure</span>
+          </button>
+          <button onClick={() => setMobileTab('presets')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'presets' ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-500'}`}>
+            <Sparkles size={20} />
+            <span className="text-[10px] font-medium">Presets</span>
+          </button>
+          <button onClick={() => setMobileTab('yaml')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'yaml' ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-500'}`}>
+            <Code size={20} />
+            <span className="text-[10px] font-medium">YAML</span>
+          </button>
+        </nav>
+      </div>
+
+      {showButtonLibrary && (
+        <LibraryModal
+          title="Tile Library"
+          itemNoun="tile card"
+          queuedRecords={queuedButtons}
+          savedRecords={savedButtons}
+          loadAccentClass="bg-emerald-600 hover:bg-emerald-500"
+          emptyQueueText="Queue tile cards from the YAML panel to keep a working set for this session."
+          emptySavedText="Save tile cards to revisit and reuse them later."
+          exportFilenamePrefix="tile-card"
+          onClose={() => setShowButtonLibrary(false)}
+          onLoad={handleLoadButtonRecord}
+          onSaveQueued={handleSaveQueuedButton}
+          onRemoveQueued={handleRemoveQueuedButton}
+          onClearQueue={() => setQueuedButtons([])}
+          onDelete={handleDeleteSavedButton}
+          onCommitEdit={handleCommitEditSavedButton}
+        />
       )}
 
       {saveModalState && (
+        <SaveRecordModal
+          title="Save Tile Card"
+          description="Save this tile card with a name, optional folder, and tags so it is easy to find later."
+          itemNoun="tile card"
+          initialName={saveModalState.initialName}
+          initialFolder={saveModalState.initialFolder}
+          initialTags={saveModalState.initialTags}
+          existingNames={savedButtons
+            .filter((button) => saveModalState.mode !== 'queued' || button.id !== saveModalState.buttonId)
+            .map((button) => button.name)}
+          onConfirm={handleConfirmSaveModal}
+          onClose={() => setSaveModalState(null)}
+        />
+      )}
+
+      {isImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
+          <div className="bg-gray-900 w-full max-w-2xl rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Save size={20} className="text-emerald-400" />
-                Save Tile Card
+                <FileUp size={20} className="text-emerald-400" />
+                Import Tile Card YAML
               </h3>
-              <button onClick={() => setSaveModalState(null)} className="text-gray-400 hover:text-white">
-                ×
+              <button onClick={() => { setIsImportOpen(false); setImportYaml(''); setImportError(''); }} className="text-gray-400 hover:text-white">
+                <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
               <p className="text-sm text-gray-300">
-                Save this tile card with a name, optional folder, and tags so it is easy to reuse later.
+                Paste tile card YAML from a Home Assistant dashboard to load it into the builder.
               </p>
-              <div className="space-y-3">
-                <input type="text" value={saveNameInput} onChange={(e) => setSaveNameInput(e.target.value)} placeholder="Card name" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
-                <input type="text" value={saveFolderInput} onChange={(e) => setSaveFolderInput(e.target.value)} placeholder="Folder (optional)" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
-                <input type="text" value={saveTagsInput} onChange={(e) => setSaveTagsInput(e.target.value)} placeholder="Tags, comma separated" className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500" />
+              <textarea
+                value={importYaml}
+                onChange={(e) => setImportYaml(e.target.value)}
+                placeholder={'type: tile\nentity: light.living_room\nfeatures:\n  - type: light-brightness'}
+                spellCheck={false}
+                className="w-full h-56 bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white font-mono placeholder-gray-600 focus:border-emerald-500 focus:outline-none resize-none"
+              />
+              {importError && (
+                <p className="text-sm text-red-400">{importError}</p>
+              )}
+              <div className="border-t border-gray-800 pt-4">
+                <label className="inline-flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-200">
+                  <FileUp size={14} />
+                  Or import a JSON config backup
+                  <input type="file" accept=".json" onChange={(e) => { handleImportJsonFile(e); setIsImportOpen(false); }} className="hidden" />
+                </label>
               </div>
             </div>
 
             <div className="p-6 bg-gray-800/50 flex justify-end gap-3">
-              <button onClick={() => setSaveModalState(null)} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
+              <button onClick={() => { setIsImportOpen(false); setImportYaml(''); setImportError(''); }} className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white">
                 Cancel
               </button>
-              <button onClick={handleConfirmSaveModal} disabled={!saveNameInput.trim()} className="inline-flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                <Save size={16} />
-                Save Tile Card
+              <button onClick={handleImportYaml} disabled={!importYaml.trim()} className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                <FileUp size={16} />
+                Import
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <Toast message={toastMessage} />
     </div>
   );
 };

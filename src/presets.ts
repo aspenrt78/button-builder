@@ -114,7 +114,7 @@ const STYLE_PRESET_KEYS: ReadonlyArray<keyof ButtonConfig> = [
 const clonePresetValue = <T,>(value: T): T => {
   if (value && typeof value === 'object') {
     try {
-      return JSON.parse(JSON.stringify(value)) as T;
+      return structuredClone(value) as T;
     } catch {
       return value;
     }

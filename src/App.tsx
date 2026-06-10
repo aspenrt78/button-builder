@@ -1,5 +1,6 @@
-// Main App - Card Type Selector Wrapper
-// Allows switching between Button Card Builder and Bubble Card Builder
+// Main App - Routes to the correct card builder based on ?app= URL param.
+// In HA, each builder is registered as its own sidebar panel with its own URL.
+// In dev mode (no param) the switcher tab bar is shown for convenience.
 
 import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { ButtonCardApp } from './ButtonCardApp';
@@ -7,7 +8,6 @@ import { BubbleCardApp } from './bubble-card/BubbleCardApp';
 import { TileCardApp } from './tile-card/TileCardApp';
 import { Layers, AlertTriangle, RefreshCw } from 'lucide-react';
 
-// Global Error Boundary to catch any rendering errors
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
@@ -66,6 +66,20 @@ type CardType = 'button-card' | 'bubble-card' | 'tile-card';
 
 const CARD_TYPE_STORAGE_KEY = 'button-builder-card-type';
 
+// Read the ?app= param set by the HA panel registration.
+// Returns null when running in dev mode (no param present).
+const getAppParam = (): CardType | null => {
+  try {
+    const param = new URLSearchParams(window.location.search).get('app');
+    if (param === 'button-card' || param === 'bubble-card' || param === 'tile-card') {
+      return param;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
 const loadSavedCardType = (): CardType => {
   try {
     const saved = localStorage.getItem(CARD_TYPE_STORAGE_KEY);
@@ -79,19 +93,40 @@ const loadSavedCardType = (): CardType => {
 };
 
 const App: React.FC = () => {
-  const [cardType, setCardType] = useState<CardType>(loadSavedCardType);
+  // When an ?app= param is present we lock to that app and hide the switcher.
+  const appParam = getAppParam();
+
+  const [cardType, setCardType] = useState<CardType>(appParam ?? loadSavedCardType);
 
   useEffect(() => {
+    if (appParam) return; // Don't persist when driven by URL param
     try {
       localStorage.setItem(CARD_TYPE_STORAGE_KEY, cardType);
     } catch (e) {
       console.warn('Failed to save card type:', e);
     }
-  }, [cardType]);
+  }, [cardType, appParam]);
 
+  const renderApp = (type: CardType) => {
+    if (type === 'button-card') return <ButtonCardApp />;
+    if (type === 'bubble-card') return <BubbleCardApp />;
+    return <TileCardApp />;
+  };
+
+  // In HA each builder is its own panel — no switcher needed.
+  if (appParam) {
+    return (
+      <div className="h-screen w-screen flex flex-col bg-black text-white overflow-hidden">
+        <GlobalErrorBoundary>
+          {renderApp(appParam)}
+        </GlobalErrorBoundary>
+      </div>
+    );
+  }
+
+  // Dev mode: show the card-type switcher at the top.
   return (
     <div className="h-screen w-screen flex flex-col bg-black text-white overflow-hidden">
-      {/* Card Type Selector Header */}
       <div className="shrink-0 h-10 bg-gray-950 border-b border-gray-800 flex items-center justify-center gap-1 px-4">
         <div className="flex items-center gap-2 mr-4">
           <Layers size={16} className="text-gray-500" />
@@ -132,16 +167,9 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Selected Card Builder */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <GlobalErrorBoundary>
-          {cardType === 'button-card' ? (
-            <ButtonCardApp />
-          ) : cardType === 'bubble-card' ? (
-            <BubbleCardApp />
-          ) : (
-            <TileCardApp />
-          )}
+          {renderApp(cardType)}
         </GlobalErrorBoundary>
       </div>
     </div>
