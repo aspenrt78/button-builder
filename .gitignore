@@ -27,3 +27,5 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.claude-tmp-diff.txt
+__pycache__/

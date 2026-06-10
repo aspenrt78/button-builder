@@ -1,5 +1,5 @@
 import YAML from 'yaml';
-import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, Variable, CustomField, ToastConfig, DEFAULT_TOAST_CONFIG, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG } from '../types';
+import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateOperator, Variable, CustomField, ToastConfig, DEFAULT_TOAST_CONFIG, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG } from '../types';
 
 /**
  * Parses button-card YAML and converts it to a ButtonConfig object
@@ -76,7 +76,6 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   
   // Advanced options
   if (parsed.numeric_precision !== undefined) config.numericPrecision = Number(parsed.numeric_precision);
-  if (parsed.hold_time !== undefined) config.holdTime = Number(parsed.hold_time);
   if (parsed.update_timer !== undefined) config.updateTimer = Number(parsed.update_timer);
   if (parsed.hidden !== undefined) {
     if (typeof parsed.hidden === 'string' && parsed.hidden.includes('[[[')) {
@@ -118,7 +117,6 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   }
   
   // Trigger options
-  if (parsed.trigger_entity) config.triggerEntity = String(parsed.trigger_entity);
   if (parsed.triggers_update && Array.isArray(parsed.triggers_update)) {
     config.triggersUpdate = parsed.triggers_update.map(String);
   }
@@ -217,7 +215,13 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
     const firstCondition = parsed.conditions[0];
     if (firstCondition.entity) config.conditionalEntity = String(firstCondition.entity);
     if (firstCondition.state !== undefined) config.conditionalState = String(firstCondition.state);
-    if (firstCondition.operator) config.conditionalOperator = String(firstCondition.operator);
+    if (firstCondition.operator) {
+      const op = String(firstCondition.operator);
+      const validOperators: StateOperator[] = ['equals', 'not_equals', 'above', 'above_equal', 'below', 'below_equal', 'regex', 'template', 'default'];
+      if ((validOperators as string[]).includes(op)) {
+        config.conditionalOperator = op as StateOperator;
+      }
+    }
   }
   
   return config;

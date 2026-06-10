@@ -69,8 +69,12 @@ export function BubbleYamlViewer({
     setTimeout(() => setSavedCurrent(false), 2000);
   };
 
+  const escapeHtml = (text: string) =>
+    text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
   const highlightYaml = (code: string) => {
-    return code.split('\n').map((line, i) => {
+    return code.split('\n').map((rawLine, i) => {
+      const line = escapeHtml(rawLine);
       let highlighted = line.replace(
         /^(\s*)([a-z_]+)(:)/gi,
         '$1<span class="text-cyan-400">$2</span><span class="text-gray-400">$3</span>'

@@ -447,7 +447,8 @@ export interface ButtonConfig {
   tooltipStyles: string;
   
   // Advanced Trigger Options
-  // (trigger_entity / triggers_update removed — not valid button-card options)
+  // triggers_update is a valid button-card option (list of entity_ids that force a card update)
+  triggersUpdate: string[];
 
   // Live Stream
   liveStreamFitMode: string;
@@ -739,6 +740,9 @@ export const DEFAULT_CONFIG: ButtonConfig = {
 
   // Haptic
   hapticFeedback: '',
+
+  // Advanced Trigger Options
+  triggersUpdate: [],
 
   // Spinner Template
   spinnerTemplate: '',

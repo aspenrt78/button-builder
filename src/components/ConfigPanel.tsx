@@ -2486,14 +2486,8 @@ export const ConfigPanel: React.FC<Props> = ({
                   <ControlInput label="JavaScript Code" value={config.tapActionJavascript} onChange={(v) => update('tapActionJavascript', v)} placeholder="alert('Hello!')" />
                 </div>
               )}
-              {(config.tapAction === 'toast') && (
-                <div className="mt-2 space-y-2">
-                  <ControlInput label="Toast Message" value={config.tapActionToast.message} onChange={(v) => update('tapActionToast', { ...config.tapActionToast, message: v })} />
-                  <ControlInput label="Duration (ms)" value={config.tapActionToast.duration.toString()} onChange={(v) => update('tapActionToast', { ...config.tapActionToast, duration: Number(v) || 3000 })} />
-                </div>
-              )}
             </div>
-            
+
             <div>
               <ControlInput label="Hold Action" type="select" value={config.holdAction} options={entityActionOptions} onChange={(v) => update('holdAction', v)} />
               {(config.holdAction === 'call-service') && (
@@ -2979,12 +2973,7 @@ export const ConfigPanel: React.FC<Props> = ({
             <YamlOnlyHint text="Most options here are runtime-only (timers, templates, haptic, trigger rules, conditional display)." />
             <div className="grid grid-cols-2 gap-4">
               <ControlInput label="Update Timer (s)" value={config.updateTimer.toString()} onChange={(v) => update('updateTimer', Number(v) || 0)} placeholder="0 = disabled" />
-              <ControlInput label="Hold Time (ms)" value={config.holdTime.toString()} onChange={(v) => update('holdTime', Number(v) || 500)} placeholder="500" />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
               <ControlInput label="Template" value={config.template} onChange={(v) => update('template', v)} placeholder="template_name" />
-              <div />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -3020,7 +3009,6 @@ export const ConfigPanel: React.FC<Props> = ({
               <p className="text-xs font-bold text-gray-400 uppercase mb-2">Trigger Options</p>
               <YamlOnlyBadge />
             </div>
-            <ControlInput label="Trigger Entity" value={config.triggerEntity} onChange={(v) => update('triggerEntity', v)} placeholder="sensor.time" />
             <div>
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Triggers Update (one entity per line)</label>
               <textarea

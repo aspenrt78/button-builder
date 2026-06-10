@@ -591,6 +591,14 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `update_timer: ${config.updateTimer}\n`;
   }
 
+  // Triggers Update (entities that force a card re-render)
+  if (config.triggersUpdate && config.triggersUpdate.length > 0) {
+    yaml += `triggers_update:\n`;
+    config.triggersUpdate.forEach(e => {
+      yaml += `  - ${e}\n`;
+    });
+  }
+
   // Template
   if (config.template) {
     yaml += `template: ${config.template}\n`;
