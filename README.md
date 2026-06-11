@@ -46,13 +46,24 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 
 ## ✨ Features
 
-- 🎯 **Visual Editor**: Real-time preview as you configure your button cards
+**Three builders, three sidebar panels:**
+
+| Panel | Designs cards for | Requires |
+|-------|-------------------|----------|
+| 🎯 Button Card Builder | [custom:button-card](https://github.com/custom-cards/button-card) | button-card via HACS |
+| 🫧 Bubble Card Builder | [custom:bubble-card](https://github.com/Clooos/Bubble-Card) | Bubble Card via HACS |
+| 🟦 Tile Card Builder | Home Assistant's built-in Tile card | Nothing extra! |
+
+- 🎯 **Visual Editors**: Real-time preview as you configure your cards
 - 🤖 **AI-Powered Design**: Generate complete button configurations from natural language descriptions
+- 💾 **Save & Library**: Save designs with folders and tags, search, duplicate, export backups, undo/redo
 - 🎨 **Full Style Control**: Colors, gradients, opacity, borders, shadows, glassmorphism effects
 - ⚡ **Animations**: 10+ animation types (pulse, flash, spin, shake, bounce, etc.)
 - 📐 **Layout Options**: Multiple layout presets for icon, name, state, and label positioning
+- 📥 **YAML Import**: Paste existing card YAML to edit it visually
 - 📋 **YAML Export**: Copy generated YAML directly to your Home Assistant configuration
-- 🔧 **All button-card Features**: Comprehensive support for custom:button-card options
+- 🔧 **Full Option Coverage**: Comprehensive support for button-card, bubble-card, and tile card options (including all 37+ tile features)
+- 📱 **Mobile Friendly**: Dedicated phone layout with bottom-tab navigation
 
 ## 📦 Installation
 
@@ -65,7 +76,7 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 5. Click "Download"
 6. Restart Home Assistant
 7. Go to Settings → Devices & Services → Add Integration → Search "Button Builder"
-8. The "Button Builder" panel will appear in your sidebar
+8. Three panels appear in your sidebar: **Button Card Builder**, **Bubble Card Builder**, and **Tile Card Builder**
 
 ### Manual Installation
 
@@ -79,13 +90,13 @@ Happy automating — and thanks in advance to anyone willing to play with this t
    ```
 4. Restart Home Assistant
 5. Go to Settings → Devices & Services → Add Integration → Search "Button Builder"
-6. The "Button Builder" panel will appear in your sidebar
+6. Three panels appear in your sidebar: **Button Card Builder**, **Bubble Card Builder**, and **Tile Card Builder**
 
 ## 🚀 Usage
 
 ### Basic Workflow
 
-1. Click "Button Builder" in your Home Assistant sidebar
+1. Click the builder you want in your Home Assistant sidebar (Button Card, Bubble Card, or Tile Card)
 2. Use the left panel to configure your button:
    - Set entity ID, name, icon, and label
    - Choose layout and visibility options
@@ -101,7 +112,7 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 2. **First time?** You'll be prompted to enter your free Gemini API key:
    - Click the link to [Google AI Studio](https://aistudio.google.com/apikey)
    - Create a free API key (takes 30 seconds)
-   - Paste it into the app — it's stored locally in your browser, never sent to our servers
+   - Paste it into the app — it's kept only for your current browser session, never sent anywhere except Google's API
 3. Describe your ideal button in plain English:
    - Example: *"A futuristic cyan button for a bedroom fan that glows when on"*
    - Example: *"Glassmorphism style button for living room lights with purple accent"*
@@ -195,7 +206,9 @@ button-builder/
 │   ├── components/         # React components
 │   ├── services/           # API services
 │   ├── utils/              # Utility functions
-│   ├── bubble-card/        # Bubble Card builder (beta)
+│   ├── bubble-card/        # Bubble Card builder
+│   ├── tile-card/          # Tile Card builder
+│   ├── shared/             # Shared UI (library, save modal, history)
 │   └── assets/             # Images & assets
 ├── docs/                   # Documentation
 ├── scripts/                # Build & deploy scripts

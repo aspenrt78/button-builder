@@ -20,6 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 DOMAIN = "button_builder"
 PANEL_ID_BUTTON = "button-card-builder"
 PANEL_ID_BUBBLE = "bubble-card-builder"
+PANEL_ID_TILE = "tile-card-builder"
 DATA_PANEL_REGISTERED = "panel_registered"
 DATA_STATIC_REGISTERED = "static_path_registered"
 DATA_REGISTER_TIMER = "register_timer_cancel"
@@ -63,7 +64,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         cancel_timer()
 
     if domain_data.get(DATA_PANEL_REGISTERED):
-        for panel_id in (PANEL_ID_BUTTON, PANEL_ID_BUBBLE):
+        for panel_id in (PANEL_ID_BUTTON, PANEL_ID_BUBBLE, PANEL_ID_TILE):
             try:
                 async_remove_panel(hass, panel_id)
             except Exception as err:
@@ -123,6 +124,19 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         frontend_url_path=PANEL_ID_BUBBLE,
         config={
             "url": f"/button_builder/panel.html?app=bubble-card&v={version}"
+        },
+        require_admin=False,
+    )
+
+    # Register Tile Card Builder panel
+    async_register_built_in_panel(
+        hass,
+        component_name="iframe",
+        sidebar_title="Tile Card Builder",
+        sidebar_icon="mdi:view-grid-outline",
+        frontend_url_path=PANEL_ID_TILE,
+        config={
+            "url": f"/button_builder/panel.html?app=tile-card&v={version}"
         },
         require_admin=False,
     )
