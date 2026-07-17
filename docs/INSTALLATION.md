@@ -1,133 +1,79 @@
 # Installation Guide
 
-## Prerequisites
+## Requirements
 
-### Required
-- **Home Assistant** (version 2021.12 or newer)
-- **custom:button-card** integration (Install via HACS or manually)
-  - HACS: Search for "button-card" in Frontend section
-  - Manual: https://github.com/custom-cards/button-card
+- Home Assistant 2024.1.0 or newer
+- [`custom:button-card`](https://github.com/custom-cards/button-card), installed separately through HACS or manually
+- A modern browser
 
-### Optional
-- **Gemini API Key** (for AI-powered design generation)
-  - Get a free key at: https://aistudio.google.com/apikey
+AI design is optional. Magic Builder can use a Home Assistant AI Task provider or a direct Gemini API key entered in the app.
 
-## Installation Methods
+## HACS installation
 
-### Method 1: HACS (Recommended)
+1. Open **HACS → Integrations**.
+2. Search for **Button Builder**.
+3. Select **Download**.
+4. Restart Home Assistant.
+5. Open **Settings → Devices & services → Add integration**.
+6. Search for and add **Button Builder**.
+7. Open the new **Button Builder** sidebar panel.
 
-1. **Open HACS** in your Home Assistant instance
-2. Click on **"Integrations"**
-3. Click the **"+"** button in the bottom right
-4. Search for **"Button Builder"**
-5. Click **"Download"**
-6. **Restart Home Assistant**
-7. The **"Button Builder"** panel will appear in your sidebar
+## Manual installation
 
-### Method 2: Manual Installation
+1. Download the latest source archive from the [GitHub releases page](https://github.com/aspenrt78/button-builder/releases).
+2. Copy `custom_components/button_builder` into your Home Assistant configuration directory:
 
-1. **Download** the latest release from the [releases page](https://github.com/aspenrt78/button-builder/releases)
-
-2. **Extract** the archive and locate the `custom_components/button_builder` folder
-
-3. **Copy** the folder to your Home Assistant configuration directory:
-   ```
-   <config_directory>/custom_components/button_builder/
-   ```
-
-4. Your directory structure should look like:
-   ```
+   ```text
    config/
    └── custom_components/
        └── button_builder/
-           ├── __init__.py
-           ├── manifest.json
-           └── www/
-               ├── panel.html
-               ├── index.js
-               └── index.css
    ```
 
-5. **Restart Home Assistant**
+3. Restart Home Assistant.
+4. Add **Button Builder** from **Settings → Devices & services**.
+5. Open **Button Builder** from the sidebar.
 
-6. The **"Button Architect"** panel will appear in your sidebar
+## Upgrading to version 3
 
-## Configuration
+Version 3 replaces `/button-card-builder`, `/bubble-card-builder`, and `/tile-card-builder` with one `/button-builder` panel.
 
-### Setting Up Gemini API Key (Optional)
+1. Update through HACS or replace the manual integration files.
+2. Restart Home Assistant so the old panels are removed and the new panel is registered.
+3. Hard-refresh the browser once if an older frontend bundle remains cached.
 
-The AI Magic Builder feature requires a Gemini API key. This is optional - the visual editor works without it.
+Bubble Card, Tile Card, and other builders are planned as separate integrations. Existing card YAML already used on dashboards is not modified.
 
-#### Option 1: Via Home Assistant Configuration
+## AI providers
 
-Add to your `configuration.yaml`:
+### Home Assistant AI Tasks
 
-```yaml
-button_builder:
-  gemini_api_key: "your_api_key_here"
-```
+If Home Assistant exposes an AI Task provider, Magic Builder lists it automatically. Requests run through Home Assistant; Button Builder does not read or store that provider's credentials.
 
-#### Option 2: Via Environment Variable
+### Direct Gemini
 
-Set the `GEMINI_API_KEY` environment variable before starting Home Assistant.
-
-#### Option 3: In-App Configuration
-
-Enter your API key in the app when prompted to use AI features.
-
-## Verification
-
-After installation and restart:
-
-1. Check **Configuration** → **Logs** for any errors related to `button_builder`
-2. Look for **"Button Architect"** in your sidebar (left navigation menu)
-3. Click it to open the designer
+Choose **Gemini API key (direct)** in Magic Builder and enter a key from [Google AI Studio](https://aistudio.google.com/apikey). The key is stored in that browser's local storage and can be removed from the Magic Builder key controls.
 
 ## Troubleshooting
 
-### Panel Not Showing
+### Panel not showing
 
-- Ensure you've restarted Home Assistant after installation
-- Check the logs for errors: **Configuration** → **Logs**
-- Verify the files are in the correct location
+- Confirm Home Assistant was restarted after installation or upgrade.
+- Confirm the integration was added under **Settings → Devices & services**.
+- Check Home Assistant logs for `button_builder` errors.
+- Remove stale manually pinned sidebar links to the former v2 routes.
 
-### AI Features Not Working
+### Preview or panel appears stale
 
-- Ensure you've entered a valid Gemini API key
-- Check your internet connection
-- Verify the API key has not exceeded rate limits
+- Hard-refresh with Ctrl+Shift+R or Cmd+Shift+R.
+- Confirm `custom_components/button_builder/manifest.json` reports the expected release version.
 
-### Button Preview Not Updating
+### Generated cards do not render
 
-- Try refreshing your browser
-- Clear your browser cache (Ctrl+Shift+R / Cmd+Shift+R)
-
-## Updating
-
-### Via HACS
-
-HACS will notify you when updates are available. Click "Update" and restart Home Assistant.
-
-### Manual Update
-
-1. Download the new release
-2. Replace the `button_builder` folder in `custom_components`
-3. Restart Home Assistant
+- Confirm `custom:button-card` is installed and registered as a Lovelace resource.
+- Validate the entity ID and generated YAML in Home Assistant's manual card editor.
 
 ## Uninstallation
 
-1. Remove the `custom_components/button_builder` folder
-2. Restart Home Assistant
-3. The panel will be removed from the sidebar
-
-## Next Steps
-
-- Read the [Usage Guide](README.md#-usage)
-- Try the [AI Magic Builder](README.md#ai-magic-builder)
-- Check out [example configurations](examples/)
-
-## Support
-
-- 🐛 [Report an issue](https://github.com/aspenrt78/button-builder/issues)
-- 💬 [Discussions](https://github.com/aspenrt78/button-builder/discussions)
-- 📖 [Full Documentation](README.md)
+1. Remove Button Builder from **Settings → Devices & services**.
+2. If installed manually, remove `custom_components/button_builder`.
+3. Restart Home Assistant.

@@ -150,14 +150,14 @@ const buttonSchema: Schema = {
     // Animations
     cardAnimation: { 
       type: Type.STRING, 
-      enum: ['none', 'flash', 'pulse', 'jiggle', 'marquee', 'spin', 'blink', 'shake', 'bounce', 'glow', 'float', 'swing', 'rubberBand', 'tada', 'heartbeat', 'flip', 'wobble', 'breathe', 'ripple'],
+      enum: ['none', 'flash', 'pulse', 'jiggle', 'marquee', 'spin', 'blink', 'shake', 'bounce', 'glow', 'float', 'swing', 'rubberBand', 'tada', 'heartbeat', 'flip', 'wobble', 'breathe', 'ripple', 'auroraBorder', 'cometBorder', 'energyCharge', 'neonCurrent', 'scanner', 'shimmer', 'liquidGradient', 'meshGradient', 'plasma', 'starfield', 'embers', 'rain', 'radarPulse', 'sonarRings', 'statusBeacon', 'glitch', 'electricJolt', 'frost', 'heatHaze', 'breathingGlass', 'magneticHover', 'iconOrbit', 'iconDraw', 'stateMorph', 'progressBorder', 'thresholdPulse'],
       description: "Card animation effect"
     },
     cardAnimationTrigger: { type: Type.STRING, enum: ['always', 'on', 'off'], description: "When to play animation" },
     cardAnimationSpeed: { type: Type.STRING, description: "Animation duration (e.g., 2s, 500ms)" },
     iconAnimation: { 
       type: Type.STRING, 
-      enum: ['none', 'flash', 'pulse', 'jiggle', 'marquee', 'spin', 'blink', 'shake', 'bounce', 'glow', 'float', 'swing', 'rubberBand', 'tada', 'heartbeat', 'flip', 'wobble', 'breathe', 'ripple'],
+      enum: ['none', 'flash', 'pulse', 'jiggle', 'marquee', 'spin', 'blink', 'shake', 'bounce', 'glow', 'float', 'swing', 'rubberBand', 'tada', 'heartbeat', 'flip', 'wobble', 'breathe', 'ripple', 'auroraBorder', 'cometBorder', 'energyCharge', 'neonCurrent', 'scanner', 'shimmer', 'liquidGradient', 'meshGradient', 'plasma', 'starfield', 'embers', 'rain', 'radarPulse', 'sonarRings', 'statusBeacon', 'glitch', 'electricJolt', 'frost', 'heatHaze', 'breathingGlass', 'magneticHover', 'iconOrbit', 'iconDraw', 'stateMorph', 'progressBorder', 'thresholdPulse'],
       description: "Icon animation effect"
     },
     iconAnimationTrigger: { type: Type.STRING, enum: ['always', 'on', 'off'] },

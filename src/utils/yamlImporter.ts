@@ -1,5 +1,6 @@
 import YAML from 'yaml';
 import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateOperator, Variable, CustomField, ToastConfig, DEFAULT_TOAST_CONFIG, DEFAULT_LOCK_CONFIG, DEFAULT_PROTECT_CONFIG, DEFAULT_TOOLTIP_CONFIG } from '../types';
+import { clampEffectIntensity } from './effectIntensity';
 
 /**
  * Parses button-card YAML and converts it to a ButtonConfig object
@@ -72,11 +73,21 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   
   // Live stream options
   if (parsed.live_stream_aspect_ratio) config.liveStreamAspectRatio = String(parsed.live_stream_aspect_ratio);
-  if (parsed.live_stream_fit) config.liveStreamFitMode = String(parsed.live_stream_fit);
-  
+  const liveStreamFit = parsed.live_stream_fit_mode ?? parsed.live_stream_fit;
+  if (liveStreamFit) config.liveStreamFitMode = String(liveStreamFit);
+
   // Advanced options
   if (parsed.numeric_precision !== undefined) config.numericPrecision = Number(parsed.numeric_precision);
-  if (parsed.update_timer !== undefined) config.updateTimer = Number(parsed.update_timer);
+  if (parsed.update_timer !== undefined) {
+    // Accept duration strings ("5s") and bare numbers (button-card reads those as ms)
+    const raw = parsed.update_timer;
+    if (typeof raw === 'string' && /^\d+(\.\d+)?s$/.test(raw.trim())) {
+      config.updateTimer = Number.parseFloat(raw);
+    } else {
+      const num = Number(raw) || 0;
+      config.updateTimer = num >= 100 ? Math.round(num / 1000) : num;
+    }
+  }
   if (parsed.hidden !== undefined) {
     if (typeof parsed.hidden === 'string' && parsed.hidden.includes('[[[')) {
       config.hidden = true;
@@ -95,7 +106,8 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   }
   if (parsed.group_expand !== undefined) config.groupExpand = Boolean(parsed.group_expand);
   if (parsed.haptic !== undefined) config.hapticFeedback = String(parsed.haptic);
-  if (parsed.disable_keyboard !== undefined) config.disableKeyboard = Boolean(parsed.disable_keyboard);
+  const disableKbd = parsed.disable_kbd ?? parsed.disable_keyboard;
+  if (disableKbd !== undefined) config.disableKeyboard = Boolean(disableKbd);
   
   // Section mode / Grid
   if (parsed.section_mode !== undefined) config.sectionMode = Boolean(parsed.section_mode);
@@ -111,6 +123,9 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   if (parsed.color) {
     if (parsed.color === 'auto') {
       config.colorAuto = true;
+    } else if (parsed.color === 'auto-no-temperature') {
+      config.colorAuto = true;
+      config.colorAutoNoTemperature = true;
     } else {
       config.color = String(parsed.color);
     }
@@ -168,26 +183,37 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
     };
   }
   
-  // Protect
+  // Protect — button-card uses a `pin:` or `password:` key on the protect object
   if (parsed.protect) {
+    const isPassword = parsed.protect.password !== undefined;
     config.protect = {
       ...DEFAULT_PROTECT_CONFIG,
       enabled: true,
-      type: parsed.protect.type ?? 'pin',
-      value: parsed.protect.code ?? '',
+      type: isPassword ? 'password' : 'pin',
+      value: String(parsed.protect.password ?? parsed.protect.pin ?? parsed.protect.code ?? ''),
       failureMessage: parsed.protect.failure_message ?? DEFAULT_PROTECT_CONFIG.failureMessage,
       successMessage: parsed.protect.success_message ?? ''
     };
   }
-  
-  // Tooltip
+
+  // Tooltip — either a plain string or an object with content/placement/delays
   if (parsed.tooltip) {
-    config.tooltip = {
-      ...DEFAULT_TOOLTIP_CONFIG,
-      enabled: true,
-      content: parsed.tooltip.content ?? '',
-      position: parsed.tooltip.position ?? 'top'
-    };
+    if (typeof parsed.tooltip === 'string') {
+      config.tooltip = {
+        ...DEFAULT_TOOLTIP_CONFIG,
+        enabled: true,
+        content: parsed.tooltip,
+      };
+    } else {
+      config.tooltip = {
+        ...DEFAULT_TOOLTIP_CONFIG,
+        enabled: true,
+        content: parsed.tooltip.content ?? '',
+        position: parsed.tooltip.placement ?? parsed.tooltip.position ?? 'top',
+        delay: Number(parsed.tooltip.delay) || 0,
+        hideDelay: Number(parsed.tooltip.hide_delay) || 0,
+      };
+    }
   }
   
   // Custom Fields
@@ -210,8 +236,30 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
     parseStateConfig(parsed.state, config);
   }
   
-  // Conditions (for conditional display)
-  if (parsed.conditions && Array.isArray(parsed.conditions) && parsed.conditions.length > 0) {
+  // Card visibility (HA `visibility:` conditions — the emitted form)
+  if (parsed.visibility && Array.isArray(parsed.visibility) && parsed.visibility.length > 0) {
+    const condition = parsed.visibility[0];
+    if (condition && condition.entity) {
+      config.conditionalEntity = String(condition.entity);
+      if (condition.condition === 'numeric_state') {
+        if (condition.above !== undefined) {
+          config.conditionalState = String(condition.above);
+          config.conditionalOperator = 'above';
+        } else if (condition.below !== undefined) {
+          config.conditionalState = String(condition.below);
+          config.conditionalOperator = 'below';
+        }
+      } else if (condition.state_not !== undefined) {
+        config.conditionalState = String(condition.state_not);
+        config.conditionalOperator = 'not_equals';
+      } else if (condition.state !== undefined) {
+        config.conditionalState = String(condition.state);
+        config.conditionalOperator = 'equals';
+      }
+    }
+  }
+  // Legacy `conditions:` block from earlier Button Builder versions
+  else if (parsed.conditions && Array.isArray(parsed.conditions) && parsed.conditions.length > 0) {
     const firstCondition = parsed.conditions[0];
     if (firstCondition.entity) config.conditionalEntity = String(firstCondition.entity);
     if (firstCondition.state !== undefined) config.conditionalState = String(firstCondition.state);
@@ -433,12 +481,44 @@ function parseAction(
   config: Partial<ButtonConfig>,
   configPrefix: string
 ): void {
-  const action = parsed[yamlKey];
+  let action = parsed[yamlKey];
   if (!action) return;
-  
+
   // Type assertion for dynamic property access
   const cfg = config as any;
-  
+
+  // Unwrap generator-produced multi-actions (primary action + trailing toast step)
+  if (action.action === 'multi-actions' && Array.isArray(action.actions)) {
+    const toastStep = action.actions.find((a: any) => a && a.action === 'toast' && a.toast);
+    const primary = action.actions.find((a: any) => a && a.action && a.action !== 'toast');
+    if (toastStep?.toast?.message) {
+      cfg[`${configPrefix}Toast`] = {
+        enabled: true,
+        message: String(toastStep.toast.message),
+        duration: Number(toastStep.toast.duration ?? 3000),
+        dismissable: toastStep.toast.dismissable !== false,
+      };
+    }
+    if (!primary) return;
+    // Keep top-level extras (confirmation/sound/haptic) from the wrapper
+    action = { confirmation: action.confirmation, sound: action.sound, haptic: action.haptic, ...primary };
+  }
+
+  // A standalone toast action maps to "no action + toast message"
+  if (action.action === 'toast') {
+    cfg[configPrefix] = 'none';
+    const toastObj = action.toast || action;
+    if (toastObj.message) {
+      cfg[`${configPrefix}Toast`] = {
+        enabled: true,
+        message: String(toastObj.message),
+        duration: Number(toastObj.duration ?? 3000),
+        dismissable: toastObj.dismissable !== false,
+      };
+    }
+    return;
+  }
+
   if (action.action) {
     cfg[configPrefix] = action.action;
   }
@@ -463,24 +543,32 @@ function parseAction(
     cfg[`${configPrefix}Navigation`] = action.url_path;
   }
   
-  // JavaScript
-  if (action.code) {
-    cfg[`${configPrefix}Javascript`] = action.code;
+  // JavaScript (button-card key is `javascript`; `code` kept for legacy imports)
+  const jsCode = action.javascript ?? action.code;
+  if (jsCode) {
+    cfg[`${configPrefix}Javascript`] = String(jsCode);
   }
-  
-  // Toast
-  if (action.action === 'toast' && action.message) {
-    cfg[`${configPrefix}Toast`] = {
-      message: action.message,
-      duration: action.duration ?? 3000,
-      dismissable: action.dismissable !== false
-    };
+
+  // Navigation replace / assist options
+  if (action.navigation_replace !== undefined) cfg[`${configPrefix}NavigationReplace`] = Boolean(action.navigation_replace);
+  if (action.pipeline_id) cfg[`${configPrefix}PipelineId`] = String(action.pipeline_id);
+  if (action.start_listening !== undefined) cfg[`${configPrefix}StartListening`] = Boolean(action.start_listening);
+
+  // Per-action confirmation
+  if (action.confirmation) {
+    cfg[`${configPrefix}Confirmation`] = true;
+    if (typeof action.confirmation === 'object' && action.confirmation.text) {
+      cfg[`${configPrefix}ConfirmationText`] = String(action.confirmation.text);
+    }
   }
-  
-  // Haptic/Sound
-  if (action.haptic) {
+
+  // Sound / Haptic
+  if (action.sound) {
     const soundKey = configPrefix.replace('Action', 'ActionSound');
-    cfg[soundKey] = action.haptic;
+    cfg[soundKey] = String(action.sound);
+  }
+  if (action.haptic) {
+    config.hapticFeedback = String(action.haptic);
   }
 }
 
@@ -648,6 +736,32 @@ function parseStyleString(style: string): { property: string; value: string } | 
 }
 
 const ANIMATION_NAME_MAP: Array<[string, string]> = [
+  ['auroraBorder', 'auroraBorder'],
+  ['cometBorder', 'cometBorder'],
+  ['energyCharge', 'energyCharge'],
+  ['neonCurrent', 'neonCurrent'],
+  ['liquidGradient', 'liquidGradient'],
+  ['meshGradient', 'meshGradient'],
+  ['statusBeacon', 'statusBeacon'],
+  ['electricJolt', 'electricJolt'],
+  ['breathingGlass', 'breathingGlass'],
+  ['magneticHover', 'magneticHover'],
+  ['progressBorder', 'progressBorder'],
+  ['thresholdPulse', 'thresholdPulse'],
+  ['radarPulse', 'radarPulse'],
+  ['sonarRings', 'sonarRings'],
+  ['iconOrbit', 'iconOrbit'],
+  ['iconDraw', 'iconDraw'],
+  ['stateMorph', 'stateMorph'],
+  ['starfield', 'starfield'],
+  ['scanner', 'scanner'],
+  ['shimmer', 'shimmer'],
+  ['plasma', 'plasma'],
+  ['embers', 'embers'],
+  ['rain', 'rain'],
+  ['glitch', 'glitch'],
+  ['frost', 'frost'],
+  ['heatHaze', 'heatHaze'],
   ['flash', 'flash'],
   ['pulse', 'pulse'],
   ['jiggle', 'jiggle'],
@@ -820,8 +934,28 @@ function mapCardStyle(
       if (speedMatch) config.cardAnimationSpeed = speedMatch[1];
       break;
     }
+
+    case '--cba-effect-intensity':
+      config.effectIntensity = clampEffectIntensity(Number(value));
+      break;
+
+    case '--cba-effect-filter':
+    case '--cba-liquid-radius-a':
+    case '--cba-liquid-radius-b':
+      // Derived from effectIntensity; do not duplicate it in custom styles.
+      break;
+
+    case 'filter':
+      if (!value.includes('var(--cba-effect-filter)')) {
+        extraStyles.push(`${property}: ${value}`);
+      }
+      break;
       
     default:
+      if (property.startsWith('--cba-')) {
+        // Generated animation amplitude variables are derived from effectIntensity.
+        break;
+      }
       // Store unrecognized styles in extraStyles
       extraStyles.push(`${property}: ${value}`);
       break;
@@ -845,16 +979,20 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
         for (const style of state.styles.card) {
           const parsedEntries = getStyleEntries(style);
           for (const parsed of parsedEntries) {
-            if (parsed.property === 'background-color') {
-              const hexMatch = parsed.value.match(/#[0-9a-fA-F]{6}/);
+            // The generator emits `background:` (shorthand); older YAML may use
+            // `background-color:`. Match both, but ignore gradient/function values
+            // and the OFF auto-dim `filter: brightness(...)` sentinel. parseColorToken
+            // normalizes hex and rgba(...) (converting rgba back to hex + opacity).
+            if (parsed.property === 'background' || parsed.property === 'background-color') {
+              if (/gradient|url\(/i.test(parsed.value)) continue;
+              const token = parseColorToken(parsed.value.trim());
+              if (!/^#[0-9a-fA-F]{6}$/.test(token.color)) continue;
               if (stateValue === 'on') {
-                if (hexMatch) config.stateOnColor = hexMatch[0];
-                const rgbaMatch = parsed.value.match(/rgba?\([^)]+,\s*([\d.]+)\)/);
-                if (rgbaMatch) config.stateOnOpacity = Math.round(parseFloat(rgbaMatch[1]) * 100);
+                config.stateOnColor = token.color;
+                if (token.opacity !== undefined) config.stateOnOpacity = token.opacity;
               } else {
-                if (hexMatch) config.stateOffColor = hexMatch[0];
-                const rgbaMatch = parsed.value.match(/rgba?\([^)]+,\s*([\d.]+)\)/);
-                if (rgbaMatch) config.stateOffOpacity = Math.round(parseFloat(rgbaMatch[1]) * 100);
+                config.stateOffColor = token.color;
+                if (token.opacity !== undefined) config.stateOffOpacity = token.opacity;
               }
             }
           }
@@ -876,7 +1014,7 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       entityPicture: state.entity_picture ?? '',
       label: state.label ?? '',
       stateDisplay: state.state_display ?? '',
-      spin: state.spin ?? false,
+      spin: Boolean(state.rotate ?? state.spin ?? false),
       styles: '',
       backgroundColor: '',
       iconColor: '',
@@ -886,6 +1024,7 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       borderColor: '',
       cardAnimation: 'none',
       cardAnimationSpeed: '2s',
+      effectIntensity: 100,
       iconAnimation: 'none',
       iconAnimationSpeed: '2s'
     };
@@ -895,8 +1034,12 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
       customState.operator = 'default';
     } else if (state.operator === '>') {
       customState.operator = 'above';
+    } else if (state.operator === '>=') {
+      customState.operator = 'above_equal';
     } else if (state.operator === '<') {
       customState.operator = 'below';
+    } else if (state.operator === '<=') {
+      customState.operator = 'below_equal';
     } else if (state.operator === '!=') {
       customState.operator = 'not_equals';
     } else if (state.operator === 'regex') {
@@ -951,6 +1094,8 @@ function parseStateConfig(states: any[], config: Partial<ButtonConfig>): void {
               if (animName) customState.cardAnimation = animName as any;
               const speedMatch = parsed.value.match(/(\d+(?:\.\d+)?s)/);
               if (speedMatch) customState.cardAnimationSpeed = speedMatch[1];
+            } else if (parsed.property === '--cba-effect-intensity') {
+              customState.effectIntensity = clampEffectIntensity(Number(parsed.value));
             }
           }
         }
@@ -1069,6 +1214,9 @@ export const validateImportedConfig = (config: Partial<ButtonConfig>): Partial<B
   if (validated.cardOpacity !== undefined) {
     validated.cardOpacity = Math.max(0, Math.min(100, validated.cardOpacity));
   }
+  if (validated.effectIntensity !== undefined) {
+    validated.effectIntensity = clampEffectIntensity(validated.effectIntensity);
+  }
 
   // Validate hex color fields — remove values that aren't valid hex colors
   const hexColorRe = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
@@ -1091,6 +1239,9 @@ export const validateImportedConfig = (config: Partial<ButtonConfig>): Partial<B
       (s) => s && typeof s === 'object' && validOperators.includes(s.operator)
     );
     for (const s of validated.stateStyles) {
+      if (s.effectIntensity !== undefined) {
+        s.effectIntensity = clampEffectIntensity(s.effectIntensity);
+      }
       if (typeof s.styles === 'string' && s.styles) {
         s.styles = sanitizeStyleBlock(s.styles);
       }

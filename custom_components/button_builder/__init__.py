@@ -18,9 +18,7 @@ from homeassistant.helpers.event import async_call_later
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "button_builder"
-PANEL_ID_BUTTON = "button-card-builder"
-PANEL_ID_BUBBLE = "bubble-card-builder"
-PANEL_ID_TILE = "tile-card-builder"
+PANEL_ID = "button-builder"
 DATA_PANEL_REGISTERED = "panel_registered"
 DATA_STATIC_REGISTERED = "static_path_registered"
 DATA_REGISTER_TIMER = "register_timer_cancel"
@@ -64,13 +62,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         cancel_timer()
 
     if domain_data.get(DATA_PANEL_REGISTERED):
-        for panel_id in (PANEL_ID_BUTTON, PANEL_ID_BUBBLE, PANEL_ID_TILE):
-            try:
-                async_remove_panel(hass, panel_id)
-            except Exception as err:
-                _LOGGER.warning("Failed to remove panel %s: %s", panel_id, err)
+        try:
+            async_remove_panel(hass, PANEL_ID)
+        except Exception as err:
+            _LOGGER.warning("Failed to remove panel %s: %s", PANEL_ID, err)
         domain_data[DATA_PANEL_REGISTERED] = False
-        _LOGGER.info("Button Builder panels removed")
+        _LOGGER.info("Button Builder panel removed")
     return True
 
 
@@ -102,47 +99,20 @@ async def async_register_panel(hass: HomeAssistant) -> None:
             _LOGGER.debug("Static path already registered for Button Builder")
         domain_data[DATA_STATIC_REGISTERED] = True
 
-    # Register Button Card Builder panel
     async_register_built_in_panel(
         hass,
         component_name="iframe",
-        sidebar_title="Button Card Builder",
+        sidebar_title="Button Builder",
         sidebar_icon="mdi:gesture-tap-button",
-        frontend_url_path=PANEL_ID_BUTTON,
+        frontend_url_path=PANEL_ID,
         config={
-            "url": f"/button_builder/panel.html?app=button-card&v={version}"
-        },
-        require_admin=False,
-    )
-
-    # Register Bubble Card Builder panel
-    async_register_built_in_panel(
-        hass,
-        component_name="iframe",
-        sidebar_title="Bubble Card Builder",
-        sidebar_icon="mdi:card-multiple-outline",
-        frontend_url_path=PANEL_ID_BUBBLE,
-        config={
-            "url": f"/button_builder/panel.html?app=bubble-card&v={version}"
-        },
-        require_admin=False,
-    )
-
-    # Register Tile Card Builder panel
-    async_register_built_in_panel(
-        hass,
-        component_name="iframe",
-        sidebar_title="Tile Card Builder",
-        sidebar_icon="mdi:view-grid-outline",
-        frontend_url_path=PANEL_ID_TILE,
-        config={
-            "url": f"/button_builder/panel.html?app=tile-card&v={version}"
+            "url": f"/button_builder/panel.html?v={version}"
         },
         require_admin=False,
     )
 
     hass.data[DOMAIN][DATA_PANEL_REGISTERED] = True
-    _LOGGER.info("Button Builder panels registered")
+    _LOGGER.info("Button Builder panel registered")
 
 
 def _integration_version() -> str:

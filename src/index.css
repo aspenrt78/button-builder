@@ -158,9 +158,38 @@ html, body, #root {
 
 @keyframes cba-ripple {
   0% { box-shadow: 0 0 0 0 currentColor; }
-  50% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 var(--cba-ripple-reach, 20px) transparent; }
 }
+
+/* Extended visual effects shared by the editor, preset gallery, and generated cards. */
+@keyframes cba-auroraBorder { 0%,100% { box-shadow: 0 0 var(--cba-aurora-soft, 5px) #22d3ee, inset 0 0 var(--cba-aurora-inner, 4px) #8b5cf6; border-color: #22d3ee; } 33% { box-shadow: 0 0 var(--cba-aurora-peak, 14px) #8b5cf6, inset 0 0 var(--cba-aurora-inner-peak, 7px) #ec4899; border-color: #8b5cf6; } 66% { box-shadow: 0 0 var(--cba-aurora-mid, 10px) #34d399, inset 0 0 var(--cba-aurora-soft, 5px) #22d3ee; border-color: #34d399; } }
+@keyframes cba-cometBorder { 0%,100% { box-shadow: var(--cba-comet-x-neg, -8px) var(--cba-comet-y-neg, -5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #22d3ee; } 25% { box-shadow: var(--cba-comet-x, 8px) var(--cba-comet-y-neg, -5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #8b5cf6; } 50% { box-shadow: var(--cba-comet-x, 8px) var(--cba-comet-y, 5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #ec4899; } 75% { box-shadow: var(--cba-comet-x-neg, -8px) var(--cba-comet-y, 5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #22d3ee; } }
+@keyframes cba-energyCharge { 0% { box-shadow: inset 0 -2px 0 #22d3ee, 0 0 2px #22d3ee; filter: brightness(.85) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 75% { box-shadow: inset 0 var(--cba-charge-depth, -18px) var(--cba-charge-blur, 18px) var(--cba-charge-spread, -16px) #22d3ee, 0 0 var(--cba-charge-glow, 14px) #22d3ee; filter: brightness(1.15) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 82% { box-shadow: inset 0 var(--cba-charge-depth, -18px) var(--cba-charge-blur, 18px) var(--cba-charge-spread, -16px) #fff, 0 0 var(--cba-charge-flash, 24px) #fff; filter: brightness(1.5) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 100% { box-shadow: inset 0 -2px 0 #22d3ee, 0 0 2px #22d3ee; filter: brightness(.85) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+@keyframes cba-neonCurrent { 0%,100% { border-color: #22d3ee; box-shadow: var(--cba-neon-offset, 5px) 0 var(--cba-neon-blur, 8px) #22d3ee, var(--cba-neon-offset-neg, -5px) 0 var(--cba-neon-blur, 8px) #a855f7; } 25% { border-color: #a855f7; box-shadow: 0 var(--cba-neon-offset, 5px) var(--cba-neon-blur, 8px) #a855f7, 0 var(--cba-neon-offset-neg, -5px) var(--cba-neon-blur, 8px) #f43f5e; } 50% { border-color: #f43f5e; box-shadow: var(--cba-neon-offset-neg, -5px) 0 var(--cba-neon-blur, 8px) #f43f5e, var(--cba-neon-offset, 5px) 0 var(--cba-neon-blur, 8px) #facc15; } 75% { border-color: #facc15; box-shadow: 0 var(--cba-neon-offset-neg, -5px) var(--cba-neon-blur, 8px) #facc15, 0 var(--cba-neon-offset, 5px) var(--cba-neon-blur, 8px) #22d3ee; } }
+@keyframes cba-scanner { 0% { background-position: 0 var(--cba-scanner-start, -120%); } 100% { background-position: 0 var(--cba-scanner-end, 220%); } }
+@keyframes cba-shimmer { 0% { background-position: var(--cba-shimmer-start, 180%) 0; } 100% { background-position: var(--cba-shimmer-end, -180%) 0; } }
+@keyframes cba-liquidGradient { 0%,100% { background-position: 0% 50%; border-radius: var(--cba-liquid-radius-a, 18px 12px 20px 10px); } 50% { background-position: 100% 50%; border-radius: var(--cba-liquid-radius-b, 11px 21px 12px 19px); } }
+@keyframes cba-meshGradient { 0%,100% { background-position: 0% 0%, 100% 100%, 50% 50%; } 50% { background-position: var(--cba-mesh-position, 100% 70%, 0% 30%, 80% 20%); } }
+@keyframes cba-plasma { 0%,100% { background-position: var(--cba-plasma-start, 0%) 50%; filter: hue-rotate(0deg) saturate(1.2) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 50% { background-position: var(--cba-plasma-end, 100%) 50%; filter: hue-rotate(var(--cba-plasma-hue, 100deg)) saturate(1.8) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+@keyframes cba-starfield { 0% { background-position: 0 0, 12px 8px, 0 0; } 100% { background-position: var(--cba-starfield-end, 24px 40px, -18px 30px, 0 0); } }
+@keyframes cba-embers { 0% { background-position: 0 30px, 10px 45px, 0 0; } 100% { background-position: var(--cba-embers-end, 8px -35px, -5px -20px, 0 0); } }
+@keyframes cba-rain { 0% { background-position: var(--cba-rain-start, 0 -30px); } 100% { background-position: var(--cba-rain-end, -12px 45px); } }
+@keyframes cba-radarPulse { 0% { box-shadow: inset 0 0 0 0 rgba(34,211,238,.55); } 75%,100% { box-shadow: inset 0 0 0 var(--cba-radar-reach, 35px) rgba(34,211,238,0); } }
+@keyframes cba-sonarRings { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.7), 0 0 0 0 rgba(56,189,248,.4); } 100% { box-shadow: 0 0 0 var(--cba-sonar-near, 10px) transparent, 0 0 0 var(--cba-sonar-far, 20px) transparent; } }
+@keyframes cba-statusBeacon { 0%,100% { border-color: #22c55e; box-shadow: var(--cba-beacon-offset-neg, -7px) 0 var(--cba-beacon-blur, 12px) #22c55e; } 25% { box-shadow: 0 var(--cba-beacon-offset-neg, -7px) var(--cba-beacon-blur, 12px) #22c55e; } 50% { box-shadow: var(--cba-beacon-offset, 7px) 0 var(--cba-beacon-blur, 12px) #22c55e; } 75% { box-shadow: 0 var(--cba-beacon-offset, 7px) var(--cba-beacon-blur, 12px) #22c55e; } }
+@keyframes cba-glitch { 0%,88%,100% { transform: translate(0); filter: var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 90% { transform: translate(var(--cba-glitch-wide-neg, -3px), var(--cba-glitch-small, 1px)); filter: drop-shadow(var(--cba-glitch-shadow, 3px) 0 #f0f) drop-shadow(var(--cba-glitch-shadow-neg, -3px) 0 #0ff) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 93% { transform: translate(var(--cba-glitch-wide, 3px), var(--cba-glitch-small-neg, -1px)) skewX(var(--cba-glitch-skew, 3deg)); filter: var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 96% { transform: translate(var(--cba-glitch-small-neg, -1px),0); filter: drop-shadow(var(--cba-glitch-wide-neg, -3px) 0 #f0f) drop-shadow(var(--cba-glitch-wide, 3px) 0 #0ff) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+@keyframes cba-electricJolt { 0%,78%,100% { box-shadow: 0 0 5px #38bdf8; transform: translate(0); } 80% { box-shadow: var(--cba-electric-x-neg, -8px) var(--cba-electric-y-neg, -5px) var(--cba-electric-glow, 18px) #fff, var(--cba-electric-x, 8px) var(--cba-electric-y, 4px) 12px #38bdf8; transform: translateX(var(--cba-electric-jolt-neg, -1px)); } 84% { box-shadow: var(--cba-electric-x, 8px) -3px var(--cba-electric-glow-peak, 20px) #fff; transform: translateX(var(--cba-electric-jolt, 2px)); } 88% { box-shadow: 0 0 7px #38bdf8; transform: translate(0); } }
+@keyframes cba-frost { 0%,100% { box-shadow: inset 0 0 var(--cba-frost-inner, 8px) rgba(186,230,253,.35), 0 0 var(--cba-frost-outer, 5px) #bae6fd; filter: brightness(.95) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 50% { box-shadow: inset 0 0 var(--cba-frost-inner-peak, 18px) rgba(255,255,255,.55), 0 0 var(--cba-frost-outer-peak, 14px) #7dd3fc; filter: brightness(1.2) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+@keyframes cba-heatHaze { 0%,100% { transform: skewX(0) scale(1); filter: saturate(1) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 33% { transform: skewX(var(--cba-haze-skew, .7deg)) scale(var(--cba-haze-scale-up, 1.01)); filter: saturate(1.25) brightness(1.08) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 66% { transform: skewX(var(--cba-haze-skew-neg, -.7deg)) scale(var(--cba-haze-scale-down, .995)); filter: saturate(1.1) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+@keyframes cba-breathingGlass { 0%,100% { filter: brightness(.9) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); box-shadow: inset 0 0 var(--cba-glass-inner, 8px) rgba(255,255,255,.08), 0 0 var(--cba-glass-outer, 4px) rgba(125,211,252,.25); } 50% { filter: brightness(1.16) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); box-shadow: inset 0 0 var(--cba-glass-inner-peak, 16px) rgba(255,255,255,.2), 0 0 var(--cba-glass-outer-peak, 14px) rgba(125,211,252,.55); } }
+@keyframes cba-magneticHover { 0%,100% { transform: perspective(240px) rotateX(0) rotateY(-2deg) translateY(0); } 50% { transform: perspective(240px) rotateX(2deg) rotateY(2deg) translateY(-4px); } }
+@keyframes cba-iconOrbit { 0% { transform: rotate(0deg) translateX(5px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(5px) rotate(-360deg); } }
+@keyframes cba-iconDraw { 0% { clip-path: inset(0 100% 0 0); opacity: .2; } 55%,100% { clip-path: inset(0 0 0 0); opacity: 1; } }
+@keyframes cba-stateMorph { 0%,100% { filter: hue-rotate(0deg) brightness(.85) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); border-radius: var(--cba-morph-radius-start, 10px); } 50% { filter: hue-rotate(var(--cba-morph-hue, 75deg)) brightness(1.2) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); border-radius: var(--cba-morph-radius-end, 22px); } }
+@keyframes cba-progressBorder { 0% { border-color: #ef4444; box-shadow: inset 8px 0 0 -6px #ef4444; } 50% { border-color: #eab308; box-shadow: inset 45px 0 0 -40px #eab308; } 100% { border-color: #22c55e; box-shadow: inset 90px 0 0 -82px #22c55e; } }
+@keyframes cba-thresholdPulse { 0%,100% { box-shadow: 0 0 var(--cba-threshold-glow, 3px) currentColor; filter: brightness(.9) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 50% { box-shadow: 0 0 var(--cba-threshold-glow-peak, 18px) currentColor; filter: brightness(1.35) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+
+@keyframes cba-glow { 0%,100% { box-shadow: 0 0 var(--cba-glow-near, 5px) currentColor, 0 0 var(--cba-glow-mid, 10px) currentColor; } 50% { box-shadow: 0 0 var(--cba-glow-far, 20px) currentColor, 0 0 var(--cba-glow-peak, 30px) currentColor; } }
 
 /* Gradient animation keyframes for presets */
 @keyframes holo-shift {
@@ -198,7 +227,33 @@ html, body, #root {
 .cba-animate-wobble { animation: cba-wobble 1s infinite; will-change: transform; }
 .cba-animate-breathe { animation: cba-breathe 3s ease-in-out infinite; will-change: opacity, transform; }
 .cba-animate-ripple { animation: cba-ripple 1.5s infinite; will-change: box-shadow; }
-.cba-animate-glow { animation: cba-pulse 2s infinite; will-change: transform; }
+.cba-animate-auroraBorder { animation: cba-auroraBorder 4s ease-in-out infinite; }
+.cba-animate-cometBorder { animation: cba-cometBorder 2.5s linear infinite; }
+.cba-animate-energyCharge { animation: cba-energyCharge 3s ease-in-out infinite; }
+.cba-animate-neonCurrent { animation: cba-neonCurrent 2.5s linear infinite; }
+.cba-animate-scanner { animation: cba-scanner 2.5s linear infinite; }
+.cba-animate-shimmer { animation: cba-shimmer 2.5s linear infinite; }
+.cba-animate-liquidGradient { animation: cba-liquidGradient 7s ease-in-out infinite; }
+.cba-animate-meshGradient { animation: cba-meshGradient 8s ease-in-out infinite; }
+.cba-animate-plasma { animation: cba-plasma 5s ease-in-out infinite; }
+.cba-animate-starfield { animation: cba-starfield 8s linear infinite; }
+.cba-animate-embers { animation: cba-embers 5s linear infinite; }
+.cba-animate-rain { animation: cba-rain 2s linear infinite; }
+.cba-animate-radarPulse { animation: cba-radarPulse 2.2s ease-out infinite; }
+.cba-animate-sonarRings { animation: cba-sonarRings 2s ease-out infinite; }
+.cba-animate-statusBeacon { animation: cba-statusBeacon 2.4s linear infinite; }
+.cba-animate-glitch { animation: cba-glitch 2.8s steps(1,end) infinite; }
+.cba-animate-electricJolt { animation: cba-electricJolt 2.4s steps(1,end) infinite; }
+.cba-animate-frost { animation: cba-frost 4s ease-in-out infinite; }
+.cba-animate-heatHaze { animation: cba-heatHaze 3.5s ease-in-out infinite; }
+.cba-animate-breathingGlass { animation: cba-breathingGlass 4s ease-in-out infinite; }
+.cba-animate-magneticHover { animation: cba-magneticHover 4s ease-in-out infinite; }
+.cba-animate-iconOrbit { animation: cba-iconOrbit 2.5s linear infinite; }
+.cba-animate-iconDraw { animation: cba-iconDraw 2.5s ease-in-out infinite; }
+.cba-animate-stateMorph { animation: cba-stateMorph 5s ease-in-out infinite; }
+.cba-animate-progressBorder { animation: cba-progressBorder 5s ease-in-out infinite alternate; }
+.cba-animate-thresholdPulse { animation: cba-thresholdPulse 2s ease-in-out infinite; }
+.cba-animate-glow { animation: cba-glow 2s ease-in-out infinite; will-change: box-shadow; }
 
 /* Fade in animation */
 @keyframes fadeIn {

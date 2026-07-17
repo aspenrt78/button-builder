@@ -90,6 +90,7 @@ const STYLE_PRESET_KEYS: ReadonlyArray<keyof ButtonConfig> = [
   'cardAnimation',
   'cardAnimationTrigger',
   'cardAnimationSpeed',
+  'effectIntensity',
   'iconAnimation',
   'iconAnimationTrigger',
   'iconAnimationSpeed',
@@ -247,6 +248,56 @@ export const generateDarkModePreset = (preset: Preset): Preset => {
     isAutoDark: true,
   };
 };
+
+const extendedEffectPreset = (
+  name: string,
+  description: string,
+  animation: ButtonConfig['cardAnimation'],
+  config: Partial<ButtonConfig> = {},
+  iconOnly = false,
+): Preset => ({
+  name,
+  description,
+  category: 'animated',
+  config: {
+    backgroundColor: '#10131c',
+    backgroundColorOpacity: 100,
+    color: '#ffffff',
+    ...(iconOnly
+      ? { iconAnimation: animation, iconAnimationTrigger: 'always', iconAnimationSpeed: '2.5s' }
+      : { cardAnimation: animation, cardAnimationTrigger: 'always', cardAnimationSpeed: '3s' }),
+    ...config,
+  },
+});
+
+const EXTENDED_EFFECT_PRESETS: Preset[] = [
+  extendedEffectPreset('Aurora Border', 'Flowing cyan, violet, and green edge glow', 'auroraBorder', { borderStyle: 'solid', borderWidth: '2px', borderColor: '#22d3ee', cardAnimationSpeed: '4s' }),
+  extendedEffectPreset('Comet Border', 'A bright point races around the card edge', 'cometBorder', { borderStyle: 'solid', borderWidth: '2px', borderColor: '#334155', cardAnimationSpeed: '2.5s' }),
+  extendedEffectPreset('Energy Charge', 'Builds energy from the base before flashing', 'energyCharge', { backgroundColor: '#071827', iconColor: '#67e8f9', cardAnimationSpeed: '3s' }),
+  extendedEffectPreset('Neon Current', 'Colored electrical current travels around the border', 'neonCurrent', { borderStyle: 'solid', borderWidth: '2px', borderColor: '#22d3ee', cardAnimationSpeed: '2.5s' }),
+  extendedEffectPreset('Scanner', 'A luminous scanner beam sweeps down the card', 'scanner', { extraStyles: 'background: linear-gradient(180deg, #07111f 0%, #07111f 43%, rgba(34,211,238,0.75) 49%, #07111f 56%, #07111f 100%)\nbackground-size: 100% 220%', cardAnimationSpeed: '2.5s', iconColor: '#67e8f9' }),
+  extendedEffectPreset('Shimmer', 'A polished highlight travels across the surface', 'shimmer', { extraStyles: 'background: linear-gradient(110deg, #172033 30%, #475569 45%, #f8fafc 50%, #475569 55%, #172033 70%)\nbackground-size: 260% 100%', cardAnimationSpeed: '2.5s' }),
+  extendedEffectPreset('Liquid Gradient', 'Slowly morphing liquid color field', 'liquidGradient', { extraStyles: 'background: linear-gradient(135deg, #0891b2, #7c3aed, #db2777, #0891b2)\nbackground-size: 300% 300%', cardAnimationSpeed: '7s' }),
+  extendedEffectPreset('Mesh Gradient', 'Several soft color points drift together', 'meshGradient', { extraStyles: 'background: radial-gradient(circle at 20% 20%, #22d3ee, transparent 45%), radial-gradient(circle at 80% 80%, #ec4899, transparent 45%), linear-gradient(135deg, #312e81, #111827)\nbackground-size: 160% 160%, 160% 160%, 100% 100%', cardAnimationSpeed: '8s' }),
+  extendedEffectPreset('Plasma', 'High-energy color waves flow through the card', 'plasma', { extraStyles: 'background: linear-gradient(120deg, #4c1d95, #db2777, #0891b2, #4c1d95)\nbackground-size: 300% 300%', cardAnimationSpeed: '5s' }),
+  extendedEffectPreset('Starfield', 'Tiny stars drift across a deep-space backdrop', 'starfield', { extraStyles: 'background: radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.5px), radial-gradient(circle, rgba(125,211,252,.7) 0 1px, transparent 1.5px), linear-gradient(#020617,#0f172a)\nbackground-size: 19px 19px, 29px 29px, 100% 100%', cardAnimationSpeed: '8s' }),
+  extendedEffectPreset('Embers', 'Warm sparks rise through a smoky background', 'embers', { extraStyles: 'background: radial-gradient(circle, #fb923c 0 1px, transparent 2px), radial-gradient(circle, #facc15 0 1px, transparent 2px), linear-gradient(#1c0a05,#321307)\nbackground-size: 17px 24px, 27px 31px, 100% 100%', cardAnimationSpeed: '5s', iconColor: '#fdba74' }),
+  extendedEffectPreset('Rain', 'Cool rain streaks fall across the card', 'rain', { extraStyles: 'background: repeating-linear-gradient(105deg, transparent 0 8px, rgba(125,211,252,.35) 9px 10px, transparent 11px 20px), linear-gradient(#0f2740,#07111f)\nbackground-size: 32px 48px, 100% 100%', cardAnimationSpeed: '2s', iconColor: '#7dd3fc' }),
+  extendedEffectPreset('Radar Pulse', 'A radar wave expands from the center', 'radarPulse', { backgroundColor: '#052e2b', color: '#5eead4', iconColor: '#5eead4', cardAnimationSpeed: '2.2s' }),
+  extendedEffectPreset('Sonar Rings', 'Repeated blue rings radiate from the card', 'sonarRings', { backgroundColor: '#082f49', color: '#7dd3fc', iconColor: '#7dd3fc', cardAnimationSpeed: '2s' }),
+  extendedEffectPreset('Status Beacon', 'A green status light circles the perimeter', 'statusBeacon', { borderStyle: 'solid', borderWidth: '2px', borderColor: '#22c55e', iconColor: '#4ade80', cardAnimationSpeed: '2.4s' }),
+  extendedEffectPreset('Glitch', 'Occasional digital RGB displacement', 'glitch', { backgroundColor: '#09090b', iconColor: '#22d3ee', nameColor: '#f0abfc', cardAnimationSpeed: '2.8s' }),
+  extendedEffectPreset('Electric Jolt', 'Irregular electrical flashes jump around the card', 'electricJolt', { backgroundColor: '#071827', borderStyle: 'solid', borderWidth: '1px', borderColor: '#38bdf8', iconColor: '#7dd3fc', cardAnimationSpeed: '2.4s' }),
+  extendedEffectPreset('Frost', 'Icy crystalline light gathers around the edges', 'frost', { extraStyles: 'background: linear-gradient(135deg, rgba(224,242,254,.3), rgba(14,116,144,.35)), #102a43\nbackdrop-filter: blur(8px)', borderStyle: 'solid', borderWidth: '1px', borderColor: '#bae6fd', cardAnimationSpeed: '4s' }),
+  extendedEffectPreset('Heat Haze', 'Warm color and shape gently distort like rising heat', 'heatHaze', { extraStyles: 'background: linear-gradient(135deg, #7c2d12, #ea580c, #f59e0b)\nbackground-size: 200% 200%', cardAnimationSpeed: '3.5s' }),
+  extendedEffectPreset('Breathing Glass', 'Glass brightness and edge light slowly breathe', 'breathingGlass', { backgroundColor: '#1e293b', backgroundColorOpacity: 65, backdropBlur: '10px', borderStyle: 'solid', borderWidth: '1px', borderColor: '#94a3b8', cardAnimationSpeed: '4s' }),
+  extendedEffectPreset('Magnetic Hover', 'The card gently tilts and lifts in space', 'magneticHover', { shadowSize: 'lg', shadowColor: '#000000', shadowOpacity: 45, cardAnimationSpeed: '4s' }),
+  extendedEffectPreset('Icon Orbit', 'The icon follows a smooth orbital path', 'iconOrbit', { backgroundColor: '#111827', iconColor: '#67e8f9', iconAnimationSpeed: '2.5s' }, true),
+  extendedEffectPreset('Icon Draw', 'The icon reveals itself like a drawn line', 'iconDraw', { backgroundColor: '#111827', iconColor: '#a7f3d0', iconAnimationSpeed: '2.5s' }, true),
+  extendedEffectPreset('State Morph', 'Shape and color flow between visual states', 'stateMorph', { extraStyles: 'background: linear-gradient(135deg, #0e7490, #7c3aed)\nbackground-size: 200% 200%', cardAnimationSpeed: '5s' }),
+  extendedEffectPreset('Progress Border', 'Border color and fill visualize numeric progress', 'progressBorder', { borderStyle: 'solid', borderWidth: '3px', borderColor: '#22c55e', cardAnimationSpeed: '5s' }),
+  extendedEffectPreset('Threshold Pulse', 'Pulse intensity highlights an approaching threshold', 'thresholdPulse', { backgroundColor: '#2a1505', color: '#fb923c', iconColor: '#fb923c', borderStyle: 'solid', borderWidth: '1px', borderColor: '#fb923c', cardAnimationSpeed: '2s' }),
+];
 
 export const PRESETS: Preset[] = [
   // ============================================
@@ -749,6 +800,7 @@ export const PRESETS: Preset[] = [
       cardAnimationSpeed: '1.5s',
     }
   },
+  ...EXTENDED_EFFECT_PRESETS,
 
   // ============================================
   // 3D STYLES
@@ -788,14 +840,14 @@ export const PRESETS: Preset[] = [
     description: 'Soft UI neumorphic style',
     category: '3d',
     config: {
-      backgroundColor: '#e0e0e0',
+      backgroundColor: '#E0E5EC',
       backgroundColorOpacity: 100,
       color: '#555555',
-      iconColor: '#666666',
+      iconColor: '#6B7A94',
       nameColor: '#444444',
       borderRadius: '20px',
       borderStyle: 'none',
-      extraStyles: 'box-shadow: 8px 8px 16px #bebebe, -8px -8px 16px #ffffff',
+      extraStyles: 'box-shadow: 8px 8px 16px #A3B1C6, -8px -8px 16px #FFFFFF',
     }
   },
   {
@@ -803,13 +855,13 @@ export const PRESETS: Preset[] = [
     description: 'Dark neumorphic style',
     category: '3d',
     config: {
-      backgroundColor: '#2d2d2d',
+      backgroundColor: '#2E3239',
       backgroundColorOpacity: 100,
       color: '#ffffff',
-      iconColor: '#888888',
+      iconColor: '#8AA0C8',
       borderRadius: '20px',
       borderStyle: 'none',
-      extraStyles: 'box-shadow: 8px 8px 16px #1a1a1a, -8px -8px 16px #404040',
+      extraStyles: 'box-shadow: 8px 8px 16px #1F2227, -8px -8px 16px #3D424B',
     }
   },
   {
@@ -1402,7 +1454,7 @@ export const PRESETS: Preset[] = [
   },
   {
     name: 'Dashed Border',
-    description: 'Animated dashed outline',
+    description: 'Simple dashed outline',
     category: 'custom',
     config: {
       backgroundColor: '#1a1a1a',
@@ -1621,11 +1673,14 @@ padding: 8px 16px`,
     category: 'icon-styles',
     config: {
       size: '45%',
-      backgroundColor: '#2a2a2a',
-      imgCellStyles: `background: #2a2a2a
+      backgroundColor: '#E0E5EC',
+      color: '#4B5563',
+      iconColor: '#6B7A94',
+      nameColor: '#4B5563',
+      imgCellStyles: `background: #E0E5EC
 border-radius: 50%
 padding: 14px
-box-shadow: 8px 8px 16px #1a1a1a, -8px -8px 16px #3a3a3a`,
+box-shadow: 8px 8px 16px #A3B1C6, -8px -8px 16px #FFFFFF`,
     }
   },
   {
@@ -1755,10 +1810,10 @@ padding: 14px`,
       showState: false,
       iconColor: 'rgba(255, 255, 255, 0.9)',
       imgCellStyles: `position: absolute
-top: 8px
-right: 8px
+bottom: 8px
+left: 8px
 opacity: 0.85`,
-      extraStyles: `justify-content: flex-end
+      extraStyles: `justify-content: flex-start
 align-items: flex-end
 padding: 12px`,
     }
@@ -1774,10 +1829,10 @@ padding: 12px`,
       showState: false,
       iconColor: 'rgba(255, 255, 255, 0.9)',
       imgCellStyles: `position: absolute
-top: 8px
-left: 8px
+bottom: 8px
+right: 8px
 opacity: 0.85`,
-      extraStyles: `justify-content: flex-end
+      extraStyles: `justify-content: flex-start
 align-items: flex-start
 padding: 12px`,
     }
@@ -1790,9 +1845,9 @@ padding: 12px`,
       size: '40%',
       layout: 'vertical',
       imgCellStyles: `position: absolute
-bottom: 8px
-right: 8px`,
-      extraStyles: `justify-content: flex-start
+top: 8px
+left: 8px`,
+      extraStyles: `justify-content: flex-end
 align-items: flex-end
 padding: 12px`,
     }
@@ -1805,9 +1860,9 @@ padding: 12px`,
       size: '40%',
       layout: 'vertical',
       imgCellStyles: `position: absolute
-bottom: 8px
-left: 8px`,
-      extraStyles: `justify-content: flex-start
+top: 8px
+right: 8px`,
+      extraStyles: `justify-content: flex-end
 align-items: flex-start
 padding: 12px`,
     }

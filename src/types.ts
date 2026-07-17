@@ -5,7 +5,15 @@ export interface ButtonStyle {
   textTransform: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
 }
 
-export type AnimationType = 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake' | 'bounce' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat' | 'flip' | 'wobble' | 'breathe' | 'ripple';
+export type AnimationType =
+  | 'none' | 'flash' | 'pulse' | 'jiggle' | 'marquee' | 'spin' | 'blink' | 'shake'
+  | 'bounce' | 'glow' | 'float' | 'swing' | 'rubberBand' | 'tada' | 'heartbeat'
+  | 'flip' | 'wobble' | 'breathe' | 'ripple'
+  | 'auroraBorder' | 'cometBorder' | 'energyCharge' | 'neonCurrent' | 'scanner'
+  | 'shimmer' | 'liquidGradient' | 'meshGradient' | 'plasma' | 'starfield' | 'embers'
+  | 'rain' | 'radarPulse' | 'sonarRings' | 'statusBeacon' | 'glitch' | 'electricJolt'
+  | 'frost' | 'heatHaze' | 'breathingGlass' | 'magneticHover' | 'iconOrbit'
+  | 'iconDraw' | 'stateMorph' | 'progressBorder' | 'thresholdPulse';
 export type AnimationTrigger = 'always' | 'on' | 'off';
 export type ActionType = 'none' | 'toggle' | 'more-info' | 'call-service' | 'perform-action' | 'navigate' | 'url' | 'assist' | 'fire-dom-event' | 'javascript';
 export type LockUnlockType = 'tap' | 'hold' | 'double_tap';
@@ -128,9 +136,25 @@ export interface StateStyleConfig {
   stateColor: string;
   labelColor: string;
   borderColor: string;
+  // Extended per-state appearance (used by merged ON/OFF Design entries; optional so
+  // user-authored conditional styles remain valid without them)
+  cardOpacity?: number;
+  borderWidth?: string;
+  borderStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double' | 'groove' | '';
+  backdropBlur?: string;
+  shadowSize?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner' | '';
+  shadowColor?: string;
+  shadowOpacity?: number;
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: 'normal' | 'bold' | 'lighter' | 'bolder' | '';
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize' | '';
+  letterSpacing?: string;
+  lineHeight?: string;
   // Conditional Animations
   cardAnimation: AnimationType;
   cardAnimationSpeed: string;
+  effectIntensity?: number;
   iconAnimation: AnimationType;
   iconAnimationSpeed: string;
   // Gradient properties
@@ -151,11 +175,21 @@ export interface StateAppearanceConfig {
   backgroundColor: string;
   backgroundColorOpacity: number;
   color: string;
+  colorAuto: boolean;
+  cardOpacity: number;
   iconColor: string;
+  iconColorAuto: boolean;
   nameColor: string;
+  nameColorAuto: boolean;
   stateColor: string;
+  stateColorAuto: boolean;
   labelColor: string;
+  labelColorAuto: boolean;
   borderColor: string;
+  borderColorAuto: boolean;
+  // Border shape
+  borderWidth: string;
+  borderStyle: 'none' | 'solid' | 'dashed' | 'dotted' | 'double' | 'groove' | '';
   // Gradient
   gradientEnabled: boolean;
   gradientType: 'linear' | 'radial' | 'conic';
@@ -167,12 +201,20 @@ export interface StateAppearanceConfig {
   gradientOpacity: number;
   // Glass / Depth
   backdropBlur: string;
-  shadowSize: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner';
+  shadowSize: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'inner' | '';
   shadowColor: string;
   shadowOpacity: number;
+  // Typography
+  fontFamily: string;
+  fontSize: string;
+  fontWeight: 'normal' | 'bold' | 'lighter' | 'bolder' | '';
+  textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize' | '';
+  letterSpacing: string;
+  lineHeight: string;
   // Animations
   cardAnimation: AnimationType;
   cardAnimationSpeed: string;
+  effectIntensity: number;
   iconAnimation: AnimationType;
   iconAnimationSpeed: string;
   // Extra styles
@@ -183,11 +225,20 @@ export const DEFAULT_STATE_APPEARANCE: StateAppearanceConfig = {
   backgroundColor: '',
   backgroundColorOpacity: 100,
   color: '',
+  colorAuto: false,
+  cardOpacity: 100,
   iconColor: '',
+  iconColorAuto: false,
   nameColor: '',
+  nameColorAuto: false,
   stateColor: '',
+  stateColorAuto: false,
   labelColor: '',
+  labelColorAuto: false,
   borderColor: '',
+  borderColorAuto: false,
+  borderWidth: '',
+  borderStyle: '',
   gradientEnabled: false,
   gradientType: 'linear',
   gradientAngle: 135,
@@ -196,12 +247,19 @@ export const DEFAULT_STATE_APPEARANCE: StateAppearanceConfig = {
   gradientColor3: '#f093fb',
   gradientColor3Enabled: false,
   gradientOpacity: 100,
-  backdropBlur: 'none',
-  shadowSize: 'none',
+  backdropBlur: '',
+  shadowSize: '',
   shadowColor: '#000000',
   shadowOpacity: 25,
+  fontFamily: '',
+  fontSize: '',
+  fontWeight: '',
+  textTransform: '',
+  letterSpacing: '',
+  lineHeight: '',
   cardAnimation: 'none',
   cardAnimationSpeed: '2s',
+  effectIntensity: 100,
   iconAnimation: 'none',
   iconAnimationSpeed: '2s',
   extraStyles: '',
@@ -316,6 +374,7 @@ export interface ButtonConfig {
   cardAnimation: AnimationType;
   cardAnimationTrigger: AnimationTrigger;
   cardAnimationSpeed: string;
+  effectIntensity: number;
   iconAnimation: AnimationType;
   iconAnimationTrigger: AnimationTrigger;
   iconAnimationSpeed: string;
@@ -466,6 +525,21 @@ export interface ButtonConfig {
 
   // Threshold-based Color Alerts
   thresholdColor: ThresholdColorConfig;
+
+  // Theme: appearance controls the user elected to keep global (single value,
+  // persists across ON/OFF states) instead of per-state. Keys are StateAppearanceConfig
+  // field names. A key present here is edited on the base config and ignores the
+  // ON/OFF editing toggle.
+  themeKeys: string[];
+}
+
+// A saved, reusable theme: which appearance controls are global (themeKeys) plus
+// the captured base-config values for those controls.
+export interface SavedTheme {
+  id: string;
+  name: string;
+  themeKeys: string[];
+  values: Partial<ButtonConfig>;
 }
 
 export const DEFAULT_TOAST_CONFIG: ToastConfig = {
@@ -508,13 +582,14 @@ export interface SavedButtonRecord {
   tags: string[];
   yaml: string;
   config: ButtonConfig;
-  presetCondition: 'always' | 'on' | 'off';
   useAutoDarkMode: boolean;
   activePresetId: string | null;
-  offStatePresetId: string | null;
-  onStatePresetId: string | null;
   onStateAppearance: Partial<StateAppearanceConfig>;
   offStateAppearance: Partial<StateAppearanceConfig>;
+  /** Load-only compatibility metadata from the retired preset-condition model. */
+  legacyPresetCondition?: 'always' | 'on' | 'off';
+  legacyOffStatePresetId?: string | null;
+  legacyOnStatePresetId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -614,6 +689,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
   cardAnimation: 'none',
   cardAnimationTrigger: 'always',
   cardAnimationSpeed: '2s',
+  effectIntensity: 100,
   iconAnimation: 'none',
   iconAnimationTrigger: 'always',
   iconAnimationSpeed: '2s',
@@ -754,4 +830,7 @@ export const DEFAULT_CONFIG: ButtonConfig = {
 
   // Threshold-based Color Alerts
   thresholdColor: { ...DEFAULT_THRESHOLD_CONFIG },
+
+  // Theme (global appearance controls)
+  themeKeys: [],
 };

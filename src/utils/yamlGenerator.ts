@@ -1,6 +1,7 @@
 
-import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig, ThresholdColorConfig } from "../types";
-import { getToggleFallbackService, supportsToggleAction, supportsLiveStream, hasOnOffState } from "./entityCapabilities";
+import { ButtonConfig, AnimationType, CustomField, StateStyleConfig, StateAppearanceConfig, LockConfig, TooltipConfig, ProtectConfig, ToastConfig, ThresholdColorConfig } from "../types";
+import { getToggleFallbackService, supportsToggleAction, supportsLiveStream } from "./entityCapabilities";
+import { getEffectIntensityStyles } from './effectIntensity';
 
 // Helper to convert hex + opacity (0-100) to RGBA string
 const hexToRgba = (hex: string, opacity: number) => {
@@ -43,8 +44,160 @@ const getAnimationCSS = (type: AnimationType, speed: string = '2s') => {
     case 'wobble': return `animation: cba-wobble 1s ease infinite`;
     case 'breathe': return `animation: cba-breathe ${speed} ease-in-out infinite`;
     case 'ripple': return `animation: cba-ripple 1.5s ease-out infinite`;
-    default: return null;
+    case 'progressBorder':
+    case 'none':
+    case 'marquee': return null;
+    default: return `animation: cba-${type} ${speed} ease-in-out infinite`;
   }
+};
+
+// Marquee: inline styles can't target pseudo-elements, so the rotating rainbow
+// border is driven by an animatable @property angle on a conic-gradient border.
+const marqueeCardLines = (background: string, speed: string): string[] => [
+  'border: var(--cba-marquee-width, 3px) solid transparent',
+  `background: linear-gradient(${background}, ${background}) padding-box, conic-gradient(from var(--cba-marquee-angle), #22d3ee, #a855f7, #f43f5e, #facc15, #22d3ee) border-box`,
+  `animation: cba-marquee-spin ${speed} linear infinite`,
+];
+
+const numericValueTemplate = "Math.max(0, Math.min(100, Number.parseFloat(entity?.state) || 0))";
+const progressBorderBackground = (background: string) =>
+  `background: [[[ const v = ${numericValueTemplate}; return 'linear-gradient(${background}, ${background}) padding-box, conic-gradient(#22c55e 0 ' + v + '%, rgba(148,163,184,.22) ' + v + '% 100%) border-box'; ]]]`;
+const thresholdValueColor =
+  `[[[ const v = ${numericValueTemplate}; return v >= 80 ? '#ef4444' : v >= 50 ? '#eab308' : '#22c55e'; ]]]`;
+
+// Build the styles.card / icon / name / state / label bundles for a single merged
+// state appearance (ON or OFF). Used to emit exactly one `- value: 'on'` and one
+// `- value: 'off'` state entry for binary entities. `themeKeys` are appearance keys
+// the user made global; they live in base styles.card and must NOT be re-emitted here.
+export interface AppearanceStyleBundle {
+  card: string[];
+  icon: string[];
+  name: string[];
+  state: string[];
+  label: string[];
+}
+
+const buildStateStylesFromAppearance = (
+  app: StateAppearanceConfig,
+  themeKeys: string[] = [],
+): AppearanceStyleBundle => {
+  const card: string[] = [];
+  const icon: string[] = [];
+  const name: string[] = [];
+  const state: string[] = [];
+  const label: string[] = [];
+  const isGlobal = (key: keyof StateAppearanceConfig) => themeKeys.includes(key as string);
+
+  // Background: gradient wins, else solid background color (with opacity).
+  // Use `background:` shorthand so it overrides any base gradient.
+  if (!isGlobal('backgroundColor') && !isGlobal('gradientEnabled')) {
+    if (app.gradientEnabled) {
+      const gOpacity = app.gradientOpacity ?? 100;
+      const c1 = hexToRgba(app.gradientColor1 || '#667eea', gOpacity);
+      const c2 = hexToRgba(app.gradientColor2 || '#764ba2', gOpacity);
+      const c3 = hexToRgba(app.gradientColor3 || '#f093fb', gOpacity);
+      const colors = app.gradientColor3Enabled ? `${c1}, ${c2}, ${c3}` : `${c1}, ${c2}`;
+      switch (app.gradientType) {
+        case 'linear': card.push(`background: linear-gradient(${app.gradientAngle}deg, ${colors})`); break;
+        case 'radial': card.push(`background: radial-gradient(circle, ${colors})`); break;
+        case 'conic': card.push(`background: conic-gradient(from ${app.gradientAngle}deg, ${colors}, ${c1})`); break;
+      }
+    } else if (app.backgroundColor) {
+      const bgOpacity = app.backgroundColorOpacity ?? 100;
+      const bgValue = bgOpacity < 100 ? hexToRgba(app.backgroundColor, bgOpacity) : app.backgroundColor;
+      card.push(`background: ${bgValue}`);
+    }
+  }
+
+  // Whole-card opacity
+  if (!isGlobal('cardOpacity') && app.cardOpacity !== undefined && app.cardOpacity < 100) {
+    card.push(`opacity: ${app.cardOpacity / 100}`);
+  }
+
+  // Border (width + style + color). Only emit when style is set for this state.
+  if (!isGlobal('borderStyle') && app.borderStyle && app.borderStyle !== 'none') {
+    const bColor = app.borderColorAuto
+      ? 'var(--button-card-light-color)'
+      : (app.borderColor || 'var(--primary-text-color)');
+    const bWidth = !app.borderWidth || (Number.parseFloat(app.borderWidth) || 0) === 0 ? '1px' : app.borderWidth;
+    card.push(`border: ${bWidth} ${app.borderStyle} ${bColor}`);
+  } else if (!isGlobal('borderColor') && app.borderColor) {
+    // Border color override without a per-state style change
+    card.push(`border-color: ${app.borderColor}`);
+  }
+
+  // Glass / depth
+  if (!isGlobal('backdropBlur') && app.backdropBlur && app.backdropBlur !== 'none' && app.backdropBlur !== '0px') {
+    card.push(`backdrop-filter: blur(${app.backdropBlur})`);
+  }
+  if (!isGlobal('shadowSize') && app.shadowSize && app.shadowSize !== 'none') {
+    const shadow = getShadowCSS(app.shadowSize, app.shadowColor || '#000000', app.shadowOpacity ?? 25);
+    if (shadow) card.push(shadow);
+  }
+
+  // Default text color
+  if (!isGlobal('color')) {
+    if (app.colorAuto) card.push(`color: var(--button-card-light-color)`);
+    else if (app.color) card.push(`color: ${app.color}`);
+  }
+
+  // Typography (card-level)
+  if (!isGlobal('fontFamily') && app.fontFamily) card.push(`font-family: ${app.fontFamily}`);
+  if (!isGlobal('fontSize') && app.fontSize) card.push(`font-size: ${app.fontSize}`);
+  if (!isGlobal('textTransform') && app.textTransform && app.textTransform !== 'none') card.push(`text-transform: ${app.textTransform}`);
+  if (!isGlobal('letterSpacing') && app.letterSpacing && app.letterSpacing !== 'normal') card.push(`letter-spacing: ${app.letterSpacing}`);
+  if (!isGlobal('lineHeight') && app.lineHeight && app.lineHeight !== 'normal') card.push(`line-height: ${app.lineHeight}`);
+
+  // Element colors
+  if (!isGlobal('iconColor')) {
+    if (app.iconColorAuto) icon.push(`color: var(--button-card-light-color)`);
+    else if (app.iconColor) icon.push(`color: ${app.iconColor}`);
+  }
+  if (!isGlobal('nameColor')) {
+    if (app.nameColorAuto) name.push(`color: var(--button-card-light-color)`);
+    else if (app.nameColor) name.push(`color: ${app.nameColor}`);
+  }
+  if (!isGlobal('stateColor')) {
+    if (app.stateColorAuto) state.push(`color: var(--button-card-light-color)`);
+    else if (app.stateColor) state.push(`color: ${app.stateColor}`);
+  }
+  if (!isGlobal('labelColor')) {
+    if (app.labelColorAuto) label.push(`color: var(--button-card-light-color)`);
+    else if (app.labelColor) label.push(`color: ${app.labelColor}`);
+  }
+  // Name font-weight (name-level typography)
+  if (!isGlobal('fontWeight') && app.fontWeight && app.fontWeight !== 'normal') {
+    name.push(`font-weight: ${app.fontWeight}`);
+  }
+
+  // Per-state animations
+  if (app.cardAnimation && app.cardAnimation !== 'none') {
+    const anim = getAnimationCSS(app.cardAnimation, app.cardAnimationSpeed || '2s');
+    if (anim) card.push(anim);
+    card.push(...getEffectIntensityStyles(app.cardAnimation, app.effectIntensity));
+    if (app.cardAnimation === 'progressBorder') {
+      card.push('border: var(--cba-progress-width, 3px) solid transparent');
+      card.push(progressBorderBackground(app.backgroundColor || '#10131c'));
+    }
+    if (app.cardAnimation === 'thresholdPulse') {
+      card.push(`color: ${thresholdValueColor}`);
+      card.push(`border-color: ${thresholdValueColor}`);
+    }
+  }
+  if (app.iconAnimation && app.iconAnimation !== 'none') {
+    const anim = getAnimationCSS(app.iconAnimation, app.iconAnimationSpeed || '2s');
+    if (anim) icon.push(anim);
+  }
+
+  // Extra raw styles
+  if (app.extraStyles) {
+    app.extraStyles.split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && trimmed.includes(':')) card.push(trimmed);
+    });
+  }
+
+  return { card, icon, name, state, label };
 };
 
 const quoteYamlSingle = (value: string): string => `'${String(value).replace(/'/g, "''")}'`;
@@ -149,26 +302,28 @@ const generateThresholdColorTemplate = (config: ThresholdColorConfig): string =>
       ? `entity.state` 
       : `states['${entityId}'].state`;
   
+  // Block scalar content must be indented deeper than the `- color:` key it is
+  // attached to (emitted at 4-space list indent), hence the 8-space content indent.
   if (config.mode === 'ascending') {
     // Low values = green, high values = red
     return `|
-      [[[
-        var val = parseFloat(${valueSource});
-        if (isNaN(val)) return 'inherit';
-        if (val <= ${config.greenThreshold}) return '${config.greenColor}';
-        if (val <= ${config.yellowThreshold}) return '${config.yellowColor}';
-        return '${config.redColor}';
-      ]]]`;
+        [[[
+          var val = parseFloat(${valueSource});
+          if (isNaN(val)) return 'inherit';
+          if (val <= ${config.greenThreshold}) return '${config.greenColor}';
+          if (val <= ${config.yellowThreshold}) return '${config.yellowColor}';
+          return '${config.redColor}';
+        ]]]`;
   } else {
     // High values = green, low values = red (descending)
     return `|
-      [[[
-        var val = parseFloat(${valueSource});
-        if (isNaN(val)) return 'inherit';
-        if (val >= ${config.greenThreshold}) return '${config.greenColor}';
-        if (val >= ${config.yellowThreshold}) return '${config.yellowColor}';
-        return '${config.redColor}';
-      ]]]`;
+        [[[
+          var val = parseFloat(${valueSource});
+          if (isNaN(val)) return 'inherit';
+          if (val >= ${config.greenThreshold}) return '${config.greenColor}';
+          if (val >= ${config.yellowThreshold}) return '${config.yellowColor}';
+          return '${config.redColor}';
+        ]]]`;
   }
 };
 
@@ -195,61 +350,92 @@ const generateActionYaml = (
   actionNavigation: string,
   extras: ActionExtras = {}
 ): string => {
-  let yaml = `  action: ${actionType}\n`;
+  // Core action lines built without indentation so they can be emitted flat, or
+  // nested inside a multi-actions wrapper when a toast rides along.
+  const core: string[] = [`action: ${actionType}`];
 
   if ((actionType === 'call-service' || actionType === 'perform-action') && actionData) {
     try {
       const data = JSON.parse(actionData);
       // perform-action uses perform_action key; call-service uses service key
       if (actionType === 'perform-action') {
-        yaml += `  perform_action: ${data.service || data.perform_action || ''}\n`;
+        core.push(`perform_action: ${data.service || data.perform_action || ''}`);
       } else {
-        yaml += `  service: ${data.service || ''}\n`;
+        core.push(`service: ${data.service || ''}`);
       }
       if (data.service_data || data.data) {
         const serviceData = data.service_data || data.data;
-        yaml += actionType === 'perform-action' ? `  data:\n` : `  service_data:\n`;
+        core.push(actionType === 'perform-action' ? `data:` : `service_data:`);
         Object.entries(serviceData).forEach(([key, value]) => {
-          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
+          core.push(`  ${key}: ${JSON.stringify(value)}`);
         });
       }
       if (data.target) {
-        yaml += `  target:\n`;
+        core.push(`target:`);
         Object.entries(data.target).forEach(([key, value]) => {
-          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
+          core.push(`  ${key}: ${JSON.stringify(value)}`);
         });
       }
     } catch (e) {
-      yaml += `  # Invalid JSON in action_data\n`;
+      core.push(`# Invalid JSON in action_data`);
     }
   }
 
   if ((actionType === 'more-info' || actionType === 'toggle') && extras.entityOverride) {
-    yaml += `  entity: ${extras.entityOverride}\n`;
+    core.push(`entity: ${extras.entityOverride}`);
   }
 
   if (actionType === 'navigate' && actionNavigation) {
-    yaml += `  navigation_path: ${actionNavigation}\n`;
+    core.push(`navigation_path: ${actionNavigation}`);
     if (extras.navigationReplace) {
-      yaml += `  navigation_replace: true\n`;
+      core.push(`navigation_replace: true`);
     }
   }
 
   if (actionType === 'url' && actionNavigation) {
-    yaml += `  url_path: ${actionNavigation}\n`;
+    core.push(`url_path: ${actionNavigation}`);
   }
 
   if (actionType === 'assist') {
     if (extras.pipelineId && extras.pipelineId !== 'last_used') {
-      yaml += `  pipeline_id: ${extras.pipelineId}\n`;
+      core.push(`pipeline_id: ${extras.pipelineId}`);
     }
     if (extras.startListening) {
-      yaml += `  start_listening: true\n`;
+      core.push(`start_listening: true`);
     }
   }
 
   if (actionType === 'javascript' && extras.javascript) {
-    yaml += `  javascript: |\n    ${extras.javascript.split('\n').join('\n    ')}\n`;
+    // button-card evaluates `javascript` as a JS template — it must be wrapped in [[[ ]]]
+    const code = extras.javascript.includes('[[[')
+      ? extras.javascript
+      : `[[[\n${extras.javascript}\n]]]`;
+    core.push(`javascript: |`);
+    code.split('\n').forEach(line => core.push(`  ${line}`));
+  }
+
+  // button-card only reads `toast:` when the action itself is `toast`, so a toast
+  // attached to another action is emitted as a multi-actions sequence.
+  const attachToast = actionType !== 'none' && !!extras.toast?.enabled && !!extras.toast?.message;
+
+  let yaml = '';
+  if (attachToast) {
+    const toast = extras.toast!;
+    yaml += `  action: multi-actions\n`;
+    yaml += `  actions:\n`;
+    yaml += `    - ${core[0]}\n`;
+    core.slice(1).forEach(line => { yaml += `      ${line}\n`; });
+    yaml += `    - action: toast\n`;
+    yaml += `      toast:\n`;
+    yaml += `        message: ${JSON.stringify(toast.message)}\n`;
+    if (toast.duration !== 3000) {
+      yaml += `        duration: ${toast.duration}\n`;
+    }
+    if (toast.dismissable === false) {
+      yaml += `        dismissable: false\n`;
+    }
+  } else {
+    core.forEach(line => { yaml += `  ${line}\n`; });
   }
 
   if (extras.repeatMs && extras.repeatMs > 0) {
@@ -261,23 +447,9 @@ const generateActionYaml = (
 
   if (actionType !== 'none') {
     if (extras.confirmation) {
-      if (extras.confirmationText) {
-        yaml += `  confirmation:\n`;
-        yaml += `    text: "${extras.confirmationText}"\n`;
-      } else {
-        yaml += `  confirmation: true\n`;
-      }
-    }
-
-    if (extras.toast?.enabled && extras.toast.message) {
-      yaml += `  toast:\n`;
-      yaml += `    message: "${extras.toast.message}"\n`;
-      if (extras.toast.duration !== 3000) {
-        yaml += `    duration: ${extras.toast.duration}\n`;
-      }
-      if (extras.toast.dismissable === false) {
-        yaml += `    dismissable: false\n`;
-      }
+      // confirmation is an object in button-card; a bare boolean is not part of the schema
+      yaml += `  confirmation:\n`;
+      yaml += `    text: ${JSON.stringify(extras.confirmationText || 'Are you sure?')}\n`;
     }
 
     if (extras.sound) {
@@ -292,17 +464,32 @@ const generateActionYaml = (
   return yaml;
 };
 
-export const generateYaml = (config: ButtonConfig): string => {
+export const generateYaml = (
+  config: ButtonConfig,
+  stateAppearance?: { on: StateAppearanceConfig; off: StateAppearanceConfig } | null,
+): string => {
+  // Binary-state mode: the two merged ON/OFF appearances own all state-specific
+  // styling. State-owned properties are stripped from base styles.card here and
+  // emitted inside the merged `- value: 'on'` / `- value: 'off'` entries instead.
+  const binaryStateMode = !!stateAppearance;
+  const themeKeys = config.themeKeys || [];
+  const isGlobalKey = (key: string) => themeKeys.includes(key);
+  // In binaryStateMode, a state-owned property is emitted at base level only when
+  // the user made it a global (theme) control; otherwise it lives in the state entries.
+  const baseOwns = (key: string) => !binaryStateMode || isGlobalKey(key);
+
   // Helper to generate color style line
   const getColorLine = (color: string, auto: boolean) => {
     if (auto) return `    - color: var(--button-card-light-color)\n`;
     if (color) return `    - color: ${color}\n`;
     return null;
   };
-  
+
   // Resolve border color for styles
   const borderColor = config.borderColorAuto ? 'var(--button-card-light-color)' : config.borderColor;
-  const borderStyle = config.borderStyle !== 'none' ? `border: ${config.borderWidth} ${config.borderStyle} ${borderColor || 'var(--primary-text-color)'}` : 'border: none';
+  // A visible border style with a 0/empty width renders as 1px (matches the preview)
+  const baseBorderWidth = !config.borderWidth || (Number.parseFloat(config.borderWidth) || 0) === 0 ? '1px' : config.borderWidth;
+  const borderStyle = config.borderStyle !== 'none' ? `border: ${baseBorderWidth} ${config.borderStyle} ${borderColor || 'var(--primary-text-color)'}` : 'border: none';
 
   // Resolve Backgrounds
   const bgColor = config.backgroundColor ? hexToRgba(config.backgroundColor, config.backgroundColorOpacity) : '';
@@ -335,43 +522,62 @@ export const generateYaml = (config: ButtonConfig): string => {
   const gradientCSS = getGradientCSS();
 
   // --- Base Card Styles ---
+  // State-neutral properties always emit at base level. State-owned properties
+  // (background/opacity/color/typography/border/blur/shadow) emit here only when
+  // baseOwns() is true: non-binary entities, or a theme/global control.
+  const customFont = (config.customFontName && config.customFontUrl)
+    ? `font-family: '${config.customFontName}', sans-serif`
+    : (config.fontFamily ? `font-family: ${config.fontFamily}` : null);
   const cardStyles = [
     config.height !== 'auto' ? `height: ${config.height}` : null,
     // aspect-ratio is already emitted as a top-level YAML property; omit from styles.card
-    gradientCSS ? gradientCSS : (bgColor ? `background-color: ${bgColor}` : null),
-    config.cardOpacity < 100 ? `opacity: ${config.cardOpacity / 100}` : null,
+    baseOwns('backgroundColor') ? (gradientCSS ? gradientCSS : (bgColor ? `background-color: ${bgColor}` : null)) : null,
+    baseOwns('cardOpacity') && config.cardOpacity < 100 ? `opacity: ${config.cardOpacity / 100}` : null,
     `border-radius: ${config.borderRadius}`,
     `padding: ${config.padding}`,
     // Only emit color in styles.card when not using color:auto (which is a top-level override)
-    !config.colorAuto ? `color: ${config.color}` : null,
-    // Use custom font if specified, otherwise use fontFamily dropdown
-    (config.customFontName && config.customFontUrl) 
-      ? `font-family: '${config.customFontName}', sans-serif`
-      : (config.fontFamily ? `font-family: ${config.fontFamily}` : null),
-    `font-size: ${config.fontSize}`,
-    `text-transform: ${config.textTransform}`,
-    `font-weight: ${config.fontWeight}`,
-    config.letterSpacing !== 'normal' ? `letter-spacing: ${config.letterSpacing}` : null,
-    config.lineHeight !== 'normal' ? `line-height: ${config.lineHeight}` : null,
-    borderStyle,
-    config.backdropBlur !== '0px' ? `backdrop-filter: blur(${config.backdropBlur})` : null,
-    shadowCSS,
+    baseOwns('color') && !config.colorAuto ? `color: ${config.color}` : null,
+    // Custom font URL takes priority and is not part of per-state typography.
+    (config.customFontName && config.customFontUrl)
+      ? customFont
+      : (baseOwns('fontFamily') && config.fontFamily ? `font-family: ${config.fontFamily}` : null),
+    baseOwns('fontSize') ? `font-size: ${config.fontSize}` : null,
+    baseOwns('textTransform') ? `text-transform: ${config.textTransform}` : null,
+    baseOwns('fontWeight') ? `font-weight: ${config.fontWeight}` : null,
+    baseOwns('letterSpacing') && config.letterSpacing !== 'normal' ? `letter-spacing: ${config.letterSpacing}` : null,
+    baseOwns('lineHeight') && config.lineHeight !== 'normal' ? `line-height: ${config.lineHeight}` : null,
+    baseOwns('borderStyle') ? borderStyle : null,
+    baseOwns('backdropBlur') && config.backdropBlur !== '0px' ? `backdrop-filter: blur(${config.backdropBlur})` : null,
+    baseOwns('shadowSize') ? shadowCSS : null,
   ].filter((s): s is string => Boolean(s));
 
   // --- Base Icon Styles ---
   const iconStyles: string[] = [];
-  if (config.iconColorAuto) iconStyles.push(`color: var(--button-card-light-color)`);
-  else if (config.iconColor) iconStyles.push(`color: ${config.iconColor}`);
-  
+  if (baseOwns('iconColor')) {
+    if (config.iconColorAuto) iconStyles.push(`color: var(--button-card-light-color)`);
+    else if (config.iconColor) iconStyles.push(`color: ${config.iconColor}`);
+  }
+
   if (config.spin || config.rotate) {
     iconStyles.push(`animation: cba-rotate ${config.spinDuration} linear infinite`);
   }
 
   // --- Apply ALWAYS Animations ---
-  // If alwaysAnimate is enabled, output animations regardless of trigger
+  // If alwaysAnimate is enabled, output animations regardless of trigger.
+  // In binaryStateMode, per-state animations live in the ON/OFF entries; only
+  // "always" animations belong at base level.
   if (config.cardAnimation !== 'none' && (config.alwaysAnimateCard || config.cardAnimationTrigger === 'always')) {
     const anim = getAnimationCSS(config.cardAnimation, config.cardAnimationSpeed);
     if (anim) cardStyles.push(anim);
+    cardStyles.push(...getEffectIntensityStyles(config.cardAnimation, config.effectIntensity));
+    if (config.cardAnimation === 'progressBorder') {
+      cardStyles.push('border: var(--cba-progress-width, 3px) solid transparent');
+      cardStyles.push(progressBorderBackground(bgColor || '#10131c'));
+    }
+    if (config.cardAnimation === 'thresholdPulse') {
+      cardStyles.push(`color: ${thresholdValueColor}`);
+      cardStyles.push(`border-color: ${thresholdValueColor}`);
+    }
   }
   if (config.iconAnimation !== 'none' && (config.alwaysAnimateIcon || config.iconAnimationTrigger === 'always')) {
     const anim = getAnimationCSS(config.iconAnimation, config.iconAnimationSpeed);
@@ -388,7 +594,7 @@ export const generateYaml = (config: ButtonConfig): string => {
 
   // Units override
   if (config.units) {
-    yaml += `units: "${config.units}"\n`;
+    yaml += `units: ${JSON.stringify(config.units)}\n`;
   }
 
   // Core fields with templates - only output if has value
@@ -416,12 +622,12 @@ export const generateYaml = (config: ButtonConfig): string => {
   } else if (config.labelEntity) {
     // Generate template to display another entity's value
     if (config.labelAttribute) {
-      yaml += `label: "[[[ return states['${config.labelEntity}'].attributes.${config.labelAttribute} ]]]"\n`;
+      yaml += `label: "[[[ return states['${config.labelEntity}'].attributes['${config.labelAttribute}'] ]]]"\n`;
     } else {
       yaml += `label: "[[[ return states['${config.labelEntity}'].state ]]]"\n`;
     }
   } else if (config.label) {
-    yaml += `label: "${config.label}"\n`;
+    yaml += `label: ${JSON.stringify(config.label)}\n`;
   }
 
   // Entity Picture
@@ -433,7 +639,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (config.stateDisplayTemplate) {
     yaml += `state_display: ${config.stateDisplayTemplate}\n`;
   } else if (config.stateDisplay) {
-    yaml += `state_display: "${config.stateDisplay}"\n`;
+    yaml += `state_display: ${JSON.stringify(config.stateDisplay)}\n`;
   }
 
   // Variables
@@ -464,7 +670,9 @@ export const generateYaml = (config: ButtonConfig): string => {
   if (showLabel) yaml += `show_label: true\n`;
   if (showEntityPicture) yaml += `show_entity_picture: true\n`;
   if (showLastChanged) yaml += `show_last_changed: true\n`;
+  // button-card defaults show_units to true, so hiding units must be explicit
   if (showUnits) yaml += `show_units: true\n`;
+  else if (showState && hasEntity && !config.showUnits) yaml += `show_units: false\n`;
 
   // New show options
   if (config.showRipple === false) {
@@ -508,10 +716,13 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `section_mode: true\n`;
   }
 
-  // Grid Options - always output
-  yaml += `grid_options:\n`;
-  yaml += `  columns: ${config.gridColumns}\n`;
-  yaml += `  rows: ${config.gridRows === 0 ? 'auto' : config.gridRows}\n`;
+  // Grid Options — only meaningful in sections views; emit when section mode is on
+  // or the user changed the defaults.
+  if (config.sectionMode || config.gridColumns !== 4 || config.gridRows !== 0) {
+    yaml += `grid_options:\n`;
+    yaml += `  columns: ${config.gridColumns}\n`;
+    yaml += `  rows: ${config.gridRows === 0 ? 'auto' : config.gridRows}\n`;
+  }
 
   // Numeric Precision
   if (config.numericPrecision >= 0) {
@@ -544,7 +755,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Tooltip (object-style)
   if (config.tooltip.enabled && config.tooltip.content) {
     yaml += `tooltip:\n`;
-    yaml += `  content: "${config.tooltip.content}"\n`;
+    yaml += `  content: ${JSON.stringify(config.tooltip.content)}\n`;
     if (config.tooltip.position !== 'top') {
       yaml += `  placement: ${config.tooltip.position}\n`;
     }
@@ -586,9 +797,10 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Hold Time
   // (hold_time removed — not a valid button-card option)
 
-  // Update Timer
+  // Update Timer — the UI value is in seconds; button-card reads bare numbers as
+  // milliseconds (min 100), so emit a duration string instead.
   if (config.updateTimer > 0) {
-    yaml += `update_timer: ${config.updateTimer}\n`;
+    yaml += `update_timer: ${config.updateTimer}s\n`;
   }
 
   // Triggers Update (entities that force a card re-render)
@@ -644,7 +856,15 @@ export const generateYaml = (config: ButtonConfig): string => {
   const normalizedIconPress = normalizeAction(config.iconPressAction, config.iconPressActionData);
   const normalizedIconRelease = normalizeAction(config.iconReleaseAction, config.iconReleaseActionData);
 
+  // Momentary press/release actions replace tap/hold/double-tap in button-card.
+  const hasMomentaryActions = config.pressAction !== 'none' || config.releaseAction !== 'none';
+  const hasIconMomentaryActions = config.iconPressAction !== 'none' || config.iconReleaseAction !== 'none';
+  if (hasMomentaryActions) {
+    yaml += `# press/release actions replace tap/hold/double-tap on this card\n`;
+  }
+
   // Actions - Tap
+  if (!hasMomentaryActions) {
   yaml += `tap_action:\n`;
   yaml += generateActionYaml(
     normalizedTap.actionType,
@@ -705,6 +925,7 @@ export const generateYaml = (config: ButtonConfig): string => {
       haptic: config.hapticFeedback,
     }
   );
+  }
 
   // Momentary Actions - Press
   if (config.pressAction !== 'none') {
@@ -728,8 +949,8 @@ export const generateYaml = (config: ButtonConfig): string => {
     );
   }
 
-  // Icon Actions
-  if (config.iconTapAction !== 'none') {
+  // Icon Actions (icon press/release replace icon tap/hold/double-tap)
+  if (!hasIconMomentaryActions && config.iconTapAction !== 'none') {
     yaml += `icon_tap_action:\n`;
     yaml += generateActionYaml(
       normalizedIconTap.actionType,
@@ -739,7 +960,7 @@ export const generateYaml = (config: ButtonConfig): string => {
     );
   }
 
-  if (config.iconHoldAction !== 'none') {
+  if (!hasIconMomentaryActions && config.iconHoldAction !== 'none') {
     yaml += `icon_hold_action:\n`;
     yaml += generateActionYaml(
       normalizedIconHold.actionType,
@@ -749,7 +970,7 @@ export const generateYaml = (config: ButtonConfig): string => {
     );
   }
 
-  if (config.iconDoubleTapAction !== 'none') {
+  if (!hasIconMomentaryActions && config.iconDoubleTapAction !== 'none') {
     yaml += `icon_double_tap_action:\n`;
     yaml += generateActionYaml(
       normalizedIconDoubleTap.actionType,
@@ -781,7 +1002,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Confirmation
   if (config.confirmation.enabled) {
     yaml += `confirmation:\n`;
-    yaml += `  text: "${config.confirmation.text}"\n`;
+    yaml += `  text: ${JSON.stringify(config.confirmation.text || 'Are you sure?')}\n`;
     if (config.confirmation.exemptions && config.confirmation.exemptions.length > 0) {
       yaml += `  exemptions:\n`;
       config.confirmation.exemptions.forEach(e => {
@@ -793,12 +1014,12 @@ export const generateYaml = (config: ButtonConfig): string => {
   // Protect (PIN/Password)
   if (config.protect.enabled) {
     yaml += `protect:\n`;
-    yaml += `  ${config.protect.type === 'password' ? 'password' : 'pin'}: "${config.protect.value}"\n`;
+    yaml += `  ${config.protect.type === 'password' ? 'password' : 'pin'}: ${JSON.stringify(config.protect.value)}\n`;
     if (config.protect.failureMessage) {
-      yaml += `  failure_message: "${config.protect.failureMessage}"\n`;
+      yaml += `  failure_message: ${JSON.stringify(config.protect.failureMessage)}\n`;
     }
     if (config.protect.successMessage) {
-      yaml += `  success_message: "${config.protect.successMessage}"\n`;
+      yaml += `  success_message: ${JSON.stringify(config.protect.successMessage)}\n`;
     }
   }
 
@@ -810,43 +1031,59 @@ export const generateYaml = (config: ButtonConfig): string => {
         // Entity-based field - generate template automatically
         const entityId = field.entity;
         const attr = field.attribute;
-        const prefix = field.prefix || '';
-        const suffix = field.suffix || '';
+        const prefix = escapeJsSingle(field.prefix || '');
+        const suffix = escapeJsSingle(field.suffix || '');
         const icon = field.icon;
-        
+
         let template = '[[[';
         if (icon) {
-          template += `\n    var icon = '<ha-icon icon="${icon}" style="width:14px;height:14px;margin-right:4px;"></ha-icon>';`;
+          template += `\n  var icon = '<ha-icon icon="${icon}" style="width:14px;height:14px;margin-right:4px;"></ha-icon>';`;
         }
         if (attr) {
-          template += `\n    var val = states['${entityId}'].attributes.${attr};`;
+          template += `\n  var val = states['${entityId}'].attributes['${escapeJsSingle(attr)}'];`;
         } else {
-          template += `\n    var val = states['${entityId}'].state;`;
+          template += `\n  var val = states['${entityId}'].state;`;
         }
         if (icon) {
-          template += `\n    return icon + '${prefix}' + val + '${suffix}';`;
+          template += `\n  return icon + '${prefix}' + val + '${suffix}';`;
         } else {
-          template += `\n    return '${prefix}' + val + '${suffix}';`;
+          template += `\n  return '${prefix}' + val + '${suffix}';`;
         }
-        template += '\n  ]]]';
-        
-        yaml += `  ${field.name}: |\n    ${template}\n`;
+        template += '\n]]]';
+
+        yaml += `  ${field.name}: |\n`;
+        template.split('\n').forEach(line => { yaml += `    ${line}\n`; });
       } else if (field.value.includes('[[[') && field.value.includes(']]]')) {
-        // Template with JS syntax
-        yaml += `  ${field.name}: |\n    ${field.value}\n`;
+        // Template with JS syntax — indent every line so the block scalar stays intact
+        yaml += `  ${field.name}: |\n`;
+        field.value.split('\n').forEach(line => { yaml += `    ${line}\n`; });
       } else {
-        yaml += `  ${field.name}: "${field.value}"\n`;
+        yaml += `  ${field.name}: ${JSON.stringify(field.value)}\n`;
       }
     });
   }
 
-  // Conditional Display
+  // Conditional Display — Home Assistant's per-card `visibility` conditions
+  // (button-card has no `conditions` option of its own).
   if (config.conditionalEntity && config.conditionalState) {
-    yaml += `conditions:\n`;
-    yaml += `  - entity: ${config.conditionalEntity}\n`;
-    yaml += `    state: ${config.conditionalState}\n`;
-    if (config.conditionalOperator !== 'equals') {
-      yaml += `    operator: ${config.conditionalOperator}\n`;
+    const op = config.conditionalOperator || 'equals';
+    if (op === 'regex' || op === 'template') {
+      yaml += `# Card visibility: '${op}' comparisons are not supported by Home Assistant visibility conditions; condition omitted.\n`;
+    } else {
+      yaml += `visibility:\n`;
+      if (op === 'equals' || op === 'not_equals') {
+        yaml += `  - condition: state\n`;
+        yaml += `    entity: ${config.conditionalEntity}\n`;
+        yaml += `    ${op === 'equals' ? 'state' : 'state_not'}: ${quoteYamlSingle(config.conditionalState)}\n`;
+      } else {
+        const numericKey = (op === 'above' || op === 'above_equal') ? 'above' : 'below';
+        yaml += `  - condition: numeric_state\n`;
+        yaml += `    entity: ${config.conditionalEntity}\n`;
+        yaml += `    ${numericKey}: ${Number.parseFloat(config.conditionalState) || 0}\n`;
+        if (op === 'above_equal' || op === 'below_equal') {
+          yaml += `    # note: HA numeric_state compares exclusively; '=' boundary is approximated\n`;
+        }
+      }
     }
   }
   
@@ -865,10 +1102,17 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
   
   // Marquee special keyframes
-  if (config.cardAnimation === 'marquee') {
-    extraStyles += `  @keyframes cba-marquee-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+  const hasMarqueeAnimation = config.cardAnimation === 'marquee'
+    || stateAppearance?.on.cardAnimation === 'marquee'
+    || stateAppearance?.off.cardAnimation === 'marquee';
+  if (hasMarqueeAnimation) {
+    extraStyles += `  @property --cba-marquee-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @keyframes cba-marquee-spin {
+    to { --cba-marquee-angle: 360deg; }
   }
 `;
   }
@@ -891,6 +1135,10 @@ export const generateYaml = (config: ButtonConfig): string => {
   const needsGenericKeyframes =
     (config.cardAnimation !== 'none' && config.cardAnimation !== 'marquee') ||
     config.iconAnimation !== 'none' ||
+    (!!stateAppearance && [stateAppearance.on, stateAppearance.off].some(appearance =>
+      (appearance.cardAnimation !== 'none' && appearance.cardAnimation !== 'marquee') ||
+      appearance.iconAnimation !== 'none'
+    )) ||
     config.spin ||
     config.rotate ||
     extraStylesHasAnimation ||
@@ -930,8 +1178,8 @@ export const generateYaml = (config: ButtonConfig): string => {
     to { transform: rotate(360deg); }
   }
   @keyframes cba-glow {
-    0%, 100% { box-shadow: 0 0 5px currentColor, 0 0 10px currentColor; }
-    50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+    0%, 100% { box-shadow: 0 0 var(--cba-glow-near, 5px) currentColor, 0 0 var(--cba-glow-mid, 10px) currentColor; }
+    50% { box-shadow: 0 0 var(--cba-glow-far, 20px) currentColor, 0 0 var(--cba-glow-peak, 30px) currentColor; }
   }
   @keyframes cba-swing {
     0%, 100% { transform: rotate(0deg); transform-origin: top center; }
@@ -997,7 +1245,7 @@ export const generateYaml = (config: ButtonConfig): string => {
   }
   @keyframes cba-ripple {
     0% { box-shadow: 0 0 0 0 currentColor; }
-    100% { box-shadow: 0 0 0 20px transparent; }
+    100% { box-shadow: 0 0 0 var(--cba-ripple-reach, 20px) transparent; }
   }
   @keyframes cba-rubberBand {
     0% { transform: scale(1, 1); }
@@ -1008,6 +1256,32 @@ export const generateYaml = (config: ButtonConfig): string => {
     75% { transform: scale(1.05, 0.95); }
     100% { transform: scale(1, 1); }
   }
+  @keyframes cba-auroraBorder { 0%,100% { box-shadow: 0 0 var(--cba-aurora-soft, 5px) #22d3ee, inset 0 0 var(--cba-aurora-inner, 4px) #8b5cf6; border-color: #22d3ee; } 33% { box-shadow: 0 0 var(--cba-aurora-peak, 14px) #8b5cf6, inset 0 0 var(--cba-aurora-inner-peak, 7px) #ec4899; border-color: #8b5cf6; } 66% { box-shadow: 0 0 var(--cba-aurora-mid, 10px) #34d399, inset 0 0 var(--cba-aurora-soft, 5px) #22d3ee; border-color: #34d399; } }
+  @keyframes cba-cometBorder { 0%,100% { box-shadow: var(--cba-comet-x-neg, -8px) var(--cba-comet-y-neg, -5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #22d3ee; } 25% { box-shadow: var(--cba-comet-x, 8px) var(--cba-comet-y-neg, -5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #8b5cf6; } 50% { box-shadow: var(--cba-comet-x, 8px) var(--cba-comet-y, 5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #ec4899; } 75% { box-shadow: var(--cba-comet-x-neg, -8px) var(--cba-comet-y, 5px) var(--cba-comet-blur, 10px) var(--cba-comet-spread, -5px) #fff, 0 0 var(--cba-comet-ambient, 7px) #22d3ee; } }
+  @keyframes cba-energyCharge { 0% { box-shadow: inset 0 -2px 0 #22d3ee, 0 0 2px #22d3ee; filter: brightness(.85) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 75% { box-shadow: inset 0 var(--cba-charge-depth, -18px) var(--cba-charge-blur, 18px) var(--cba-charge-spread, -16px) #22d3ee, 0 0 var(--cba-charge-glow, 14px) #22d3ee; filter: brightness(1.15) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 82% { box-shadow: inset 0 var(--cba-charge-depth, -18px) var(--cba-charge-blur, 18px) var(--cba-charge-spread, -16px) #fff, 0 0 var(--cba-charge-flash, 24px) #fff; filter: brightness(1.5) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 100% { box-shadow: inset 0 -2px 0 #22d3ee, 0 0 2px #22d3ee; filter: brightness(.85) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+  @keyframes cba-neonCurrent { 0%,100% { border-color: #22d3ee; box-shadow: var(--cba-neon-offset, 5px) 0 var(--cba-neon-blur, 8px) #22d3ee, var(--cba-neon-offset-neg, -5px) 0 var(--cba-neon-blur, 8px) #a855f7; } 25% { border-color: #a855f7; box-shadow: 0 var(--cba-neon-offset, 5px) var(--cba-neon-blur, 8px) #a855f7, 0 var(--cba-neon-offset-neg, -5px) var(--cba-neon-blur, 8px) #f43f5e; } 50% { border-color: #f43f5e; box-shadow: var(--cba-neon-offset-neg, -5px) 0 var(--cba-neon-blur, 8px) #f43f5e, var(--cba-neon-offset, 5px) 0 var(--cba-neon-blur, 8px) #facc15; } 75% { border-color: #facc15; box-shadow: 0 var(--cba-neon-offset-neg, -5px) var(--cba-neon-blur, 8px) #facc15, 0 var(--cba-neon-offset, 5px) var(--cba-neon-blur, 8px) #22d3ee; } }
+  @keyframes cba-scanner { 0% { background-position: 0 var(--cba-scanner-start, -120%); } 100% { background-position: 0 var(--cba-scanner-end, 220%); } }
+  @keyframes cba-shimmer { 0% { background-position: var(--cba-shimmer-start, 180%) 0; } 100% { background-position: var(--cba-shimmer-end, -180%) 0; } }
+  @keyframes cba-liquidGradient { 0%,100% { background-position: 0% 50%; border-radius: var(--cba-liquid-radius-a, 18px 12px 20px 10px); } 50% { background-position: 100% 50%; border-radius: var(--cba-liquid-radius-b, 11px 21px 12px 19px); } }
+  @keyframes cba-meshGradient { 0%,100% { background-position: 0% 0%, 100% 100%, 50% 50%; } 50% { background-position: var(--cba-mesh-position, 100% 70%, 0% 30%, 80% 20%); } }
+  @keyframes cba-plasma { 0%,100% { background-position: var(--cba-plasma-start, 0%) 50%; filter: hue-rotate(0deg) saturate(1.2) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 50% { background-position: var(--cba-plasma-end, 100%) 50%; filter: hue-rotate(var(--cba-plasma-hue, 100deg)) saturate(1.8) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+  @keyframes cba-starfield { 0% { background-position: 0 0, 12px 8px, 0 0; } 100% { background-position: var(--cba-starfield-end, 24px 40px, -18px 30px, 0 0); } }
+  @keyframes cba-embers { 0% { background-position: 0 30px, 10px 45px, 0 0; } 100% { background-position: var(--cba-embers-end, 8px -35px, -5px -20px, 0 0); } }
+  @keyframes cba-rain { 0% { background-position: var(--cba-rain-start, 0 -30px); } 100% { background-position: var(--cba-rain-end, -12px 45px); } }
+  @keyframes cba-radarPulse { 0% { box-shadow: inset 0 0 0 0 rgba(34,211,238,.55); } 75%,100% { box-shadow: inset 0 0 0 var(--cba-radar-reach, 35px) rgba(34,211,238,0); } }
+  @keyframes cba-sonarRings { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.7), 0 0 0 0 rgba(56,189,248,.4); } 100% { box-shadow: 0 0 0 var(--cba-sonar-near, 10px) transparent, 0 0 0 var(--cba-sonar-far, 20px) transparent; } }
+  @keyframes cba-statusBeacon { 0%,100% { border-color: #22c55e; box-shadow: var(--cba-beacon-offset-neg, -7px) 0 var(--cba-beacon-blur, 12px) #22c55e; } 25% { box-shadow: 0 var(--cba-beacon-offset-neg, -7px) var(--cba-beacon-blur, 12px) #22c55e; } 50% { box-shadow: var(--cba-beacon-offset, 7px) 0 var(--cba-beacon-blur, 12px) #22c55e; } 75% { box-shadow: 0 var(--cba-beacon-offset, 7px) var(--cba-beacon-blur, 12px) #22c55e; } }
+  @keyframes cba-glitch { 0%,88%,100% { transform: translate(0); filter: var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 90% { transform: translate(var(--cba-glitch-wide-neg, -3px), var(--cba-glitch-small, 1px)); filter: drop-shadow(var(--cba-glitch-shadow, 3px) 0 #f0f) drop-shadow(var(--cba-glitch-shadow-neg, -3px) 0 #0ff) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 93% { transform: translate(var(--cba-glitch-wide, 3px), var(--cba-glitch-small-neg, -1px)) skewX(var(--cba-glitch-skew, 3deg)); filter: var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 96% { transform: translate(var(--cba-glitch-small-neg, -1px),0); filter: drop-shadow(var(--cba-glitch-wide-neg, -3px) 0 #f0f) drop-shadow(var(--cba-glitch-wide, 3px) 0 #0ff) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+  @keyframes cba-electricJolt { 0%,78%,100% { box-shadow: 0 0 5px #38bdf8; transform: translate(0); } 80% { box-shadow: var(--cba-electric-x-neg, -8px) var(--cba-electric-y-neg, -5px) var(--cba-electric-glow, 18px) #fff, var(--cba-electric-x, 8px) var(--cba-electric-y, 4px) 12px #38bdf8; transform: translateX(var(--cba-electric-jolt-neg, -1px)); } 84% { box-shadow: var(--cba-electric-x, 8px) -3px var(--cba-electric-glow-peak, 20px) #fff; transform: translateX(var(--cba-electric-jolt, 2px)); } 88% { box-shadow: 0 0 7px #38bdf8; transform: translate(0); } }
+  @keyframes cba-frost { 0%,100% { box-shadow: inset 0 0 var(--cba-frost-inner, 8px) rgba(186,230,253,.35), 0 0 var(--cba-frost-outer, 5px) #bae6fd; filter: brightness(.95) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 50% { box-shadow: inset 0 0 var(--cba-frost-inner-peak, 18px) rgba(255,255,255,.55), 0 0 var(--cba-frost-outer-peak, 14px) #7dd3fc; filter: brightness(1.2) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+  @keyframes cba-heatHaze { 0%,100% { transform: skewX(0) scale(1); filter: saturate(1) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 33% { transform: skewX(var(--cba-haze-skew, .7deg)) scale(var(--cba-haze-scale-up, 1.01)); filter: saturate(1.25) brightness(1.08) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 66% { transform: skewX(var(--cba-haze-skew-neg, -.7deg)) scale(var(--cba-haze-scale-down, .995)); filter: saturate(1.1) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
+  @keyframes cba-breathingGlass { 0%,100% { filter: brightness(.9) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); box-shadow: inset 0 0 var(--cba-glass-inner, 8px) rgba(255,255,255,.08), 0 0 var(--cba-glass-outer, 4px) rgba(125,211,252,.25); } 50% { filter: brightness(1.16) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); box-shadow: inset 0 0 var(--cba-glass-inner-peak, 16px) rgba(255,255,255,.2), 0 0 var(--cba-glass-outer-peak, 14px) rgba(125,211,252,.55); } }
+  @keyframes cba-magneticHover { 0%,100% { transform: perspective(240px) rotateX(0) rotateY(-2deg) translateY(0); } 50% { transform: perspective(240px) rotateX(2deg) rotateY(2deg) translateY(-4px); } }
+  @keyframes cba-iconOrbit { 0% { transform: rotate(0deg) translateX(5px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(5px) rotate(-360deg); } }
+  @keyframes cba-iconDraw { 0% { clip-path: inset(0 100% 0 0); opacity: .2; } 55%,100% { clip-path: inset(0 0 0 0); opacity: 1; } }
+  @keyframes cba-stateMorph { 0%,100% { filter: hue-rotate(0deg) brightness(.85) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); border-radius: var(--cba-morph-radius-start, 10px); } 50% { filter: hue-rotate(var(--cba-morph-hue, 75deg)) brightness(1.2) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); border-radius: var(--cba-morph-radius-end, 22px); } }
+  @keyframes cba-progressBorder { 0% { border-color: #ef4444; box-shadow: inset 8px 0 0 -6px #ef4444; } 50% { border-color: #eab308; box-shadow: inset 45px 0 0 -40px #eab308; } 100% { border-color: #22c55e; box-shadow: inset 90px 0 0 -82px #22c55e; } }
+  @keyframes cba-thresholdPulse { 0%,100% { box-shadow: 0 0 var(--cba-threshold-glow, 3px) currentColor; filter: brightness(.9) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } 50% { box-shadow: 0 0 var(--cba-threshold-glow-peak, 18px) currentColor; filter: brightness(1.35) var(--cba-effect-filter, saturate(1) contrast(1) brightness(1)); } }
   @keyframes lava-shift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -1025,27 +1299,16 @@ export const generateYaml = (config: ButtonConfig): string => {
     yaml += `extra_styles: |\n${extraStyles}`;
   }
 
-  // Helper to format CSS style for YAML (quote values with special chars)
-  const formatStyleForYaml = (style: string): string => {
-    const colonIndex = style.indexOf(':');
-    if (colonIndex > 0) {
-      const prop = style.substring(0, colonIndex).trim();
-      const value = style.substring(colonIndex + 1).trim();
-      // Quote values containing parentheses, commas, or other special chars
-      if (value.includes('(') || value.includes(',') || value.includes('#')) {
-        return `${prop}: '${value}'`;
-      }
-    }
-    return style;
-  };
-
   // --- Styles Section (only if there are styles) ---
-  const hasCardStyles = cardStyles.length > 0 || config.extraStyles;
+  const hasCardStyles = cardStyles.length > 0 || (baseOwns('backgroundColor') && config.extraStyles);
   const hasIconStyles = iconStyles.length > 0 || (config.thresholdColor.enabled && config.thresholdColor.applyToIcon);
-  const nameColorLine = getColorLine(config.nameColor, config.nameColorAuto);
-  const labelColorLine = getColorLine(config.labelColor, config.labelColorAuto);
-  const stateColorLine = getColorLine(config.stateColor, config.stateColorAuto);
-  const hasNameStyles = nameColorLine || (config.fontWeight && config.fontWeight !== 'normal') || (config.thresholdColor.enabled && config.thresholdColor.applyToName);
+  // Plain element colors move to the per-state entries in binaryStateMode; threshold
+  // colors and name font-weight remain global.
+  const nameColorLine = baseOwns('nameColor') ? getColorLine(config.nameColor, config.nameColorAuto) : null;
+  const labelColorLine = baseOwns('labelColor') ? getColorLine(config.labelColor, config.labelColorAuto) : null;
+  const stateColorLine = baseOwns('stateColor') ? getColorLine(config.stateColor, config.stateColorAuto) : null;
+  const baseFontWeight = baseOwns('fontWeight') && config.fontWeight && config.fontWeight !== 'normal';
+  const hasNameStyles = nameColorLine || baseFontWeight || (config.thresholdColor.enabled && config.thresholdColor.applyToName);
   const hasLabelStyles = !!labelColorLine || (config.thresholdColor.enabled && config.thresholdColor.applyToLabel);
   const hasStateStyles = !!stateColorLine || (config.thresholdColor.enabled && config.thresholdColor.applyToState);
   const hasEntityPictureStyles = !!config.entityPictureStyles;
@@ -1070,30 +1333,16 @@ export const generateYaml = (config: ButtonConfig): string => {
       });
       // Marquee special handling for alwaysAnimate or trigger='always'
       if (config.cardAnimation === 'marquee' && (config.alwaysAnimateCard || config.cardAnimationTrigger === 'always')) {
-        yaml += `    - overflow: hidden\n`;
-        yaml += `    - position: relative\n`;
-        yaml += `    - "::before":\n`;
-        yaml += `        - content: '""'\n`;
-        yaml += `        - position: absolute\n`;
-        yaml += `        - inset: -4px\n`;
-        yaml += `        - border-radius: inherit\n`;
-        yaml += `        - background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.6) 50%, transparent 70%)\n`;
-        yaml += `        - background-size: 200% 200%\n`;
-        yaml += `        - animation: cba-marquee-spin ${config.cardAnimationSpeed || '4s'} linear infinite\n`;
+        marqueeCardLines(bgColor || '#1c1c1c', config.cardAnimationSpeed || '4s').forEach(line => {
+          yaml += `    - ${formatStyleForYaml(line)}\n`;
+        });
       }
       // Extra styles from textarea
       if (config.extraStyles) {
         yaml += `    # Custom Extra Styles\n`;
         config.extraStyles.split('\n').forEach(line => {
           if (line.trim()) {
-            const colonIndex = line.indexOf(':');
-            if (colonIndex > 0) {
-              const prop = line.substring(0, colonIndex).trim();
-              const value = line.substring(colonIndex + 1).trim();
-              yaml += `    - ${prop}: '${value}'\n`;
-            } else {
-              yaml += `    - ${line.trim()}\n`;
-            }
+            yaml += `    - ${formatStyleForYaml(line.trim())}\n`;
           }
         });
       }
@@ -1113,7 +1362,7 @@ export const generateYaml = (config: ButtonConfig): string => {
     // Name Styles - only if there's actual styling
     if (hasNameStyles) {
       yaml += `  name:\n`;
-      if (config.fontWeight && config.fontWeight !== 'normal') {
+      if (baseFontWeight) {
         yaml += `    - font-weight: ${config.fontWeight}\n`;
       }
       if (config.thresholdColor.enabled && config.thresholdColor.applyToName && thresholdColorTemplate) {
@@ -1227,96 +1476,76 @@ export const generateYaml = (config: ButtonConfig): string => {
     }
   }
 
-  const hasExplicitEqualsStateStyle = (stateVal: 'on' | 'off') =>
-    (config.stateStyles || []).some(stateStyle =>
-      stateStyle.operator === 'equals' &&
-      String(stateStyle.value || '').toLowerCase() === stateVal
-    );
+  // --- Merged ON/OFF State Entries (binary entities) ---
+  // For binary entities we emit exactly one `- value: 'on'` and one `- value: 'off'`
+  // entry, each built from the fully-merged appearance (preset + manual) for that
+  // state. They are rendered here but emitted after Advanced State-based Styling,
+  // so a matching advanced condition wins via button-card's first-match ordering.
+  const renderMergedStateEntry = (stateVal: 'on' | 'off'): string => {
+    if (!stateAppearance) return '';
+    const app = stateVal === 'on' ? stateAppearance.on : stateAppearance.off;
+    const bundle = buildStateStylesFromAppearance(app, themeKeys);
 
-  // --- Conditional State Logic ---
-  const getStateLogic = (stateVal: 'on' | 'off') => {
-     // Avoid duplicate ON/OFF entries. button-card uses first matching state,
-     // so explicit stateStyles for on/off should take precedence.
-     if (hasExplicitEqualsStateStyle(stateVal)) {
-       return '';
-     }
+    // OFF auto-dim: when nothing gives OFF a distinct background, dim it so ON != OFF.
+    // Suppressed when Card Background is a theme/global control (base owns it) or the
+    // card uses color:auto (button-card already differentiates via light color).
+    if (
+      stateVal === 'off' &&
+      !isGlobalKey('backgroundColor') &&
+      !config.colorAuto &&
+      !bundle.card.some(s => s.startsWith('background') || s.startsWith('filter'))
+    ) {
+      bundle.card.push('filter: brightness(0.5)');
+    }
 
-     // Background color is now handled by state appearance, not hardcoded on/off colors
-     const stateCardStyles: string[] = [];
-     const stateIconStyles: string[] = [];
-     
-     // Handle stateOnColor / stateOffColor for background
-     const stateColor = stateVal === 'on' ? config.stateOnColor : config.stateOffColor;
-     const stateOpacity = stateVal === 'on' ? config.stateOnOpacity : config.stateOffOpacity;
-     if (stateColor) {
-       // Use `background:` not `background-color:` so it overrides any gradient in base styles
-       if (stateOpacity !== undefined && stateOpacity < 100) {
-         stateCardStyles.push(`background: ${hexToRgba(stateColor, stateOpacity)}`);
-       } else {
-         stateCardStyles.push(`background: ${stateColor}`);
-       }
-     } else if (stateVal === 'off' && !config.colorAuto && hasOnOffState(config.entity)) {
-       // Default OFF-state dimming: button-card puts background-color in styles.card which applies
-       // to both states, making ON and OFF look identical. Automatically dim the card when OFF
-       // so it visually indicates the entity is inactive.
-       stateCardStyles.push(`filter: brightness(0.5)`);
-     }
-     
-     // Conditional Card Animation (skip if alwaysAnimateCard is enabled - handled globally)
-     if (!config.alwaysAnimateCard && config.cardAnimation !== 'none' && config.cardAnimationTrigger === stateVal) {
-         const anim = getAnimationCSS(config.cardAnimation, config.cardAnimationSpeed);
-         if (anim) stateCardStyles.push(anim);
-     }
-     
-     // Conditional Icon Animation (skip if alwaysAnimateIcon is enabled - handled globally)
-     if (!config.alwaysAnimateIcon && config.iconAnimation !== 'none' && config.iconAnimationTrigger === stateVal) {
-         const anim = getAnimationCSS(config.iconAnimation, config.iconAnimationSpeed);
-         if (anim) stateIconStyles.push(anim);
-     }
-     
-     // Marquee Special Handling
-     let marqueePseudo = '';
-     if (!config.alwaysAnimateCard && config.cardAnimation === 'marquee' && (config.cardAnimationTrigger === stateVal || config.cardAnimationTrigger === 'always')) {
-       marqueePseudo = `        - overflow: hidden
-        - position: relative
-        - "::before":
-            - content: '""'
-            - position: absolute
-            - inset: -4px
-            - z-index: -1
-            - background: conic-gradient(transparent 20%, var(--button-card-light-color, ${config.borderColor || '#FFC107'}))
-            - animation: cba-marquee-spin ${config.cardAnimationSpeed || '4s'} linear infinite`;
-     }
+    // Rotating conic border for a per-state marquee card animation
+    if (app.cardAnimation === 'marquee') {
+      bundle.card.push(...marqueeCardLines(app.backgroundColor || '#1c1c1c', app.cardAnimationSpeed || '4s'));
+    }
 
-     // Only return state entry if there are actual styles to output
-     if (stateCardStyles.length === 0 && stateIconStyles.length === 0 && !marqueePseudo) {
-       return '';
-     }
+    const hasCard = bundle.card.length > 0;
+    if (!hasCard && bundle.icon.length === 0 && bundle.name.length === 0 &&
+        bundle.state.length === 0 && bundle.label.length === 0) {
+      return '';
+    }
 
-     return `  - value: '${stateVal}'
-    styles:
-${stateCardStyles.length > 0 || marqueePseudo ? `      card:
-${stateCardStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}
-${marqueePseudo}` : ''}${stateIconStyles.length > 0 ? `      icon:
-${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : ''}`;
+    const section = (indent: string, key: string, lines: string[]) => {
+      if (lines.length === 0) return '';
+      return `${indent}${key}:\n${lines.map(s => `${indent}  - ${formatStyleForYaml(s)}`).join('\n')}`;
+    };
+
+    let entry = `  - value: '${stateVal}'\n    styles:\n`;
+    const parts: string[] = [];
+    if (hasCard) parts.push(section('      ', 'card', bundle.card));
+    if (bundle.icon.length) parts.push(section('      ', 'icon', bundle.icon));
+    if (bundle.name.length) parts.push(section('      ', 'name', bundle.name));
+    if (bundle.state.length) parts.push(section('      ', 'state', bundle.state));
+    if (bundle.label.length) parts.push(section('      ', 'label', bundle.label));
+    entry += parts.filter(Boolean).join('\n');
+    return entry;
   };
 
-  const onStateLogic = getStateLogic('on');
-  const offStateLogic = getStateLogic('off');
-  
-  // Output state section if we have state logic OR state styles (conditionals)
-  const hasStateConditionals = config.stateStyles && config.stateStyles.length > 0;
-  
+  const onStateLogic = renderMergedStateEntry('on');
+  const offStateLogic = renderMergedStateEntry('off');
+
+  // The user's advanced Conditional Styles. Synthetic merged ON/OFF entries (used to
+  // drive the live preview) are emitted via the stateAppearance path above, so exclude
+  // them here to avoid duplicate state entries.
+  const userConditionals = (config.stateStyles || []).filter(
+    s => !String(s.id || '').startsWith('state-appearance-')
+  );
+
+  // Output state section if we have merged state entries OR advanced conditionals
+  const hasStateConditionals = userConditionals.length > 0;
+
   if (onStateLogic || offStateLogic || hasStateConditionals) {
     yaml += `state:
 `;
-    if (onStateLogic) yaml += onStateLogic + '\n';
-    if (offStateLogic) yaml += offStateLogic + '\n';
   }
-  
+
   // Custom State Styles / Conditionals
   if (hasStateConditionals) {
-    config.stateStyles.forEach(stateStyle => {
+    userConditionals.forEach(stateStyle => {
       yaml += `  -\n`;
 
       const usesCrossEntityCondition = shouldUseTemplateCondition(stateStyle, config.entity || '');
@@ -1377,7 +1606,8 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
         yaml += `    state_display: ${JSON.stringify(stateStyle.stateDisplay)}\n`;
       }
       if (stateStyle.spin) {
-        yaml += `    spin: true\n`;
+        // button-card's per-state icon spin key is `rotate`
+        yaml += `    rotate: true\n`;
       }
       
       // Build styles for conditional colors and animations
@@ -1452,6 +1682,15 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
         if (cardAnimCSS) {
           conditionalCardStyles.push(cardAnimCSS);
         }
+        conditionalCardStyles.push(...getEffectIntensityStyles(stateStyle.cardAnimation, stateStyle.effectIntensity));
+        if (stateStyle.cardAnimation === 'progressBorder') {
+          conditionalCardStyles.push('border: var(--cba-progress-width, 3px) solid transparent');
+          conditionalCardStyles.push(progressBorderBackground(stateStyle.backgroundColor || bgColor || '#10131c'));
+        }
+        if (stateStyle.cardAnimation === 'thresholdPulse') {
+          conditionalCardStyles.push(`color: ${thresholdValueColor}`);
+          conditionalCardStyles.push(`border-color: ${thresholdValueColor}`);
+        }
       }
       if (stateStyle.iconAnimation && stateStyle.iconAnimation !== 'none') {
         const iconAnimCSS = getAnimationCSS(stateStyle.iconAnimation, stateStyle.iconAnimationSpeed || '2s');
@@ -1513,6 +1752,12 @@ ${stateIconStyles.map(s => `        - ${formatStyleForYaml(s)}`).join('\n')}` : 
     });
   }
 
+  // button-card uses the first matching state entry. Advanced user-authored
+  // conditions therefore come first, with the ordinary merged ON/OFF designs as
+  // fallbacks after them.
+  if (onStateLogic) yaml += onStateLogic + '\n';
+  if (offStateLogic) yaml += offStateLogic + '\n';
+
   return yaml;
 };
 
@@ -1523,8 +1768,10 @@ const formatStyleForYaml = (style: string): string => {
     const colonIndex = style.indexOf(':');
     const prop = style.substring(0, colonIndex).trim();
     const value = style.substring(colonIndex + 1).trim();
+    // JS templates must stay unquoted so button-card can evaluate them
+    if (value.startsWith('[[[')) return `${prop}: ${value}`;
     // Quote values that contain special YAML characters (commas, parentheses, etc.)
-    if (value.includes(',') || value.includes('(') || value.includes(')') || value.includes('#') || value.includes("'")) {
+    if (value.includes(',') || value.includes('(') || value.includes(')') || value.includes('#') || value.includes("'") || value.includes(': ')) {
       // Escape any single quotes in the value and wrap in single quotes
       const escapedValue = value.replace(/'/g, "''");
       return `${prop}: '${escapedValue}'`;

@@ -22,11 +22,11 @@ if (Test-Path "custom_components\button_builder\www\index.js") {
     Write-Host "Next steps:" -ForegroundColor Yellow
     Write-Host "1. Copy custom_components\button_builder to your Home Assistant config folder"
     Write-Host "2. Restart Home Assistant"
-    Write-Host "3. Find 'Button Architect' in your sidebar"
+    Write-Host "3. Find 'Button Builder' in your sidebar"
     Write-Host ""
     Write-Host "For HACS release:" -ForegroundColor Yellow
     Write-Host "1. Commit all changes to git"
-    Write-Host "2. Create a new tag: git tag v1.0.0"
+    Write-Host "2. Create an annotated version tag: git tag -a vX.Y.Z -m 'Button Builder vX.Y.Z'"
     Write-Host "3. Push with tags: git push origin main --tags"
     Write-Host "4. Create a GitHub release from the tag"
 } else {

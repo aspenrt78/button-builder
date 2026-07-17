@@ -2,8 +2,8 @@
 
 Generated from side-panel update fields in `src/components/ConfigPanel.tsx`.
 
-- Panel options audited: **157**
-- Preview + YAML: **84**
+- Panel options audited: **158**
+- Preview + YAML: **85**
 - YAML only: **73**
 - Missing YAML: **0**
 
@@ -47,6 +47,7 @@ Generated from side-panel update fields in `src/components/ConfigPanel.tsx`.
 | `entity` | Preview + YAML |  |
 | `entityPicture` | Preview + YAML |  |
 | `entityPictureStyles` | Preview + YAML |  |
+| `effectIntensity` | Preview + YAML | Effect-specific 25–200% amplitude shared by preview and generated keyframes |
 | `extraStyles` | Preview + YAML |  |
 | `fontFamily` | Preview + YAML |  |
 | `fontSize` | Preview + YAML |  |

@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDashboard, RefreshCw, Upload, X, Image } from 'lucide-react';
+import { Palette, User, HelpCircle, Lock, Loader2, Settings2, Grid3X3, LayoutDashboard, RefreshCw, Upload, X, Image, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { ButtonConfig, AnimationType, AnimationTrigger, StateStyleConfig } from '../types';
 import { getIconComponent } from '../services/iconMapper';
 import { isInHomeAssistant, fetchAllDashboardConfigs, DashboardConfig, DashboardGridConfig, parseBackgroundToCss } from '../services/dashboardService';
 import { haService, type HAEntity } from '../services/homeAssistantService';
 import { getEntityCapabilities } from '../utils/entityCapabilities';
+import { clampEffectIntensity, getEffectIntensityVariables, supportsEffectIntensity } from '../utils/effectIntensity';
 
 interface Props {
   config: ButtonConfig;
@@ -15,14 +16,22 @@ interface Props {
 
 // Dashboard layout presets matching common HA configurations
 const DASHBOARD_PRESETS = [
-  { name: 'Masonry (Default)', columns: 4, cardWidth: 100, cardHeight: 100, gap: 8 },
-  { name: 'Masonry Wide', columns: 6, cardWidth: 85, cardHeight: 85, gap: 8 },
-  { name: 'Sections', columns: 4, cardWidth: 95, cardHeight: 75, gap: 4 },
-  { name: 'Panel', columns: 1, cardWidth: 200, cardHeight: 120, gap: 16 },
-  { name: 'Sidebar', columns: 2, cardWidth: 110, cardHeight: 90, gap: 8 },
-  { name: 'Mobile', columns: 2, cardWidth: 85, cardHeight: 85, gap: 6 },
-  { name: 'Custom', columns: 4, cardWidth: 100, cardHeight: 100, gap: 8 },
+  { name: 'Masonry (Default)', cardWidth: 100, cardHeight: 100 },
+  { name: 'Masonry Wide', cardWidth: 85, cardHeight: 85 },
+  { name: 'Sections', cardWidth: 95, cardHeight: 75 },
+  { name: 'Panel', cardWidth: 200, cardHeight: 120 },
+  { name: 'Sidebar', cardWidth: 110, cardHeight: 90 },
+  { name: 'Mobile', cardWidth: 85, cardHeight: 85 },
+  { name: 'Custom', cardWidth: 100, cardHeight: 100 },
 ];
+
+// A deliberately detailed canvas backdrop so backdrop-filter blur has visible
+// pixels to soften even when the user does not have a dashboard image loaded.
+const BLUR_TEST_BACKDROP = [
+  'radial-gradient(circle at 24% 28%, rgba(56, 189, 248, 0.95) 0 9%, transparent 10%)',
+  'radial-gradient(circle at 76% 68%, rgba(244, 114, 182, 0.9) 0 11%, transparent 12%)',
+  'repeating-linear-gradient(135deg, #0f172a 0 14px, #334155 14px 28px)',
+].join(', ');
 
 // Simulate the "Light Color" provided by HA when state is ON
 const SIMULATED_ENTITY_COLOR = '#FFC107'; // Warm Amber/Gold
@@ -92,10 +101,20 @@ const evaluateStateStyleMatch = (style: StateStyleConfig, currentState: string):
       const compareNum = Number.parseFloat(value);
       return Number.isFinite(currentNum) && Number.isFinite(compareNum) && currentNum > compareNum;
     }
+    case 'above_equal': {
+      const currentNum = Number.parseFloat(currentState);
+      const compareNum = Number.parseFloat(value);
+      return Number.isFinite(currentNum) && Number.isFinite(compareNum) && currentNum >= compareNum;
+    }
     case 'below': {
       const currentNum = Number.parseFloat(currentState);
       const compareNum = Number.parseFloat(value);
       return Number.isFinite(currentNum) && Number.isFinite(compareNum) && currentNum < compareNum;
+    }
+    case 'below_equal': {
+      const currentNum = Number.parseFloat(currentState);
+      const compareNum = Number.parseFloat(value);
+      return Number.isFinite(currentNum) && Number.isFinite(compareNum) && currentNum <= compareNum;
     }
     case 'regex':
       try {
@@ -280,8 +299,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   const [selectedPreset, setSelectedPreset] = useState(0);
   const [cardWidth, setCardWidth] = useState(100);
   const [cardHeight, setCardHeight] = useState(100);
-  const [gridGap, setGridGap] = useState(8);
-  const [showGrid, setShowGrid] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(1);
   
   // Custom background image upload
   const [customBackgroundName, setCustomBackgroundName] = useState<string | null>(null);
@@ -480,7 +498,6 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       setCardHeight(Math.max(60, Math.min(200, newCardHeight)));
       
       // Set gap based on dense mode
-      setGridGap(db.grid.dense ? 4 : 8);
     }
   };
 
@@ -540,8 +557,16 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       const preset = DASHBOARD_PRESETS[index];
       setCardWidth(preset.cardWidth);
       setCardHeight(preset.cardHeight);
-      setGridGap(preset.gap);
     }
+  };
+
+  const resetPreviewView = () => {
+    setPreviewZoom(1);
+    setCanvasColor('#0a0a0a');
+    setCanvasBackground(null);
+    setCustomBackgroundName(null);
+    setSelectedDashboard(null);
+    applyPreset(0);
   };
 
   const liveEntityState = (mainEntityData?.state || '').toString().toLowerCase();
@@ -708,10 +733,31 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? thresholdColor
     : (matchingStateStyle?.labelColor || stateBaseColor || resolveColor(config.labelColor, config.labelColorAuto, config.color || '#ffffff', isOn));
   
-  const actualBorderColor = matchingStateStyle?.borderColor || resolveColor(config.borderColor, config.borderColorAuto, 'transparent', isOn);
+  const actualBorderColor = matchingStateStyle?.borderColor
+    || resolveColor(config.borderColor, config.borderColorAuto, config.color || '#ffffff', isOn);
 
-  // 3. Border Logic
-  const borderStyle = config.borderStyle !== 'none' ? `${config.borderWidth} ${config.borderStyle} ${actualBorderColor}` : 'none';
+  // 3. Border & extended per-state appearance
+  // The merged ON/OFF designs deliver border/shadow/blur/typography through the
+  // matching synthetic state style; fall back to the base config for each field.
+  const effBorderStyle = matchingStateStyle?.borderStyle || config.borderStyle;
+  const effBorderWidthRaw = matchingStateStyle?.borderWidth || config.borderWidth;
+  // A visible border style with a 0/empty width means "not sized yet" — render 1px
+  // (the YAML generator applies the same minimum).
+  const effBorderWidth = !effBorderWidthRaw || (Number.parseFloat(effBorderWidthRaw) || 0) === 0 ? '1px' : effBorderWidthRaw;
+  const borderStyle = effBorderStyle && effBorderStyle !== 'none'
+    ? `${effBorderWidth} ${effBorderStyle} ${actualBorderColor}`
+    : 'none';
+  const effShadowSize = matchingStateStyle?.shadowSize || config.shadowSize;
+  const effShadowColor = matchingStateStyle?.shadowColor || config.shadowColor;
+  const effShadowOpacity = matchingStateStyle?.shadowOpacity ?? config.shadowOpacity;
+  const effBackdropBlur = matchingStateStyle?.backdropBlur || config.backdropBlur;
+  const effCardOpacity = matchingStateStyle?.cardOpacity ?? config.cardOpacity;
+  const effFontFamily = matchingStateStyle?.fontFamily || config.fontFamily;
+  const effFontSize = matchingStateStyle?.fontSize || config.fontSize;
+  const effFontWeight = matchingStateStyle?.fontWeight || config.fontWeight;
+  const effTextTransform = matchingStateStyle?.textTransform || config.textTransform;
+  const effLetterSpacing = matchingStateStyle?.letterSpacing || config.letterSpacing;
+  const effLineHeight = matchingStateStyle?.lineHeight || config.lineHeight;
   
   // 4. Animation Logic Helper - Uses cba- prefix to avoid tailwind conflicts
   const getAnimationClass = (type: AnimationType, trigger: AnimationTrigger, alwaysAnimate: boolean = false) => {
@@ -737,7 +783,11 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     ? 'always'
     : config.cardAnimationTrigger;
 
-  const cardAnimationClass = getAnimationClass(effectiveCardAnimation, effectiveCardAnimationTrigger, config.alwaysAnimateCard);
+  // marquee renders as a rotating ring behind the card (see isMarquee below);
+  // progressBorder renders as a conic overlay — neither should spin the card itself.
+  const cardAnimationClass = (effectiveCardAnimation === 'progressBorder' || effectiveCardAnimation === 'marquee')
+    ? ''
+    : getAnimationClass(effectiveCardAnimation, effectiveCardAnimationTrigger, config.alwaysAnimateCard);
   const cardAnimationDuration = stateCardAnimationSpeed || config.cardAnimationSpeed || '2s';
 
   // Check for state-specific icon animations
@@ -772,9 +822,40 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
                     ((effectiveCardAnimationTrigger === 'always') ||
                      (effectiveCardAnimationTrigger === 'on' && isOn) ||
                      (effectiveCardAnimationTrigger === 'off' && isOff));
+  const isProgressBorder = effectiveCardAnimation === 'progressBorder' &&
+    (config.alwaysAnimateCard || effectiveCardAnimationTrigger === 'always' ||
+      (effectiveCardAnimationTrigger === 'on' && isOn) ||
+      (effectiveCardAnimationTrigger === 'off' && isOff));
+  const rawEffectValue = Number.parseFloat(String(mainEntityData?.state ?? ''));
+  const effectValue = Number.isFinite(rawEffectValue)
+    ? Math.max(0, Math.min(100, rawEffectValue))
+    : (isOn ? 100 : 0);
+  const effectValueColor = effectValue >= 80 ? '#ef4444' : effectValue >= 50 ? '#eab308' : '#22c55e';
+  const resolvedEffectIntensity = clampEffectIntensity(matchingStateStyle?.effectIntensity ?? config.effectIntensity);
+  const effectIntensityActive =
+    resolvedEffectIntensity !== 100 &&
+    supportsEffectIntensity(effectiveCardAnimation) &&
+    (Boolean(cardAnimationClass) || isMarquee || isProgressBorder);
+  const resolvedEffectIntensityVariables = effectIntensityActive
+    ? getEffectIntensityVariables(effectiveCardAnimation, resolvedEffectIntensity)
+    : {};
+  const effectIntensityFilter = resolvedEffectIntensityVariables['--cba-effect-filter'] || '';
+  const marqueeWidth = resolvedEffectIntensityVariables['--cba-marquee-width'] || '3px';
+  const progressWidth = resolvedEffectIntensityVariables['--cba-progress-width'] || '3px';
+  const shouldAutoDim =
+    canTogglePreviewState &&
+    isOff &&
+    !stateSpecificBgColor &&
+    !matchingStateStyle &&
+    !config.colorAuto;
+  const combinedCardFilter = [
+    shouldAutoDim ? 'brightness(0.5)' : '',
+    effectIntensityFilter,
+  ].filter(Boolean).join(' ');
+  const effectIntensityVariables = resolvedEffectIntensityVariables as React.CSSProperties;
 
   // 5. Shadow Logic
-  const shadowStyle = getShadowStyle(config.shadowSize, config.shadowColor, config.shadowOpacity);
+  const shadowStyle = getShadowStyle(effShadowSize || 'none', effShadowColor || '#000000', effShadowOpacity ?? 30);
 
   // 6. Parse extra styles
   const extraStylesParsed = parseExtraStyles(config.extraStyles);
@@ -864,7 +945,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     transition: 'all 0.3s ease',
     cursor: 'pointer',
     boxShadow: shadowStyle,
-    backdropFilter: config.backdropBlur !== '0px' ? `blur(${config.backdropBlur})` : 'none',
+    backdropFilter: effBackdropBlur && effBackdropBlur !== '0px' && effBackdropBlur !== 'none' ? `blur(${effBackdropBlur})` : 'none',
     // Use custom grid if enabled, otherwise use preset layout
     gridTemplateAreas: config.customGridEnabled ? config.customGridTemplateAreas : getGridTemplate(config.layout),
     gridTemplateRows: config.customGridEnabled ? config.customGridTemplateRows : getGridRows(config.layout),
@@ -873,36 +954,30 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
     justifyItems: 'center',
     alignItems: 'center',
     gap: '4px',
-    fontFamily: (config.customFontName && config.customFontUrl) 
-      ? `'${config.customFontName}', sans-serif` 
-      : (config.fontFamily || 'inherit'),
-    fontSize: config.fontSize,
-    fontWeight: config.fontWeight,
-    textTransform: config.textTransform,
-    letterSpacing: config.letterSpacing,
-    lineHeight: config.lineHeight,
-    border: borderStyle,
+    fontFamily: (config.customFontName && config.customFontUrl)
+      ? `'${config.customFontName}', sans-serif`
+      : (effFontFamily || 'inherit'),
+    fontSize: effFontSize,
+    fontWeight: effFontWeight,
+    textTransform: effTextTransform as React.CSSProperties['textTransform'],
+    letterSpacing: effLetterSpacing,
+    lineHeight: effLineHeight,
+    border: isProgressBorder ? 'none' : borderStyle,
     position: 'relative',
     zIndex: 1,
     overflow: isMarquee ? 'hidden' : 'visible', // Only hide overflow for marquee mask
-    opacity: Math.min(100, Math.max(0, config.cardOpacity)) / 100,
+    opacity: Math.min(100, Math.max(0, effCardOpacity)) / 100,
+    ...effectIntensityVariables,
     // Auto-dim when OFF: mirrors the brightness(0.5) filter emitted in the YAML off-state.
     // Only applies when the entity has binary on/off state AND no explicit off-state styling
     // (stateOffColor / matching conditional) has been configured.
-    ...(
-      canTogglePreviewState &&
-      isOff &&
-      !stateSpecificBgColor &&
-      !matchingStateStyle &&
-      !config.colorAuto
-        ? { filter: 'brightness(0.5)' }
-        : {}
-    ),
+    ...(combinedCardFilter ? { filter: combinedCardFilter } : {}),
     // Only set animationDuration if we have a cardAnimationClass (avoid overriding extraStyles animation)
     ...(cardAnimationClass ? { animationDuration: cardAnimationDuration } : {}),
     // Apply extra styles LAST so they can override defaults
     // Use filteredExtraStyles which removes background if user explicitly set backgroundColor
     ...filteredExtraStyles,
+    ...(effectiveCardAnimation === 'thresholdPulse' ? { color: effectValueColor, borderColor: effectValueColor } : {}),
   };
 
   const displayIcon = matchingStateStyle?.icon || config.icon;
@@ -937,35 +1012,40 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       className="absolute inset-0 flex items-center justify-center transition-all duration-500"
       style={canvasStyle}
     >
-      {/* Grid Overlay (when enabled) */}
-      {showGrid && (
-        <div 
-          className="absolute inset-0 pointer-events-none opacity-20"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, #666 1px, transparent 1px),
-              linear-gradient(to bottom, #666 1px, transparent 1px)
-            `,
-            backgroundSize: `${cardWidth + gridGap}px ${cardHeight + gridGap}px`,
-            backgroundPosition: 'center center',
-          }}
-        />
-      )}
-
       {/* Canvas Controls */}
-      <div className="absolute top-3 right-3 z-50 flex gap-2">
+      <div className="absolute top-3 right-3 z-50 flex max-w-[calc(100%-1.5rem)] flex-wrap justify-end gap-2">
+        {canTogglePreviewState && (
+          <button
+            type="button"
+            onClick={() => setSimulatedState(simulatedState === 'on' ? 'off' : 'on')}
+            className={`group lg:hidden rounded-xl border bg-gray-900/90 px-3 py-1.5 text-left shadow-lg backdrop-blur ${simulatedState === 'on' ? 'border-emerald-500/40' : 'border-amber-500/40'}`}
+            aria-label={`Editing for ${simulatedState.toUpperCase()} State. Click to change to ${simulatedState === 'on' ? 'OFF' : 'ON'} State`}
+          >
+            <span className="flex items-baseline gap-1 font-semibold text-gray-400">
+              <span className="text-[9px]">Editing for</span>
+              <span className={`text-xs font-black ${simulatedState === 'on' ? 'text-emerald-300' : 'text-amber-300'}`}>{simulatedState.toUpperCase()}</span>
+              <span className="text-[9px]">State</span>
+            </span>
+            <span className="block text-[8px] text-gray-600 transition-colors group-hover:text-gray-400">Click to change</span>
+          </button>
+        )}
+        <div className="flex rounded-full border border-gray-700 bg-gray-900/80 shadow-lg backdrop-blur overflow-hidden">
+          <button onClick={() => setPreviewZoom(value => Math.max(0.5, +(value - 0.1).toFixed(1)))} className="p-2 text-gray-400 hover:bg-gray-700 hover:text-white" title="Zoom out" aria-label="Zoom out"><ZoomOut size={15} /></button>
+          <span className="min-w-10 self-center text-center text-[9px] text-gray-400">{Math.round(previewZoom * 100)}%</span>
+          <button onClick={() => setPreviewZoom(value => Math.min(2, +(value + 0.1).toFixed(1)))} className="p-2 text-gray-400 hover:bg-gray-700 hover:text-white" title="Zoom in" aria-label="Zoom in"><ZoomIn size={15} /></button>
+        </div>
         {/* Dashboard Layout Settings */}
         <div className="relative">
           <button 
             onClick={() => { setShowLayoutSettings(!showLayoutSettings); setShowCanvasPicker(false); }}
             className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur transition-colors ${showLayoutSettings ? 'bg-gray-700 text-white' : ''}`}
-            title="Dashboard Layout Settings"
+            title="Viewport size and layout"
           >
             <Grid3X3 size={16} />
           </button>
           {showLayoutSettings && (
             <div className="absolute top-10 right-0 bg-gray-900 border border-gray-700 p-3 rounded-lg shadow-2xl w-64 animate-in slide-in-from-top-2">
-              <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Dashboard Layout</p>
+              <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Viewport & Layout</p>
               
               {/* Preset Selector */}
               <div className="mb-3">
@@ -1014,31 +1094,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
                   />
                   <span className="text-[10px] text-gray-300 w-10 text-right">{cardHeight}px</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-[10px] text-gray-400 w-16">Gap</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="24"
-                    value={gridGap}
-                    disabled={!!selectedDashboard}
-                    onChange={(e) => { setGridGap(Number(e.target.value)); setSelectedPreset(DASHBOARD_PRESETS.length - 1); }}
-                    className={`flex-1 h-1 bg-gray-700 rounded-lg appearance-none ${selectedDashboard ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                  />
-                  <span className="text-[10px] text-gray-300 w-10 text-right">{gridGap}px</span>
-                </div>
               </div>
-
-              {/* Show Grid Toggle */}
-              <label className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showGrid}
-                  onChange={(e) => setShowGrid(e.target.checked)}
-                  className="w-3 h-3 rounded bg-gray-700 border-gray-600"
-                />
-                <span className="text-[10px] text-gray-400">Show grid overlay</span>
-              </label>
             </div>
           )}
         </div>
@@ -1075,14 +1131,42 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
                      />
                    ))}
                 </div>
-                <input 
-                   type="color" 
-                   value={canvasColor || '#0a0a0a'}
-                   onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); setCustomBackgroundName(null); }}
-                   className="w-full h-8 rounded cursor-pointer mb-3"
-                />
+                 <input
+                    type="color"
+                    value={canvasColor || '#0a0a0a'}
+                    onChange={(e) => { setCanvasColor(e.target.value); setCanvasBackground(null); setCustomBackgroundName(null); }}
+                    className="w-full h-8 rounded cursor-pointer mb-3"
+                 />
 
-                {/* Custom Background Upload */}
+                 {/* Blur test backdrop */}
+                 <div className="border-t border-gray-800 pt-3 mt-3">
+                   <p className="text-[10px] text-gray-400 uppercase font-bold mb-2">Effect Test</p>
+                   <button
+                     type="button"
+                     onClick={() => {
+                       setCanvasBackground(BLUR_TEST_BACKDROP);
+                       setCustomBackgroundName(null);
+                       setSelectedDashboard(null);
+                     }}
+                     className={`relative flex h-12 w-full items-center justify-center overflow-hidden rounded-lg border transition-all ${
+                       canvasBackground === BLUR_TEST_BACKDROP
+                         ? 'border-blue-500 ring-2 ring-blue-500/50'
+                         : 'border-gray-600 hover:border-gray-500'
+                     }`}
+                     style={parseBackgroundToCss(BLUR_TEST_BACKDROP)}
+                     title="Use a detailed backdrop to preview backdrop blur"
+                   >
+                     <span className="flex items-center gap-1.5 rounded bg-gray-950/75 px-2 py-1 text-[10px] font-semibold text-white shadow-lg">
+                       <Grid3X3 size={12} />
+                       Blur Test Pattern
+                     </span>
+                   </button>
+                   <p className="mt-1.5 text-[9px] text-gray-500">
+                     Lower the card background opacity to make backdrop blur visible.
+                   </p>
+                 </div>
+
+                 {/* Custom Background Upload */}
                 <div className="border-t border-gray-800 pt-3 mt-3">
                   <p className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1 mb-2">
                     <Image size={12} />
@@ -1216,21 +1300,42 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
              </div>
            )}
         </div>
+        <button onClick={resetPreviewView} className="p-2 rounded-full bg-gray-900/80 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 shadow-lg backdrop-blur" title="Reset preview view" aria-label="Reset preview view"><RotateCcw size={16} /></button>
       </div>
 
       {/* The Card Preview - Centered */}
       <div 
         className="relative flex justify-center items-center z-10 transition-all duration-300" 
-        style={{ width: `${cardWidth}px`, height: config.aspectRatio ? 'auto' : `${cardHeight}px` }}
+        style={{ width: `${cardWidth}px`, height: config.aspectRatio ? 'auto' : `${cardHeight}px`, transform: `scale(${previewZoom})` }}
       >
-        {/* Marquee Background Layer (Simulates rotating border) */}
+        {/* Marquee border: matches the multicolor conic treatment used by preset thumbnails. */}
         {isMarquee && (
-          <div className="absolute -inset-[4px] overflow-hidden cba-animate-spin z-0" style={{ borderRadius: config.borderRadius === '50%' ? '50%' : `calc(${config.borderRadius} + 4px)` }}>
-             <div className="w-full h-full" style={{
-               background: `conic-gradient(transparent 20%, ${actualBorderColor || SIMULATED_ENTITY_COLOR})`,
-               filter: 'blur(4px)'
-             }}></div>
+          <div
+            className="absolute z-0 overflow-hidden"
+            style={{
+              inset: `-${marqueeWidth}`,
+              borderRadius: config.borderRadius === '50%' ? '50%' : `calc(${config.borderRadius} + ${marqueeWidth})`,
+            }}
+          >
+            <div
+              className="absolute -inset-[70%]"
+              style={{
+                background: 'conic-gradient(#22d3ee, #a855f7, #f43f5e, #facc15, #22d3ee)',
+                animation: `marquee-spin ${cardAnimationDuration || '4s'} linear infinite`,
+              }}
+            />
           </div>
+        )}
+
+        {isProgressBorder && (
+          <div
+            className="absolute z-0 transition-all duration-500"
+            style={{
+              inset: `-${progressWidth}`,
+              borderRadius: config.borderRadius === '50%' ? '50%' : `calc(${config.borderRadius} + ${progressWidth})`,
+              background: `conic-gradient(${effectValueColor} 0 ${effectValue}%, rgba(148,163,184,.22) ${effectValue}% 100%)`,
+            }}
+          />
         )}
 
         {/* Main Card */}
@@ -1238,11 +1343,6 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
           key={animationKey}
           style={containerStyle}
           className={`hover:brightness-110 ${config.aspectRatio ? '' : 'w-full'} ${cardAnimationClass} group`}
-          onClick={() => {
-            if (canTogglePreviewState) {
-              setSimulatedState(simulatedState === 'on' ? 'off' : 'on');
-            }
-          }}
           title={config.tooltip.enabled ? config.tooltip.content : undefined}
         >
            {/* Tooltip */}
@@ -1255,14 +1355,6 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
              }`} style={tooltipStylesParsed}>
                {config.tooltip.content}
              </div>
-           )}
-
-           {/* Marquee Inner Cover to create border effect (Only if marquee is on) */}
-           {isMarquee && (
-             <div className="absolute inset-[2px] z-[-1]" style={{ 
-               borderRadius: config.borderRadius,
-               backgroundColor: actualBg
-             }}></div>
            )}
 
           {/* Icon / Entity Picture */}
@@ -1308,8 +1400,8 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
           {config.showState && (
             <div style={{ gridArea: 's', color: actualStateColor, opacity: 0.8, fontSize: '0.85em' }} className="text-center flex items-center justify-center gap-1">
               <span>{displayState}</span>
-              {config.showUnits && config.units && (
-                <span className="opacity-70">{config.units}</span>
+              {config.showUnits && (config.units || mainEntityData?.attributes?.unit_of_measurement) && (
+                <span className="opacity-70">{config.units || String(mainEntityData?.attributes?.unit_of_measurement)}</span>
               )}
             </div>
           )}
@@ -1408,29 +1500,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
       {/* Controls Overlay - Positioned at bottom */}
       <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-3 pointer-events-none">
 
-        {/* Simulator Toggle */}
-        {canTogglePreviewState ? (
-          <div className="bg-gray-800/90 backdrop-blur p-1 rounded-full inline-flex border border-gray-700 shadow-xl pointer-events-auto">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setSimulatedState('on');
-              }}
-              className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'on' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
-            >
-              ON
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setSimulatedState('off');
-              }}
-              className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${simulatedState === 'off' ? 'bg-gray-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'}`}
-            >
-              OFF
-            </button>
-          </div>
-        ) : (
+        {!canTogglePreviewState && (
           <div className="bg-gray-800/90 backdrop-blur px-4 py-2 rounded-full border border-gray-700 shadow-xl pointer-events-auto text-[11px] text-gray-300">
             Live state: <span className="text-white font-semibold">{mainEntityData?.state || 'unknown'}</span>
           </div>

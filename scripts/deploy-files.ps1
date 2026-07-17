@@ -1,8 +1,8 @@
-# Deploy Button Card Architect to Home Assistant
+# Deploy Button Builder to Home Assistant
 $haConfig = "\\192.168.0.84\config"
 $targetDir = "$haConfig\custom_components\button_builder"
 
-Write-Host "Deploying Button Card Architect to Home Assistant..." -ForegroundColor Cyan
+Write-Host "Deploying Button Builder to Home Assistant..." -ForegroundColor Cyan
 
 # Create directory structure
 Write-Host "`nCreating directories..." -ForegroundColor Yellow

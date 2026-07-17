@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, ChevronDown } from 'lucide-react';
 import { getIconComponent } from '../services/iconMapper';
 
@@ -114,19 +115,42 @@ export const IconPicker: React.FC<Props> = ({ value, onChange, label = 'Icon', p
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0, maxHeight: 400 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Close on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        (!containerRef.current || !containerRef.current.contains(target)) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(target))
+      ) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen]);
+
+  const openDropdown = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const MAX_H = 400;
+      const openDown = spaceBelow >= 200 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.min(MAX_H, openDown ? spaceBelow : spaceAbove);
+      const top = openDown ? rect.bottom + 4 : rect.top - maxHeight - 4;
+      setDropdownPos({ top, left: rect.left, width: rect.width, maxHeight });
+    }
+    setIsOpen(true);
+  };
 
   // Filter icons based on search
   const filteredIcons = useMemo(() => {
@@ -153,7 +177,7 @@ export const IconPicker: React.FC<Props> = ({ value, onChange, label = 'Icon', p
       </label>
       
       {/* Input with icon preview */}
-      <div className="relative">
+      <div ref={triggerRef}>
         <div className="flex items-center gap-2">
           {/* Icon Preview */}
           <div className="w-10 h-[38px] bg-gray-800 border border-gray-700 rounded flex items-center justify-center shrink-0">
@@ -163,7 +187,7 @@ export const IconPicker: React.FC<Props> = ({ value, onChange, label = 'Icon', p
               <span className="text-gray-600 text-xs">?</span>
             )}
           </div>
-          
+
           {/* Input */}
           <div className="relative flex-1">
             <input
@@ -171,12 +195,12 @@ export const IconPicker: React.FC<Props> = ({ value, onChange, label = 'Icon', p
               type="text"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              onFocus={() => setIsOpen(true)}
+              onFocus={openDropdown}
               placeholder={placeholder}
               className="w-full h-[38px] bg-gray-800 border border-gray-700 rounded px-3 pr-8 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
             />
             <button
-              onClick={() => setIsOpen(!isOpen)}
+              onClick={() => isOpen ? setIsOpen(false) : openDropdown()}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
             >
               <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -184,9 +208,12 @@ export const IconPicker: React.FC<Props> = ({ value, onChange, label = 'Icon', p
           </div>
         </div>
 
-        {/* Dropdown */}
-        {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-[400px] overflow-hidden flex flex-col">
+        {/* Dropdown via portal to escape overflow clipping */}
+        {isOpen && createPortal(
+          <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, maxHeight: dropdownPos.maxHeight, zIndex: 9999 }}
+            className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col">
             {/* Search */}
             <div className="p-2 border-b border-gray-800">
               <div className="relative">
@@ -324,7 +351,7 @@ export const IconPicker: React.FC<Props> = ({ value, onChange, label = 'Icon', p
               )}
             </div>
           </div>
-        )}
+        , document.body)}
       </div>
     </div>
   );

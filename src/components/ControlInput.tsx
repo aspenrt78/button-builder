@@ -89,7 +89,7 @@ export const ControlInput: React.FC<Props> = ({
 
   if (type === 'slider') {
     return (
-      <div className={`flex flex-col gap-2 ${disabled ? 'opacity-50' : ''} ${className}`} title={disabled ? disabledReason : undefined}>
+      <div className={`min-w-0 flex flex-col gap-2 ${disabled ? 'opacity-50' : ''} ${className}`} title={disabled ? disabledReason : undefined}>
         <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider">
           <span className="flex items-center gap-1">
             {label}
@@ -114,7 +114,7 @@ export const ControlInput: React.FC<Props> = ({
   }
 
   return (
-    <div className={`flex flex-col gap-1.5 ${disabled ? 'opacity-50' : ''} ${className}`} title={disabled ? disabledReason : undefined}>
+    <div className={`min-w-0 flex flex-col gap-1.5 ${disabled ? 'opacity-50' : ''} ${className}`} title={disabled ? disabledReason : undefined}>
       <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
         {label}
         {disabled && (
@@ -142,7 +142,7 @@ export const ControlInput: React.FC<Props> = ({
             value={value}
             onChange={(e) => !disabled && onChange(e.target.value)}
             disabled={disabled}
-            className={`bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors ${disabled ? 'cursor-not-allowed' : ''}`}
+            className={`min-w-0 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors ${disabled ? 'cursor-not-allowed' : ''}`}
           >
             {options.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -157,7 +157,7 @@ export const ControlInput: React.FC<Props> = ({
             onBlur={handleBlurWithSuffix}
             onKeyDown={handleKeyDownWithSuffix}
             disabled={disabled}
-            className={`bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder-gray-600 ${disabled ? 'cursor-not-allowed' : ''}`}
+            className={`min-w-0 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder-gray-600 ${disabled ? 'cursor-not-allowed' : ''}`}
           />
         )}
       </div>

@@ -6,14 +6,16 @@ import { EntitySelector } from './EntitySelector';
 import { IconPicker } from './IconPicker';
 import { GridDesigner } from './GridDesigner';
 import { LAYOUT_OPTIONS, ACTION_OPTIONS, TRANSFORM_OPTIONS, WEIGHT_OPTIONS, BORDER_STYLE_OPTIONS, ANIMATION_OPTIONS, BLUR_OPTIONS, SHADOW_SIZE_OPTIONS, TRIGGER_OPTIONS, LOCK_UNLOCK_OPTIONS, COLOR_TYPE_OPTIONS, PROTECT_TYPE_OPTIONS, FONT_FAMILY_OPTIONS, LETTER_SPACING_OPTIONS, LINE_HEIGHT_OPTIONS, LIVE_STREAM_FIT_OPTIONS, CONDITIONAL_OPERATORS, HAPTIC_TYPE_OPTIONS } from '../constants';
-import { Plus, X, Variable as VariableIcon, ToggleLeft, ToggleRight, Pencil, Gauge, Search, AlertCircle, ChevronDown } from 'lucide-react';
-import { NavHeader, CategoryList, SectionList, SearchResults, useNavigation, SectionId } from './ConfigPanelNav';
+import { Plus, X, Variable as VariableIcon, Pencil, Gauge, Search, AlertCircle, ChevronDown } from 'lucide-react';
+import { NavHeader, CategoryList, SectionList, SearchResults, useNavigation, SectionId, CATEGORIES } from './ConfigPanelNav';
 import { haService } from '../services/homeAssistantService';
-import { PRESETS, Preset, generateDarkModePreset } from '../presets';
+import { PRESETS, Preset } from '../presets';
 import { validateCss, formatValidationResults } from '../utils/cssValidator';
 import { getEntityCapabilities } from '../utils/entityCapabilities';
-
-export type PresetCondition = 'always' | 'on' | 'off';
+import { THEME_ELIGIBLE_CONTROLS } from '../utils/themes';
+import { Palette } from 'lucide-react';
+import { EffectThumbnail, OptionExampleStyles, PresetExample, ThresholdExample } from './OptionExamples';
+import { supportsEffectIntensity } from '../utils/effectIntensity';
 
 // Domain to icon mappings for auto-fill
 const DOMAIN_ICONS: Record<string, string> = {
@@ -154,14 +156,8 @@ interface Props {
   onSaveCustomPreset?: (name: string, description: string) => { ok: boolean; error?: string };
   onDeleteCustomPreset?: (preset: Preset) => void;
   // Preset management props
-  onApplyPreset?: (preset: Preset, forState?: 'on' | 'off') => void;
+  onApplyPreset?: (preset: Preset) => void;
   onResetToPreset?: () => void;
-  presetCondition?: PresetCondition;
-  onSetPresetCondition?: (condition: PresetCondition) => void;
-  offStatePreset?: Preset | null;
-  onStatePreset?: Preset | null;
-  onSetOffStatePreset?: (preset: Preset | null) => void;
-  onSetOnStatePreset?: (preset: Preset | null) => void;
   useAutoDarkMode?: boolean;
   onSetUseAutoDarkMode?: (value: boolean) => void;
   // State editing props
@@ -172,6 +168,11 @@ interface Props {
   offStateAppearance?: Partial<StateAppearanceConfig>;
   onSetOnStateAppearance?: React.Dispatch<React.SetStateAction<Partial<StateAppearanceConfig>>>;
   onSetOffStateAppearance?: React.Dispatch<React.SetStateAction<Partial<StateAppearanceConfig>>>;
+  // Theme (global appearance controls)
+  onOpenThemeChooser?: () => void;
+  advancedMode?: boolean;
+  onSetAdvancedMode?: (enabled: boolean) => void;
+  layout?: 'sidebar' | 'workbench';
 }
 
 // Section component removed - now using drill-down navigation via ConfigPanelNav
@@ -254,12 +255,6 @@ export const ConfigPanel: React.FC<Props> = ({
   onDeleteCustomPreset,
   onApplyPreset,
   onResetToPreset,
-  presetCondition = 'always',
-  onSetPresetCondition,
-  offStatePreset,
-  onStatePreset,
-  onSetOffStatePreset,
-  onSetOnStatePreset,
   useAutoDarkMode = true,
   onSetUseAutoDarkMode,
   editingState = 'on',
@@ -268,6 +263,10 @@ export const ConfigPanel: React.FC<Props> = ({
   offStateAppearance = {},
   onSetOnStateAppearance,
   onSetOffStateAppearance,
+  onOpenThemeChooser,
+  advancedMode = false,
+  onSetAdvancedMode,
+  layout = 'sidebar',
 }) => {
   
   const update = (key: keyof ButtonConfig, value: any) => {
@@ -318,24 +317,65 @@ export const ConfigPanel: React.FC<Props> = ({
   // Get the current state appearance based on editing state
   const currentAppearance = editingState === 'on' ? onStateAppearance : offStateAppearance;
   const setCurrentAppearance = editingState === 'on' ? onSetOnStateAppearance : onSetOffStateAppearance;
-  
+  // A control is "global" (theme) when its key is in config.themeKeys: it always
+  // reads/writes the base config and ignores the ON/OFF editing toggle.
+  const isThemeKey = (key: keyof StateAppearanceConfig) => (config.themeKeys || []).includes(key as string);
+
+  // Append a scope hint to an appearance control label so users know where the value
+  // lands: "· Theme (global)" when the control is a theme key, or "· ON/OFF" for the
+  // active editing state on binary entities. Non-binary entities have a single state.
+  const scopeLabel = (key: keyof StateAppearanceConfig, label: string): string => {
+    if (isThemeKey(key)) return `${label} · Theme`;
+    if (entityCapabilities.hasOnOffState) return `${label} · ${editingState.toUpperCase()} State`;
+    return label;
+  };
+
+  // A compact banner shown at the top of the appearance sections summarizing which
+  // controls are currently global (theme). Controls marked "· Theme" below apply to
+  // both states; everything else is per-state.
+  const activeThemeLabels = THEME_ELIGIBLE_CONTROLS
+    .filter(ctrl => (config.themeKeys || []).includes(ctrl.key as string))
+    .map(ctrl => ctrl.label);
+  const themeBanner = (
+    <div className="mb-4 rounded-lg border border-purple-500/30 bg-purple-500/5 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase font-bold tracking-wider text-purple-300 flex items-center gap-1.5">
+          <Palette size={12} /> Theme (global)
+        </p>
+        {onOpenThemeChooser && (
+          <button onClick={onOpenThemeChooser} className="text-[10px] font-semibold text-purple-300 hover:text-purple-200 underline">
+            Theme options…
+          </button>
+        )}
+      </div>
+      {activeThemeLabels.length > 0 ? (
+        <p className="mt-1 text-[11px] text-gray-400">
+          These apply to all states: <span className="text-gray-200">{activeThemeLabels.join(', ')}</span>. Everything else is per-state.
+        </p>
+      ) : (
+        <p className="mt-1 text-[11px] text-gray-500">
+          No global controls yet — every appearance control is per-state. Use “Theme options…” to make some global.
+        </p>
+      )}
+    </div>
+  );
+
   // Update appearance for current editing state - uses functional update to handle rapid successive calls
   const updateAppearance = (key: keyof StateAppearanceConfig, value: any) => {
-    if (entityCapabilities.hasOnOffState && setCurrentAppearance) {
+    if (entityCapabilities.hasOnOffState && setCurrentAppearance && !isThemeKey(key)) {
       // Use functional update to avoid stale state when multiple updates happen in sequence
       setCurrentAppearance(prev => ({ ...prev, [key]: value }));
       return;
     }
-    // Non-binary entities should edit base card appearance directly.
+    // Non-binary entities and theme/global controls edit the base config directly.
     update(key as unknown as keyof ButtonConfig, value);
   };
-  
+
   // Get value from current appearance or fall back to config
   const getAppearanceValue = <K extends keyof StateAppearanceConfig>(key: K): StateAppearanceConfig[K] => {
-    if (entityCapabilities.hasOnOffState) {
-      const appearanceValue = (currentAppearance as StateAppearanceConfig)[key];
-      if (appearanceValue !== undefined && appearanceValue !== '') {
-        return appearanceValue as StateAppearanceConfig[K];
+    if (entityCapabilities.hasOnOffState && !isThemeKey(key)) {
+      if (Object.prototype.hasOwnProperty.call(currentAppearance, key)) {
+        return currentAppearance[key] as StateAppearanceConfig[K];
       }
     }
     // Fall back to base config value if applicable
@@ -346,7 +386,19 @@ export const ConfigPanel: React.FC<Props> = ({
   };
 
   // Drill-down navigation
-  const { nav, goBack, selectCategory, selectSection, selectFromSearch, searchQuery, setSearchQuery } = useNavigation();
+  const { nav, goBack, goHome, selectCategory, selectSection, selectFromSearch, searchQuery, setSearchQuery } = useNavigation();
+
+  useEffect(() => {
+    if (!advancedMode && nav.level !== 'categories' && nav.categoryId === 'advanced') {
+      goHome();
+    }
+  }, [advancedMode, nav]);
+
+  useEffect(() => {
+    if (layout === 'workbench' && nav.level === 'categories') {
+      selectFromSearch('appearance', 'presetGallery');
+    }
+  }, [layout, nav.level]);
   const showSection = (sectionId: SectionId) => nav.level === 'content' && nav.sectionId === sectionId;
   
   // Preset search state
@@ -766,70 +818,130 @@ export const ConfigPanel: React.FC<Props> = ({
     );
   };
 
+  const visibleWorkbenchCategories = CATEGORIES.filter(category => advancedMode || category.id !== 'advanced');
+  const activeWorkbenchCategory = nav.level !== 'categories'
+    ? visibleWorkbenchCategories.find(category => category.id === nav.categoryId) || visibleWorkbenchCategories[0]
+    : visibleWorkbenchCategories.find(category => category.id === 'appearance') || visibleWorkbenchCategories[0];
+  const activeWorkbenchSection = nav.level === 'content' ? nav.sectionId : activeWorkbenchCategory?.sections[0]?.id;
+
+  const workbenchNav = (
+    <div className="shrink-0 border-b border-gray-800 bg-gray-950/80 px-5 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-56 flex-1 flex-wrap items-center gap-1">
+          {visibleWorkbenchCategories.map(category => {
+            const Icon = category.icon;
+            const active = activeWorkbenchCategory?.id === category.id;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => {
+                  const firstSection = category.sections[0];
+                  if (firstSection) selectFromSearch(category.id, firstSection.id);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${active ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              >
+                <Icon size={14} /> {category.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="relative min-w-36 flex-1 basis-40 sm:max-w-48">
+          <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+          <input
+            value={searchQuery}
+            onChange={event => setSearchQuery(event.target.value)}
+            placeholder="Find a setting…"
+            className="w-full rounded-lg border border-gray-700 bg-gray-900 py-1.5 pl-8 pr-7 text-xs text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+          />
+          {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X size={12} /></button>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          Advanced
+          <button
+            type="button"
+            role="switch"
+            aria-checked={advancedMode}
+            onClick={() => onSetAdvancedMode?.(!advancedMode)}
+            className={`relative h-5 w-9 rounded-full transition-colors ${advancedMode ? 'bg-blue-600' : 'bg-gray-700'}`}
+          >
+            <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${advancedMode ? 'translate-x-4' : ''}`} />
+          </button>
+        </div>
+      </div>
+      {activeWorkbenchCategory && !searchQuery && (
+        <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-gray-800 pt-2">
+          {activeWorkbenchCategory.sections.map(section => {
+            const Icon = section.icon;
+            const active = activeWorkbenchSection === section.id;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => selectFromSearch(activeWorkbenchCategory.id, section.id)}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] transition-colors ${active ? 'bg-gray-700 text-white' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`}
+              >
+                <Icon size={12} /> {section.label}
+              </button>
+            );
+          })}
+          {activePreset && <span className="ml-auto max-w-full truncate pl-3 text-[10px] text-purple-400">Preset: {activePreset.name}</span>}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
-      <NavHeader nav={nav} goBack={goBack} activePreset={activePreset} searchQuery={searchQuery} onSearchChange={nav.level === 'categories' ? setSearchQuery : undefined} />
+    <div className="h-full overflow-x-hidden overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col custom-scrollbar">
+      <OptionExampleStyles />
+      {layout === 'workbench' ? workbenchNav : <NavHeader
+        nav={nav}
+        goBack={goBack}
+        activePreset={activePreset}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        advancedMode={advancedMode}
+        onAdvancedModeChange={(enabled) => onSetAdvancedMode?.(enabled)}
+      />}
 
       {/* Search results (overrides normal navigation when query is present) */}
-      {nav.level === 'categories' && searchQuery && (
-        <SearchResults query={searchQuery} onSelect={selectFromSearch} />
+      {searchQuery && (
+        <SearchResults query={searchQuery} onSelect={selectFromSearch} advancedMode={advancedMode} />
       )}
 
       {/* Category List */}
-      {nav.level === 'categories' && !searchQuery && <CategoryList onSelect={selectCategory} />}
+      {layout === 'sidebar' && nav.level === 'categories' && !searchQuery && <CategoryList onSelect={selectCategory} advancedMode={advancedMode} />}
 
       {/* Section List */}
-      {nav.level === 'sections' && <SectionList categoryId={nav.categoryId} onSelect={selectSection} />}
+      {layout === 'sidebar' && nav.level === 'sections' && !searchQuery && <SectionList categoryId={nav.categoryId} onSelect={selectSection} advancedMode={advancedMode} />}
 
       {/* Content Sections */}
-      {nav.level === 'content' && (
-        <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+      {nav.level === 'content' && !searchQuery && (
+        <div className={`flex-1 space-y-4 overflow-y-auto ${layout === 'workbench' ? 'mx-auto w-full max-w-5xl p-6' : 'p-4'}`}>
           
-          {/* State Editing Toggle - Shows for appearance-related sections */}
-          {(showSection('colors') || showSection('glass') || showSection('borders') || showSection('animations') || showSection('typography')) && (
-            <div className="mb-4 p-3 bg-gradient-to-r from-blue-900/30 to-gray-900/30 border border-blue-500/30 rounded-lg">
+          {/* Persistent state design context for binary entities */}
+          {entityCapabilities.hasOnOffState && (
+            <div className={`mb-4 rounded-lg border p-3 ${editingState === 'on' ? 'border-emerald-500/30 bg-emerald-950/30' : 'border-amber-500/30 bg-amber-950/20'}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-bold">Editing State</p>
+                  <button
+                    type="button"
+                    onClick={() => onEditingStateChange?.(editingState === 'on' ? 'off' : 'on')}
+                    className="group text-left"
+                    aria-label={`Editing for ${editingState.toUpperCase()} State. Click to change to ${editingState === 'on' ? 'OFF' : 'ON'} State`}
+                  >
+                    <span className="flex items-baseline gap-1.5 font-semibold text-gray-300">
+                      <span className="text-xs">Editing for</span>
+                      <span className={`text-lg font-black tracking-wide ${editingState === 'on' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        {editingState.toUpperCase()}
+                      </span>
+                      <span className="text-xs">State</span>
+                    </span>
+                    <span className="mt-0.5 block text-[9px] font-medium text-gray-600 transition-colors group-hover:text-gray-400">Click to change</span>
+                  </button>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {entityCapabilities.hasOnOffState ? (
-                      <>
-                        Changes apply to <span className={editingState === 'on' ? 'text-green-400 font-medium' : 'text-gray-400 font-medium'}>{editingState.toUpperCase()}</span> state
-                      </>
-                    ) : entityCapabilities.isStateless ? (
-                      <>
-                        This entity is <span className="text-amber-300 font-medium">stateless</span>; ON/OFF editing is disabled and appearance edits apply to base card style.
-                      </>
-                    ) : (
-                      <>
-                        This entity state is <span className="text-amber-300 font-medium">{selectedStateHint}</span>; ON/OFF editing is disabled, so appearance edits apply to base card style.
-                      </>
-                    )}
+                    All appearance changes save to this state, except controls marked "· Theme" (global). Content, layout, and behavior are always shared.
                   </p>
-                </div>
-                <div className="flex bg-gray-800/80 rounded-full p-0.5 border border-gray-700">
-                  <button
-                    onClick={() => entityCapabilities.hasOnOffState && onEditingStateChange?.('on')}
-                    disabled={!entityCapabilities.hasOnOffState}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                      editingState === 'on' 
-                        ? 'bg-green-600 text-white shadow-lg' 
-                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                    }`}
-                  >
-                    ON
-                  </button>
-                  <button
-                    onClick={() => entityCapabilities.hasOnOffState && onEditingStateChange?.('off')}
-                    disabled={!entityCapabilities.hasOnOffState}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                      editingState === 'off' 
-                        ? 'bg-gray-600 text-white shadow-lg' 
-                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                    }`}
-                  >
-                    OFF
-                  </button>
                 </div>
               </div>
             </div>
@@ -838,6 +950,24 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== PRESETS > GALLERY ===== */}
           {showSection('presetGallery') && (
             <>
+              {entityCapabilities.hasOnOffState && editingState === 'on' && (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-gray-400">Auto-dark OFF</p>
+                    <p className="mt-0.5 text-[9px] text-gray-500">When a preset is applied to ON, generate its muted OFF appearance too.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSetUseAutoDarkMode?.(!useAutoDarkMode)}
+                    aria-label="Toggle automatic OFF appearance"
+                    aria-pressed={useAutoDarkMode}
+                    className={`relative h-5 w-10 shrink-0 rounded-full transition-colors ${useAutoDarkMode ? 'bg-purple-500' : 'bg-gray-600'}`}
+                  >
+                    <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${useAutoDarkMode ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
+              )}
+
               {/* Save Custom Preset */}
               <div className="p-3 bg-gray-800/40 border border-gray-700 rounded-lg mb-4">
                 <p className="text-xs font-bold text-gray-300 uppercase mb-2">Save Current Style as Preset</p>
@@ -932,7 +1062,7 @@ export const ConfigPanel: React.FC<Props> = ({
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2 sticky top-0 bg-gray-900 py-1">
                       {category === '3d' ? '3D Effects' : category === 'icon-styles' ? 'Icon Styles' : category.charAt(0).toUpperCase() + category.slice(1)}
                     </p>
-                    <div className="grid grid-cols-1 gap-1">
+                    <div className={`grid gap-2 ${layout === 'workbench' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                       {filteredPresets.map(preset => (
                         <div
                           key={preset.id || preset.name}
@@ -942,7 +1072,8 @@ export const ConfigPanel: React.FC<Props> = ({
                               : 'hover:bg-gray-800 border-transparent'
                           }`}
                         >
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-center gap-3">
+                            <PresetExample preset={preset} />
                             <button
                               onClick={() => onApplyPreset?.(preset)}
                               className="flex-1 text-left"
@@ -985,191 +1116,10 @@ export const ConfigPanel: React.FC<Props> = ({
             </>
           )}
 
-          {/* ===== PRESETS > CONDITIONS ===== */}
-          {showSection('presetConditions') && (
-            <>
-              {!activePreset ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-400 text-sm">No preset selected</p>
-                  <p className="text-gray-500 text-xs mt-1">Select a preset from the gallery first</p>
-                </div>
-              ) : (
-                <>
-                  <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg mb-4">
-                    <p className="text-xs text-gray-400">Current Preset</p>
-                    <p className="text-sm font-medium text-purple-400">{activePreset.name}</p>
-                  </div>
-                  
-                  <p className="text-xs text-gray-400 mb-4">
-                    Choose when "{activePreset.name}" applies and optionally set a different preset for the other state.
-                  </p>
-                  
-                  {/* Condition Selection */}
-                  <div className="space-y-2 mb-4">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Apply Preset When</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['always', 'on', 'off'] as PresetCondition[]).map(cond => (
-                        <button
-                          key={cond}
-                          onClick={() => {
-                            onSetPresetCondition?.(cond);
-                            if (cond === 'always') {
-                              onSetOffStatePreset?.(null);
-                              onSetOnStatePreset?.(null);
-                            } else if (cond === 'on' && useAutoDarkMode && activePreset) {
-                              // Re-apply auto dark mode when switching to 'on' condition
-                              const darkPreset = generateDarkModePreset(activePreset);
-                              onSetOffStatePreset?.(darkPreset);
-                            }
-                          }}
-                          className={`px-3 py-2 rounded text-xs font-medium transition-all ${
-                            presetCondition === cond
-                              ? 'bg-purple-500 text-white'
-                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                          }`}
-                        >
-                          {cond === 'always' ? 'Always' : cond === 'on' ? 'When ON' : 'When OFF'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Auto Dark Mode Toggle - Only shown when condition is 'on' */}
-                  {presetCondition === 'on' && (
-                    <div className="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <label className="text-[10px] text-gray-500 uppercase font-bold">Auto Dark Mode for OFF</label>
-                          <p className="text-[9px] text-gray-500 mt-0.5">
-                            Automatically generate a muted/dark version of the preset for the off state
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            const newValue = !useAutoDarkMode;
-                            onSetUseAutoDarkMode?.(newValue);
-                            if (newValue && activePreset) {
-                              const darkPreset = generateDarkModePreset(activePreset);
-                              onSetOffStatePreset?.(darkPreset);
-                            } else if (!newValue) {
-                              // Clear the auto-generated preset when disabling
-                              if (offStatePreset?.isAutoDark) {
-                                onSetOffStatePreset?.(null);
-                              }
-                            }
-                          }}
-                          className={`relative w-10 h-5 rounded-full transition-colors ${
-                            useAutoDarkMode ? 'bg-purple-500' : 'bg-gray-600'
-                          }`}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                              useAutoDarkMode ? 'translate-x-5' : ''
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Secondary Preset Selection - When ON */}
-                  {presetCondition === 'on' && (
-                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
-                        <ToggleLeft size={12} />
-                        When OFF, use:
-                      </label>
-                      {offStatePreset ? (
-                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
-                          <div>
-                            <span className="text-sm text-cyan-400">{offStatePreset.name}</span>
-                            {offStatePreset.isAutoDark && (
-                              <span className="ml-2 text-[9px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">Auto-generated</span>
-                            )}
-                          </div>
-                          <button 
-                            onClick={() => {
-                              onSetOffStatePreset?.(null);
-                              // If clearing an auto-generated preset, disable auto dark mode
-                              if (offStatePreset.isAutoDark) {
-                                onSetUseAutoDarkMode?.(false);
-                              }
-                            }}
-                            className="text-gray-500 hover:text-red-400 text-xs"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          onChange={(e) => {
-                            const preset = presets.find(p => (p.id || p.name) === e.target.value);
-                            if (preset) {
-                              onSetOffStatePreset?.(preset);
-                              // User manually selected a preset, disable auto dark mode
-                              onSetUseAutoDarkMode?.(false);
-                            }
-                          }}
-                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Select preset for OFF state...</option>
-                          {presets.map(p => (
-                            <option key={p.id || p.name} value={p.id || p.name}>{p.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      <p className="text-[9px] text-gray-500">
-                        {useAutoDarkMode 
-                          ? "Using auto-generated dark mode. Select a preset manually to override."
-                          : "Or leave empty to use default styling when OFF"}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {/* Secondary Preset Selection - When OFF */}
-                  {presetCondition === 'off' && (
-                    <div className="space-y-2 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                      <label className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
-                        <ToggleRight size={12} />
-                        When ON, use:
-                      </label>
-                      {onStatePreset ? (
-                        <div className="flex items-center justify-between bg-gray-700/50 rounded px-3 py-2">
-                          <span className="text-sm text-green-400">{onStatePreset.name}</span>
-                          <button 
-                            onClick={() => onSetOnStatePreset?.(null)}
-                            className="text-gray-500 hover:text-red-400 text-xs"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          onChange={(e) => {
-                            const preset = presets.find(p => (p.id || p.name) === e.target.value);
-                            if (preset) onSetOnStatePreset?.(preset);
-                          }}
-                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Select preset for ON state...</option>
-                          {presets.map(p => (
-                            <option key={p.id || p.name} value={p.id || p.name}>{p.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      <p className="text-[9px] text-gray-500">Or leave empty to use default styling when ON</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
           {/* ===== ENTITY > CORE ===== */}
           {showSection('core') && (
             <>
+              <div className={layout === 'workbench' ? 'grid grid-cols-2 gap-4' : 'space-y-4'}>
               <EntitySelector 
                 label="Entity ID" 
                 value={config.entity} 
@@ -1196,6 +1146,7 @@ export const ConfigPanel: React.FC<Props> = ({
                 <ControlInput label="Units Override" value={config.units} onChange={(v) => update('units', v)} placeholder="°C, kW, etc." />
               )}
           
+              </div>
           <div className="pt-3 border-t border-gray-800">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-gray-400 uppercase">Label Configuration</p>
@@ -1208,7 +1159,7 @@ export const ConfigPanel: React.FC<Props> = ({
                 </button>
               )}
             </div>
-            <div className="space-y-3">
+            <div className={layout === 'workbench' ? 'grid grid-cols-2 gap-3' : 'space-y-3'}>
               <ControlInput label="Static Label" value={config.label} onChange={(v) => update('label', v)} placeholder="My Label Text" />
               <p className="text-[10px] text-gray-500 -mt-1">Or display another entity's value as label:</p>
               <EntitySelector 
@@ -1250,16 +1201,16 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
           </div>
           
-          <div className="pt-3 border-t border-gray-800">
+          {advancedMode && <div className="pt-3 border-t border-gray-800">
             <p className="text-xs font-bold text-gray-400 uppercase mb-3">Templates (Advanced)</p>
             <YamlOnlyHint text="Templates are evaluated by button-card at dashboard runtime. The local preview does not execute JS templates." />
-            <div className="space-y-3">
+            <div className={layout === 'workbench' ? 'grid grid-cols-2 gap-3' : 'space-y-3'}>
               <ControlInput label="Name Template" value={config.nameTemplate} onChange={(v) => update('nameTemplate', v)} placeholder="[[[ return entity.state ]]]" />
               <ControlInput label="Label Template" value={config.labelTemplate} onChange={(v) => update('labelTemplate', v)} placeholder="[[[ return entity.attributes.temperature + '°C' ]]]" />
               <ControlInput label="Icon Template" value={config.iconTemplate} onChange={(v) => update('iconTemplate', v)} placeholder="[[[ return entity.state === 'on' ? 'mdi:lightbulb-on' : 'mdi:lightbulb-off' ]]]" />
               <ControlInput label="State Display Template" value={config.stateDisplayTemplate} onChange={(v) => update('stateDisplayTemplate', v)} placeholder="[[[ return entity.state.toUpperCase() ]]]" />
             </div>
-          </div>
+          </div>}
             </>
           )}
 
@@ -1536,68 +1487,73 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== APPEARANCE > COLORS ===== */}
           {showSection('colors') && (
             <>
-           <div className="space-y-6">
+           {themeBanner}
+           <div className={layout === 'workbench' ? 'grid grid-cols-2 items-start gap-6' : 'space-y-6'}>
              {/* Global Settings */}
              <div className="space-y-4">
-                <ControlInput type="select" label="Color Type" value={config.colorType} options={COLOR_TYPE_OPTIONS} onChange={(v) => update('colorType', v)} />
+                <ControlInput type="select" label="Color Type · Theme" value={config.colorType} options={COLOR_TYPE_OPTIONS} onChange={(v) => update('colorType', v)} />
                 
                 <div className="grid grid-cols-2 gap-4">
-                   <ControlInput type="checkbox" label="Auto Color (Light)" value={config.colorAuto} onChange={(v) => update('colorAuto', v)} />
+                   <ControlInput type="checkbox" label="Auto Color (Light)" value={!!getAppearanceValue('colorAuto')} onChange={(v) => updateAppearance('colorAuto', v)} />
                 </div>
 
                 <div className="space-y-4">
                    <div className="space-y-2">
-                        <ControlInput label="Card Background" type="color" value={config.backgroundColor || '#000000'} onChange={(v) => {
-                          update('backgroundColor', v);
-                          update('gradientEnabled', false);
-                        }} />
-                        <ControlInput label="Card Opacity" type="slider" value={config.cardOpacity} min={0} max={100} onChange={(v) => update('cardOpacity', v)} />
+                        <div className="flex items-end gap-3">
+                          <ControlInput className="min-w-0 flex-1" label={scopeLabel('backgroundColor', 'Card Background')} type="color" value={getAppearanceValue('backgroundColor') || '#000000'} onChange={(v) => {
+                            updateAppearance('backgroundColor', v);
+                            updateAppearance('gradientEnabled', false);
+                          }} />
+                          <EffectThumbnail effect="color" />
+                        </div>
+                        <div className="flex items-end gap-3">
+                          <ControlInput className="min-w-0 flex-1" label={scopeLabel('cardOpacity', 'Entire card opacity')} type="slider" value={getAppearanceValue('cardOpacity') ?? 100} min={0} max={100} onChange={(v) => updateAppearance('cardOpacity', v)} />
+                          <EffectThumbnail effect="opacity" />
+                        </div>
+                        <div className="flex items-end gap-3">
+                          <ControlInput className="min-w-0 flex-1" label={scopeLabel('backgroundColorOpacity', 'Background opacity')} type="slider" value={getAppearanceValue('backgroundColorOpacity') ?? 100} min={0} max={100} onChange={(v) => updateAppearance('backgroundColorOpacity', v)} />
+                          <EffectThumbnail effect="backgroundOpacity" />
+                        </div>
                    </div>
-                   <ControlInput label="Default Text Color" type="color" value={config.color || '#ffffff'} onChange={(v) => update('color', v)} />
+                   <div className="flex items-end gap-3">
+                     <ControlInput className="min-w-0 flex-1" label={scopeLabel('color', 'Default Text Color')} type="color" value={getAppearanceValue('color') || '#ffffff'} onChange={(v) => updateAppearance('color', v)} />
+                     <EffectThumbnail effect="textColor" />
+                   </div>
                 </div>
              </div>
              
-             <div className="h-px bg-gray-700/50" />
+             <div className={`h-px bg-gray-700/50 ${layout === 'workbench' ? 'hidden' : ''}`} />
 
              {/* Gradient Background */}
              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-bold text-gray-400 uppercase">Gradient Background</p>
-                  <ControlInput type="checkbox" label="" value={!!getAppearanceValue('gradientEnabled')} onChange={(v) => {
-                    // When enabling gradient, clear solid background color and set defaults
-                    if (v) {
-                      updateAppearance('gradientEnabled', true);
-                      updateAppearance('backgroundColor', '');
-                      updateAppearance('backgroundColorOpacity', 100);
-                      updateAppearance('gradientType', getAppearanceValue('gradientType') || DEFAULT_STATE_APPEARANCE.gradientType);
-                      updateAppearance('gradientAngle', getAppearanceValue('gradientAngle') ?? DEFAULT_STATE_APPEARANCE.gradientAngle);
-                      updateAppearance('gradientColor1', getAppearanceValue('gradientColor1') || DEFAULT_STATE_APPEARANCE.gradientColor1);
-                      updateAppearance('gradientColor2', getAppearanceValue('gradientColor2') || DEFAULT_STATE_APPEARANCE.gradientColor2);
-                      updateAppearance('gradientColor3', getAppearanceValue('gradientColor3') || DEFAULT_STATE_APPEARANCE.gradientColor3);
-                      updateAppearance('gradientColor3Enabled', getAppearanceValue('gradientColor3Enabled') ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled);
-                      updateAppearance('gradientOpacity', getAppearanceValue('gradientOpacity') ?? DEFAULT_STATE_APPEARANCE.gradientOpacity);
-                      // Also clear base config backgroundColor so it doesn't output in base styles
-                      update('backgroundColor', '');
-                    } else {
-                      updateAppearance('gradientEnabled', false);
-                    }
-                  }} />
+                  <div className="flex items-center gap-3">
+                    <ControlInput type="checkbox" label="" value={!!getAppearanceValue('gradientEnabled')} onChange={(v) => {
+                      // When enabling gradient, clear solid background color and set defaults
+                      if (v) {
+                        updateAppearance('gradientEnabled', true);
+                        updateAppearance('backgroundColor', '');
+                        updateAppearance('backgroundColorOpacity', 100);
+                        updateAppearance('gradientType', getAppearanceValue('gradientType') || DEFAULT_STATE_APPEARANCE.gradientType);
+                        updateAppearance('gradientAngle', getAppearanceValue('gradientAngle') ?? DEFAULT_STATE_APPEARANCE.gradientAngle);
+                        updateAppearance('gradientColor1', getAppearanceValue('gradientColor1') || DEFAULT_STATE_APPEARANCE.gradientColor1);
+                        updateAppearance('gradientColor2', getAppearanceValue('gradientColor2') || DEFAULT_STATE_APPEARANCE.gradientColor2);
+                        updateAppearance('gradientColor3', getAppearanceValue('gradientColor3') || DEFAULT_STATE_APPEARANCE.gradientColor3);
+                        updateAppearance('gradientColor3Enabled', getAppearanceValue('gradientColor3Enabled') ?? DEFAULT_STATE_APPEARANCE.gradientColor3Enabled);
+                        updateAppearance('gradientOpacity', getAppearanceValue('gradientOpacity') ?? DEFAULT_STATE_APPEARANCE.gradientOpacity);
+                        // Clearing the solid background is scoped to the active state only;
+                        // it must not mutate the base/opposite state's background.
+                      } else {
+                        updateAppearance('gradientEnabled', false);
+                      }
+                    }} />
+                    <EffectThumbnail effect="gradient" />
+                  </div>
                 </div>
                 
                 {getAppearanceValue('gradientEnabled') && (
                   <div className="space-y-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                    {/* Gradient Preview */}
-                    <div 
-                      className="h-12 rounded-lg border border-gray-600"
-                      style={{
-                        background: getAppearanceValue('gradientType') === 'linear' 
-                          ? `linear-gradient(${getAppearanceValue('gradientAngle')}deg, ${getAppearanceValue('gradientColor1')}, ${getAppearanceValue('gradientColor2')}${getAppearanceValue('gradientColor3Enabled') ? `, ${getAppearanceValue('gradientColor3')}` : ''})`
-                          : getAppearanceValue('gradientType') === 'radial'
-                          ? `radial-gradient(circle, ${getAppearanceValue('gradientColor1')}, ${getAppearanceValue('gradientColor2')}${getAppearanceValue('gradientColor3Enabled') ? `, ${getAppearanceValue('gradientColor3')}` : ''})`
-                          : `conic-gradient(from ${getAppearanceValue('gradientAngle')}deg, ${getAppearanceValue('gradientColor1')}, ${getAppearanceValue('gradientColor2')}${getAppearanceValue('gradientColor3Enabled') ? `, ${getAppearanceValue('gradientColor3')}` : ''}, ${getAppearanceValue('gradientColor1')})`
-                      }}
-                    />
-                    
                     <div className="grid grid-cols-2 gap-3">
                       <ControlInput 
                         type="select" 
@@ -1645,49 +1601,52 @@ export const ConfigPanel: React.FC<Props> = ({
 
              {/* Element Colors */}
              <div className="space-y-4">
-                <p className="text-xs font-bold text-gray-400 uppercase">Element Colors</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Element Colors</p>
+                  <EffectThumbnail effect="elementColors" />
+                </div>
 
                 {!config.showIcon && !config.showName && !config.showState && !config.showLabel && (
                   <p className="text-[10px] text-gray-500 italic">Enable Name, Icon, State, or Label in Layout → Visibility to unlock element colors.</p>
                 )}
 
                 {config.showIcon && (
-                  <ColorPairInput 
-                    label="Icon Color"
+                  <ColorPairInput
+                    label={scopeLabel('iconColor', 'Icon Color')}
                     colorValue={getAppearanceValue('iconColor')}
                     setColor={(v: string) => updateAppearance('iconColor', v)}
-                    autoValue={config.iconColorAuto}
-                    setAuto={(v: boolean) => update('iconColorAuto', v)}
+                    autoValue={!!getAppearanceValue('iconColorAuto')}
+                    setAuto={(v: boolean) => updateAppearance('iconColorAuto', v)}
                   />
                 )}
 
                 {config.showName && (
-                  <ColorPairInput 
-                    label="Name Color"
+                  <ColorPairInput
+                    label={scopeLabel('nameColor', 'Name Color')}
                     colorValue={getAppearanceValue('nameColor')}
                     setColor={(v: string) => updateAppearance('nameColor', v)}
-                    autoValue={config.nameColorAuto}
-                    setAuto={(v: boolean) => update('nameColorAuto', v)}
+                    autoValue={!!getAppearanceValue('nameColorAuto')}
+                    setAuto={(v: boolean) => updateAppearance('nameColorAuto', v)}
                   />
                 )}
 
                 {config.showState && (
-                  <ColorPairInput 
-                    label="State Color"
+                  <ColorPairInput
+                    label={scopeLabel('stateColor', 'State Color')}
                     colorValue={getAppearanceValue('stateColor')}
                     setColor={(v: string) => updateAppearance('stateColor', v)}
-                    autoValue={config.stateColorAuto}
-                    setAuto={(v: boolean) => update('stateColorAuto', v)}
+                    autoValue={!!getAppearanceValue('stateColorAuto')}
+                    setAuto={(v: boolean) => updateAppearance('stateColorAuto', v)}
                   />
                 )}
 
                 {config.showLabel && (
-                  <ColorPairInput 
-                    label="Label Color"
+                  <ColorPairInput
+                    label={scopeLabel('labelColor', 'Label Color')}
                     colorValue={getAppearanceValue('labelColor')}
                     setColor={(v: string) => updateAppearance('labelColor', v)}
-                    autoValue={config.labelColorAuto}
-                    setAuto={(v: boolean) => update('labelColorAuto', v)}
+                    autoValue={!!getAppearanceValue('labelColorAuto')}
+                    setAuto={(v: boolean) => updateAppearance('labelColorAuto', v)}
                   />
                 )}
              </div>
@@ -1733,17 +1692,20 @@ export const ConfigPanel: React.FC<Props> = ({
                 </button>
               </div>
 
-              {config.stateStyles.some(s => s.operator === 'template') && (
+              {advancedMode && config.stateStyles.some(s => s.operator === 'template') && (
                 <p className="text-[10px] text-amber-300/80 mb-2">Template operators are YAML-only — preview cannot execute custom JS.</p>
               )}
 
-              {config.stateStyles.length === 0 ? (
+              {config.stateStyles.filter(style => advancedMode || style.operator !== 'template').length === 0 ? (
                 <div className="text-xs text-gray-500 italic text-center py-4 border border-dashed border-gray-700 rounded-lg">
                   No conditionals — click Add to create one
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {config.stateStyles.map((style, idx) => {
+                  {config.stateStyles
+                    .map((style, idx) => ({ style, idx }))
+                    .filter(({ style }) => advancedMode || style.operator !== 'template')
+                    .map(({ style, idx }) => {
                     const isExpanded = expandedConditions.has(idx);
                     const entityLabel = ((style.conditionEntity || config.entity || '').split('.').slice(1).join('.') || (style.conditionEntity || config.entity || '') || 'entity').trim();
                     const opLabel = CONDITION_MATCH_OPTIONS.find(o => o.value === style.operator)?.label ?? style.operator;
@@ -1822,7 +1784,7 @@ export const ConfigPanel: React.FC<Props> = ({
                                         label="Match"
                                         type="select"
                                         value={style.operator}
-                                        options={CONDITION_MATCH_OPTIONS}
+                                        options={CONDITION_MATCH_OPTIONS.filter(option => advancedMode || option.value !== 'template')}
                                         onChange={(v) => updateStateStyle(idx, { operator: v })}
                                       />
                                       {style.operator !== 'default' && (
@@ -1925,15 +1887,18 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('glass') && (
             <>
            <div className="space-y-4">
-              <p className="text-xs text-gray-500 italic">Glass & depth effects apply to all states</p>
-              <div className="grid grid-cols-2 gap-4">
-                 <ControlInput label="Backdrop Blur" type="select" value={config.backdropBlur} options={BLUR_OPTIONS} onChange={(v) => update('backdropBlur', v)} />
-                 <ControlInput label="Shadow Size" type="select" value={config.shadowSize} options={SHADOW_SIZE_OPTIONS} onChange={(v) => update('shadowSize', v)} />
+              <div className="flex items-end gap-3">
+                 <ControlInput className="min-w-0 flex-1" label={scopeLabel('backdropBlur', 'Backdrop Blur')} type="select" value={getAppearanceValue('backdropBlur') || 'none'} options={BLUR_OPTIONS} onChange={(v) => updateAppearance('backdropBlur', v)} />
+                 <EffectThumbnail effect="glass" />
               </div>
-              {config.shadowSize !== 'none' && (
+              <div className="flex items-end gap-3">
+                 <ControlInput className="min-w-0 flex-1" label={scopeLabel('shadowSize', 'Shadow Size')} type="select" value={getAppearanceValue('shadowSize') || 'none'} options={SHADOW_SIZE_OPTIONS} onChange={(v) => updateAppearance('shadowSize', v)} />
+                 <EffectThumbnail effect="shadow" />
+              </div>
+              {getAppearanceValue('shadowSize') && getAppearanceValue('shadowSize') !== 'none' && (
                 <div className="grid grid-cols-2 gap-4">
-                    <ControlInput label="Shadow Color" type="color" value={config.shadowColor} onChange={(v) => update('shadowColor', v)} />
-                    <ControlInput label="Shadow Opacity" type="slider" value={config.shadowOpacity} min={0} max={100} onChange={(v) => update('shadowOpacity', v)} />
+                    <ControlInput label={scopeLabel('shadowColor', 'Shadow Color')} type="color" value={getAppearanceValue('shadowColor') || '#000000'} onChange={(v) => updateAppearance('shadowColor', v)} />
+                    <ControlInput label={scopeLabel('shadowOpacity', 'Shadow Opacity')} type="slider" value={getAppearanceValue('shadowOpacity') ?? 25} min={0} max={100} onChange={(v) => updateAppearance('shadowOpacity', v)} />
                 </div>
               )}
            </div>
@@ -1944,18 +1909,21 @@ export const ConfigPanel: React.FC<Props> = ({
           {showSection('borders') && (
             <>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-               <ControlInput label="Border Width" value={config.borderWidth} onChange={(v) => update('borderWidth', v)} suffix="px" />
-               <ControlInput label="Border Style" type="select" value={config.borderStyle} options={BORDER_STYLE_OPTIONS} onChange={(v) => update('borderStyle', v)} />
+            <div className="flex items-end gap-3">
+              <div className="grid min-w-0 flex-1 grid-cols-2 gap-4">
+                 <ControlInput label={scopeLabel('borderWidth', 'Border Width')} value={getAppearanceValue('borderWidth') || ''} onChange={(v) => updateAppearance('borderWidth', v)} suffix="px" />
+                 <ControlInput label={scopeLabel('borderStyle', 'Border Style')} type="select" value={getAppearanceValue('borderStyle') || 'none'} options={BORDER_STYLE_OPTIONS} onChange={(v) => updateAppearance('borderStyle', v)} />
+              </div>
+              <EffectThumbnail effect="border" />
             </div>
 
-            {config.borderStyle !== 'none' && (
-              <ColorPairInput 
-                 label="Border Color"
+            {getAppearanceValue('borderStyle') && getAppearanceValue('borderStyle') !== 'none' && (
+              <ColorPairInput
+                 label={scopeLabel('borderColor', 'Border Color')}
                  colorValue={getAppearanceValue('borderColor')}
                  setColor={(v: string) => updateAppearance('borderColor', v)}
-                 autoValue={config.borderColorAuto}
-                 setAuto={(v: boolean) => update('borderColorAuto', v)}
+                 autoValue={!!getAppearanceValue('borderColorAuto')}
+                 setAuto={(v: boolean) => updateAppearance('borderColorAuto', v)}
               />
             )}
           </div>
@@ -1969,7 +1937,10 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Card Animation */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Card Animation</p>
-                <ControlInput label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
+                <div className="flex items-end gap-3">
+                  <ControlInput className="min-w-0 flex-1" label="Type" type="select" value={getAppearanceValue('cardAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('cardAnimation', v)} />
+                  <EffectThumbnail effect="cardAnimation" />
+                </div>
                 {getAppearanceValue('cardAnimation') !== 'none' && (() => {
                   // Detect whether the animation is stored in the state-appearance slot
                   // (binary entity AND currentAppearance has a non-none value).
@@ -2000,6 +1971,24 @@ export const ConfigPanel: React.FC<Props> = ({
                           />
                         )}
                       </div>
+                      {supportsEffectIntensity(getAppearanceValue('cardAnimation')) && (
+                        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+                          <ControlInput
+                            label={scopeLabel('effectIntensity', 'Effect Intensity (%)')}
+                            type="slider"
+                            value={getAppearanceValue('effectIntensity') ?? 100}
+                            min={25}
+                            max={200}
+                            step={5}
+                            onChange={(v) => updateAppearance('effectIntensity', v)}
+                          />
+                          <p className="mt-2 text-[9px] text-gray-500">
+                            {getAppearanceValue('cardAnimation') === 'liquidGradient'
+                              ? 'Controls how far the liquid corners and edges stretch during the morph. 100% preserves the original shape.'
+                              : 'Controls the effect’s defining reach, movement, distortion, glow, or pulse size. 100% preserves the original effect.'}
+                          </p>
+                        </div>
+                      )}
                       {!isStateSpecific && (
                         <ControlInput
                           type="checkbox"
@@ -2018,7 +2007,10 @@ export const ConfigPanel: React.FC<Props> = ({
              {/* Icon Animation - NOT locked by extraStyles since it only affects card */}
              <div className="space-y-3">
                 <p className="text-xs font-bold text-blue-400 uppercase">Icon Animation</p>
-                <ControlInput label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
+                <div className="flex items-end gap-3">
+                  <ControlInput className="min-w-0 flex-1" label="Type" type="select" value={getAppearanceValue('iconAnimation')} options={ANIMATION_OPTIONS} onChange={(v) => updateAppearance('iconAnimation', v)} />
+                  <EffectThumbnail effect="iconAnimation" />
+                </div>
                 {getAppearanceValue('iconAnimation') !== 'none' && (() => {
                   const stateAnim = entityCapabilities.hasOnOffState
                     ? (currentAppearance as Partial<import('../types').StateAppearanceConfig>)?.iconAnimation
@@ -2064,8 +2056,11 @@ export const ConfigPanel: React.FC<Props> = ({
           {/* ===== APPEARANCE > TYPOGRAPHY ===== */}
           {showSection('typography') && (
             <>
-           <ControlInput label="Font Family" type="select" value={config.fontFamily} options={FONT_FAMILY_OPTIONS} onChange={(v) => update('fontFamily', v)} />
-           
+           <div className="flex items-end gap-3">
+             <ControlInput className="min-w-0 flex-1" label={scopeLabel('fontFamily', 'Font Family')} type="select" value={getAppearanceValue('fontFamily') || ''} options={FONT_FAMILY_OPTIONS} onChange={(v) => updateAppearance('fontFamily', v)} />
+             <EffectThumbnail effect="typography" />
+           </div>
+
            {/* Custom Font */}
            <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
              <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Custom Font (Optional)</p>
@@ -2095,15 +2090,15 @@ export const ConfigPanel: React.FC<Props> = ({
            </div>
            
            <div className="grid grid-cols-2 gap-4 mt-3">
-              <ControlInput label="Font Size" value={config.fontSize} onChange={(v) => update('fontSize', v)} suffix="px" />
-              <ControlInput label="Transform" type="select" value={config.textTransform} options={TRANSFORM_OPTIONS} onChange={(v) => update('textTransform', v)} />
+              <ControlInput label={scopeLabel('fontSize', 'Font Size')} value={getAppearanceValue('fontSize') || ''} onChange={(v) => updateAppearance('fontSize', v)} suffix="px" />
+              <ControlInput label={scopeLabel('textTransform', 'Transform')} type="select" value={getAppearanceValue('textTransform') || 'none'} options={TRANSFORM_OPTIONS} onChange={(v) => updateAppearance('textTransform', v)} />
            </div>
            <div className="grid grid-cols-2 gap-4 mt-3">
-             <ControlInput label="Font Weight" type="select" value={config.fontWeight} options={WEIGHT_OPTIONS} onChange={(v) => update('fontWeight', v)} />
-             <ControlInput label="Letter Spacing" type="select" value={config.letterSpacing} options={LETTER_SPACING_OPTIONS} onChange={(v) => update('letterSpacing', v)} />
+             <ControlInput label={scopeLabel('fontWeight', 'Font Weight')} type="select" value={getAppearanceValue('fontWeight') || 'normal'} options={WEIGHT_OPTIONS} onChange={(v) => updateAppearance('fontWeight', v)} />
+             <ControlInput label={scopeLabel('letterSpacing', 'Letter Spacing')} type="select" value={getAppearanceValue('letterSpacing') || 'normal'} options={LETTER_SPACING_OPTIONS} onChange={(v) => updateAppearance('letterSpacing', v)} />
            </div>
             <div className="grid grid-cols-2 gap-4 mt-3">
-              <ControlInput label="Line Height" type="select" value={config.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => update('lineHeight', v)} />
+              <ControlInput label={scopeLabel('lineHeight', 'Line Height')} type="select" value={getAppearanceValue('lineHeight') || 'normal'} options={LINE_HEIGHT_OPTIONS} onChange={(v) => updateAppearance('lineHeight', v)} />
               {config.showState && (
                 <ControlInput label="Numeric Precision" value={config.numericPrecision.toString()} onChange={(v) => update('numericPrecision', Number(v))} placeholder="-1 = auto" />
               )}
@@ -2123,7 +2118,8 @@ export const ConfigPanel: React.FC<Props> = ({
                 <p className="text-xs text-gray-400">Automatically color icons/text based on numeric sensor values</p>
               </div>
             </div>
-            
+            <ThresholdExample config={config.thresholdColor} />
+
             <ControlInput 
               type="checkbox" 
               label="Enable Threshold Colors" 
@@ -2977,32 +2973,21 @@ export const ConfigPanel: React.FC<Props> = ({
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <ControlInput type="checkbox" label="Icon Spin (rotate)" value={config.spin} onChange={(v) => update('spin', v)} />
               <ControlInput type="checkbox" label="Spinner Loading" value={config.spinner} onChange={(v) => update('spinner', v)} />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <ControlInput label="Haptic Feedback" type="select" value={config.hapticFeedback} options={HAPTIC_TYPE_OPTIONS} onChange={(v) => update('hapticFeedback', v)} />
               <ControlInput type="checkbox" label="Disable Keyboard" value={config.disableKeyboard} onChange={(v) => update('disableKeyboard', v)} />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
+              <ControlInput label="Haptic Feedback" type="select" value={config.hapticFeedback} options={HAPTIC_TYPE_OPTIONS} onChange={(v) => update('hapticFeedback', v)} />
               <ControlInput type="checkbox" label="Group Expand" value={config.groupExpand} onChange={(v) => update('groupExpand', v)} />
-              <ControlInput type="checkbox" label="Hidden" value={config.hidden} onChange={(v) => update('hidden', v)} />
             </div>
-            
-            {config.spin && (
-              <ControlInput label="Spin Duration" value={config.spinDuration} onChange={(v) => update('spinDuration', v)} suffix="s" />
-            )}
-            
+
+            <p className="text-[10px] text-gray-500 italic">Icon spin now lives under Appearance → Animation (Spin). Hidden lives under Content → Visibility.</p>
+
             {config.spinner && (
               <ControlInput label="Spinner Template" value={config.spinnerTemplate} onChange={(v) => update('spinnerTemplate', v)} placeholder="[[[ return entity.state === 'on' ]]]" />
             )}
-            
-            {config.hidden && (
-              <ControlInput label="Hidden Template" value={config.hiddenTemplate} onChange={(v) => update('hiddenTemplate', v)} placeholder="[[[ return ... ]]]" />
-            )}
-            
+
             <div className="h-px bg-gray-700/50" />
             
             <div className="flex items-center gap-2">
@@ -3022,10 +3007,10 @@ export const ConfigPanel: React.FC<Props> = ({
             <div className="h-px bg-gray-700/50" />
             
             <div className="flex items-center gap-2">
-              <p className="text-xs font-bold text-gray-400 uppercase mb-2">Conditional Display</p>
+              <p className="text-xs font-bold text-gray-400 uppercase mb-2">Card Visibility Condition</p>
               <YamlOnlyBadge />
             </div>
-            <p className="text-[10px] text-gray-500 mb-3">Show/hide this button based on an entity's state</p>
+            <p className="text-[10px] text-gray-500 mb-3">Show/hide this entire button based on an entity's state</p>
             <EntitySelector
               value={config.conditionalEntity}
               onChange={(v) => update('conditionalEntity', v)}

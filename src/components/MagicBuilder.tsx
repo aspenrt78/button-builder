@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Wand2, X, Loader2, Sparkles, Key, ExternalLink, Trash2 } from 'lucide-react';
 import { generateButtonConfig, hasApiKey, setApiKey, getApiKey, clearApiKey, GeminiError } from '../services/geminiService';
+import { generateWithHomeAssistantAI, getHomeAssistantAIProviders, HomeAssistantAIProvider } from '../services/homeAssistantAIService';
 import { ButtonConfig } from '../types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onApply: (config: Partial<ButtonConfig>) => void;
+  manageApiKey?: boolean;
 }
 
-export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
+export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply, manageApiKey = false }) => {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -17,6 +19,27 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
   const [showApiKeyInput, setShowApiKeyInput] = useState(!hasApiKey());
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKeyManagement, setShowKeyManagement] = useState(false);
+  const [provider, setProvider] = useState<'home-assistant' | 'gemini'>('home-assistant');
+  const [homeAssistantProviders, setHomeAssistantProviders] = useState<HomeAssistantAIProvider[]>([]);
+  const [selectedHomeAssistantProvider, setSelectedHomeAssistantProvider] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const available = getHomeAssistantAIProviders();
+    setHomeAssistantProviders(available);
+    if (manageApiKey) {
+      setProvider('gemini');
+      if (hasApiKey()) {
+        setShowApiKeyInput(false);
+        setShowKeyManagement(true);
+      } else {
+        setShowApiKeyInput(true);
+        setShowKeyManagement(false);
+      }
+    } else if (available.length === 0) {
+      setProvider('gemini');
+    }
+  }, [isOpen, manageApiKey]);
 
   const examplePrompts = [
     "Futuristic cyan button for bedroom fan with glow effect",
@@ -33,7 +56,9 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
     setError('');
     setCanRetry(false);
     try {
-      const config = await generateButtonConfig(prompt);
+      const config = provider === 'home-assistant'
+        ? await generateWithHomeAssistantAI(prompt, selectedHomeAssistantProvider || undefined)
+        : await generateButtonConfig(prompt);
       onApply(config);
       setPrompt(''); // Clear prompt after successful generation
       onClose();
@@ -89,7 +114,7 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
             Magic Architect
           </h3>
           <div className="flex items-center gap-2">
-            {hasApiKey() && !showApiKeyInput && (
+            {provider === 'gemini' && hasApiKey() && !showApiKeyInput && (
               <button 
                 onClick={() => setShowKeyManagement(!showKeyManagement)}
                 className="text-gray-500 hover:text-gray-300 p-1"
@@ -105,7 +130,34 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
         </div>
         
         <div className="p-6 space-y-4">
-          {showApiKeyInput ? (
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-gray-400">AI provider</label>
+            <select
+              value={provider}
+              onChange={(event) => setProvider(event.target.value as 'home-assistant' | 'gemini')}
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-white focus:border-purple-500 focus:outline-none"
+            >
+              {homeAssistantProviders.length > 0 && <option value="home-assistant">Home Assistant AI (uses existing credentials)</option>}
+              <option value="gemini">Gemini API key (direct)</option>
+            </select>
+          </div>
+
+          {provider === 'home-assistant' && homeAssistantProviders.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <label className="text-xs font-medium text-emerald-300">Home Assistant AI task</label>
+              <select
+                value={selectedHomeAssistantProvider}
+                onChange={(event) => setSelectedHomeAssistantProvider(event.target.value)}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="">Preferred AI Task provider</option>
+                {homeAssistantProviders.map((item) => <option key={item.entityId} value={item.entityId}>{item.name}</option>)}
+              </select>
+              <p className="text-[11px] text-gray-400">The provider runs inside Home Assistant. Button Builder never reads or stores its API key.</p>
+            </div>
+          )}
+
+          {provider === 'gemini' && showApiKeyInput ? (
             // API Key Setup View
             <>
               <div className="text-center py-4">
@@ -165,7 +217,7 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
                 </div>
               )}
             </>
-          ) : showKeyManagement ? (
+          ) : provider === 'gemini' && showKeyManagement ? (
             // Key Management View
             <div className="py-4">
               <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
@@ -241,7 +293,7 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
           >
             Cancel
           </button>
-          {showApiKeyInput ? (
+          {provider === 'gemini' && showApiKeyInput ? (
             <button 
               onClick={handleSaveApiKey}
               disabled={!apiKeyInput.trim()}
@@ -250,7 +302,7 @@ export const MagicBuilder: React.FC<Props> = ({ isOpen, onClose, onApply }) => {
               <Key size={16} />
               Save API Key
             </button>
-          ) : !showKeyManagement && (
+          ) : !(provider === 'gemini' && showKeyManagement) && (
             <button 
               onClick={handleGenerate}
               disabled={loading || !prompt.trim()}

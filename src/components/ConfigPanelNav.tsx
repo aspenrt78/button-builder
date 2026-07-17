@@ -8,14 +8,15 @@ export type SectionId =
   | 'colors' | 'glass' | 'borders' | 'animations' | 'typography' | 'thresholdColors' | 'conditionalStyles'
   | 'cardActions' | 'momentaryActions' | 'iconActions'
   | 'confirmation' | 'lock' | 'protect' | 'tooltip' | 'customFields' | 'advancedSettings'
-  | 'presetGallery' | 'presetConditions';
+  | 'presetGallery';
 
-export type CategoryId = 'presets' | 'entity' | 'layout' | 'appearance' | 'effects' | 'actions' | 'advanced';
+export type CategoryId = 'content' | 'appearance' | 'layout' | 'behavior' | 'states' | 'advanced';
 
 interface SectionDef {
   id: SectionId;
   label: string;
   icon: any;
+  keywords?: string[];
 }
 
 interface CategoryDef {
@@ -27,61 +28,55 @@ interface CategoryDef {
 
 export const CATEGORIES: CategoryDef[] = [
   {
-    id: 'presets', label: 'Presets', icon: Wand2,
+    id: 'content', label: 'Content', icon: Target,
     sections: [
-      { id: 'presetGallery', label: 'Style Presets', icon: Palette },
-      { id: 'presetConditions', label: 'State Conditions', icon: Layers },
+      { id: 'core', label: 'Entity & Content', icon: Type, keywords: ['entity', 'name', 'icon', 'label', 'state', 'picture'] },
+      { id: 'visibility', label: 'Visibility', icon: ToggleRight, keywords: ['show name', 'show icon', 'show state', 'show label'] },
+      { id: 'tooltip', label: 'Tooltip', icon: MessageSquare, keywords: ['hover', 'hint'] },
     ]
   },
-  { 
-    id: 'entity', label: 'Entity', icon: Target,
+  {
+    id: 'appearance', label: 'Appearance', icon: Palette,
     sections: [
-      { id: 'core', label: 'Core Configuration', icon: Type },
-      { id: 'variables', label: 'Variables', icon: VariableIcon },
+      { id: 'presetGallery', label: 'Style Presets', icon: Wand2, keywords: ['theme', 'template'] },
+      { id: 'colors', label: 'Colors & Background', icon: Palette, keywords: ['background', 'gradient', 'color', 'opacity'] },
+      { id: 'typography', label: 'Typography', icon: Type, keywords: ['font', 'text', 'weight', 'size'] },
+      { id: 'borders', label: 'Borders & Corners', icon: BoxSelect, keywords: ['radius', 'outline', 'border'] },
+      { id: 'glass', label: 'Glass & Shadow', icon: Droplets, keywords: ['shadow', 'blur', 'depth', 'glassmorphism'] },
+      { id: 'animations', label: 'Animation', icon: Activity, keywords: ['motion', 'pulse', 'spin', 'flash', 'hover'] },
     ]
   },
   { 
     id: 'layout', label: 'Layout', icon: Grid3X3,
     sections: [
-      { id: 'dimensions', label: 'Dimensions', icon: Layout },
-      { id: 'visibility', label: 'Visibility', icon: ToggleRight },
-      { id: 'gridLayout', label: 'Grid Layout', icon: Grid3X3 },
+      { id: 'dimensions', label: 'Dimensions', icon: Layout, keywords: ['width', 'height', 'aspect ratio', 'padding'] },
+      { id: 'gridLayout', label: 'Grid & Positioning', icon: Grid3X3, keywords: ['position', 'areas', 'columns', 'rows', 'alignment'] },
     ]
   },
-  { 
-    id: 'appearance', label: 'Style', icon: Palette,
+  {
+    id: 'behavior', label: 'Behavior', icon: MousePointer,
     sections: [
-      { id: 'colors', label: 'Colors & Theming', icon: Palette },
-      { id: 'borders', label: 'Borders', icon: BoxSelect },
-      { id: 'typography', label: 'Typography', icon: Type },
-      { id: 'thresholdColors', label: 'Threshold Alerts', icon: Gauge },
-      { id: 'conditionalStyles', label: 'Conditionals', icon: GitBranch },
+      { id: 'cardActions', label: 'Tap, Hold & Double Tap', icon: MousePointer, keywords: ['tap', 'hold', 'double', 'navigate', 'service', 'javascript'] },
+      { id: 'momentaryActions', label: 'Momentary Actions', icon: Hand, keywords: ['press', 'release'] },
+      { id: 'iconActions', label: 'Icon Actions', icon: Target, keywords: ['icon tap', 'icon hold'] },
+      { id: 'confirmation', label: 'Confirmation', icon: AlertCircle, keywords: ['confirm'] },
+      { id: 'lock', label: 'Lock', icon: Lock, keywords: ['unlock', 'exemption'] },
+      { id: 'protect', label: 'PIN & Protection', icon: Shield, keywords: ['pin', 'password', 'protect'] },
     ]
   },
-  { 
-    id: 'effects', label: 'Effects', icon: Sparkles,
+  {
+    id: 'states', label: 'States', icon: Layers,
     sections: [
-      { id: 'glass', label: 'Glass & Depth', icon: Droplets },
-      { id: 'animations', label: 'Animations', icon: Activity },
-    ]
-  },
-  { 
-    id: 'actions', label: 'Actions', icon: MousePointer,
-    sections: [
-      { id: 'cardActions', label: 'Card Actions', icon: MousePointer },
-      { id: 'momentaryActions', label: 'Momentary Actions', icon: Hand },
-      { id: 'iconActions', label: 'Icon Actions', icon: Target },
+      { id: 'conditionalStyles', label: 'State-based Styling', icon: GitBranch, keywords: ['condition', 'operator', 'state style', 'conditional'] },
+      { id: 'thresholdColors', label: 'Threshold Colors', icon: Gauge, keywords: ['threshold', 'temperature', 'battery', 'range'] },
     ]
   },
   { 
     id: 'advanced', label: 'Advanced', icon: Settings,
     sections: [
-      { id: 'confirmation', label: 'Confirmation', icon: AlertCircle },
-      { id: 'lock', label: 'Lock', icon: Lock },
-      { id: 'protect', label: 'PIN/Password', icon: Shield },
-      { id: 'tooltip', label: 'Tooltip', icon: MessageSquare },
-      { id: 'customFields', label: 'Custom Fields', icon: Code },
-      { id: 'advancedSettings', label: 'Extra Settings', icon: Settings },
+      { id: 'variables', label: 'Variables', icon: VariableIcon, keywords: ['variable', 'template'] },
+      { id: 'customFields', label: 'Custom Fields', icon: Code, keywords: ['custom field', 'slot'] },
+      { id: 'advancedSettings', label: 'Raw CSS & Advanced', icon: Settings, keywords: ['css', 'extra styles', 'javascript', 'template', 'raw'] },
     ]
   },
 ];
@@ -97,9 +92,26 @@ interface NavHeaderProps {
   activePreset?: { name: string } | null;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  advancedMode: boolean;
+  onAdvancedModeChange: (enabled: boolean) => void;
 }
 
-export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset, searchQuery = '', onSearchChange }) => {
+const AdvancedModeToggle: React.FC<{ enabled: boolean; onChange: (enabled: boolean) => void }> = ({ enabled, onChange }) => (
+  <div className="ml-auto flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+    Advanced
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      onClick={() => onChange(!enabled)}
+      className={`relative h-5 w-9 rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-700'}`}
+    >
+      <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-4' : ''}`} />
+    </button>
+  </div>
+);
+
+export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset, searchQuery = '', onSearchChange, advancedMode, onAdvancedModeChange }) => {
   const currentCategory = nav.level !== 'categories'
     ? CATEGORIES.find(c => c.id === nav.categoryId)
     : null;
@@ -116,10 +128,11 @@ export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset,
             Editor
           </h2>
           {activePreset && (
-            <span className="text-xs font-normal text-purple-400 ml-auto">
+            <span className="ml-2 truncate text-xs font-normal text-purple-400">
               {activePreset.name}
             </span>
           )}
+          <AdvancedModeToggle enabled={advancedMode} onChange={onAdvancedModeChange} />
         </div>
         {onSearchChange && (
           <div className="px-3 pb-3 relative">
@@ -164,18 +177,33 @@ export const NavHeader: React.FC<NavHeaderProps> = ({ nav, goBack, activePreset,
             <span className="text-sm text-gray-400">{currentSection.label}</span>
           </>
         )}
+        <AdvancedModeToggle enabled={advancedMode} onChange={onAdvancedModeChange} />
       </div>
+      {onSearchChange && (
+        <div className="px-3 pb-3 relative">
+          <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Find a setting…"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-8 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          />
+          {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white" aria-label="Clear search"><X size={14} /></button>}
+        </div>
+      )}
     </div>
   );
 };
 
 interface CategoryListProps {
   onSelect: (categoryId: CategoryId) => void;
+  advancedMode: boolean;
 }
 
-export const CategoryList: React.FC<CategoryListProps> = ({ onSelect }) => (
+export const CategoryList: React.FC<CategoryListProps> = ({ onSelect, advancedMode }) => (
   <div className="flex-1">
-    {CATEGORIES.map((category) => {
+    {CATEGORIES.filter(category => advancedMode || category.id !== 'advanced').map((category) => {
       const Icon = category.icon;
       return (
         <button
@@ -200,9 +228,11 @@ export const CategoryList: React.FC<CategoryListProps> = ({ onSelect }) => (
 interface SectionListProps {
   categoryId: CategoryId;
   onSelect: (sectionId: SectionId) => void;
+  advancedMode: boolean;
 }
 
-export const SectionList: React.FC<SectionListProps> = ({ categoryId, onSelect }) => {
+export const SectionList: React.FC<SectionListProps> = ({ categoryId, onSelect, advancedMode }) => {
+  if (!advancedMode && categoryId === 'advanced') return null;
   const category = CATEGORIES.find(c => c.id === categoryId);
   if (!category) return null;
   
@@ -231,13 +261,18 @@ export const SectionList: React.FC<SectionListProps> = ({ categoryId, onSelect }
 interface SearchResultsProps {
   query: string;
   onSelect: (categoryId: CategoryId, sectionId: SectionId) => void;
+  advancedMode: boolean;
 }
 
-export const SearchResults: React.FC<SearchResultsProps> = ({ query, onSelect }) => {
+export const SearchResults: React.FC<SearchResultsProps> = ({ query, onSelect, advancedMode }) => {
   const normalizedQuery = query.trim().toLowerCase();
-  const results = CATEGORIES.flatMap((cat) =>
+  const results = CATEGORIES.filter(cat => advancedMode || cat.id !== 'advanced').flatMap((cat) =>
     cat.sections
-      .filter((sec) => sec.label.toLowerCase().includes(normalizedQuery) || cat.label.toLowerCase().includes(normalizedQuery))
+      .filter((sec) =>
+        sec.label.toLowerCase().includes(normalizedQuery)
+        || cat.label.toLowerCase().includes(normalizedQuery)
+        || sec.keywords?.some((keyword) => keyword.includes(normalizedQuery))
+      )
       .map((sec) => ({ category: cat, section: sec }))
   );
 
@@ -308,5 +343,10 @@ export function useNavigation() {
     setNav({ level: 'content', categoryId, sectionId });
   };
 
-  return { nav, goBack, selectCategory, selectSection, selectFromSearch, searchQuery, setSearchQuery };
+  const goHome = () => {
+    setSearchQuery('');
+    setNav({ level: 'categories' });
+  };
+
+  return { nav, goBack, goHome, selectCategory, selectSection, selectFromSearch, searchQuery, setSearchQuery };
 }

@@ -1,90 +1,36 @@
 # Getting Started
 
-## Choosing a Builder
+## Interface overview
 
-Button Builder now supports two card types:
+Button Builder has three working areas:
 
-| Builder | Card Type | Best For |
-|---------|-----------|----------|
-| **Button Card Builder** | `custom:button-card` | Highly customizable buttons with advanced styling |
-| **Bubble Card Builder** | `custom:bubble-card` | Modern, clean cards with smooth animations |
+| Area | Purpose |
+|---|---|
+| Configuration | Searchable controls grouped by content, appearance, behavior, states, and advanced options |
+| Preview | Live state simulation on a configurable dashboard backdrop |
+| YAML | Generated `custom:button-card` configuration ready to copy |
 
-Switch between builders using the **Card Type** selector at the top of the app.
+## Create a button
 
----
+1. Select a Home Assistant entity.
+2. Open **Appearance → Style Presets** and choose a starting design.
+3. For binary entities, switch between ON and OFF and customize each appearance.
+4. Use **Theme options** to keep selected controls global across both states.
+5. Configure actions and any advanced behavior.
+6. Copy the generated YAML.
+7. Paste it into a Home Assistant **Manual** dashboard card.
 
-## Button Card Builder
+## Effect intensity
 
-### Interface Overview
+Supported visual effects provide a 25–200% intensity slider. The slider changes the defining visual amplitude: liquid corners stretch farther, rings travel farther, glow expands, particles move farther, and distortion becomes stronger. A value of 100% preserves the original effect.
 
-Button Builder has three main panels:
+## Preview tips
 
-| Panel | Description |
-|-------|-------------|
-| **Editor** (Left) | Configuration options organized in collapsible sections |
-| **Preview** (Center) | Live preview of your button |
-| **YAML** (Right) | Generated button-card YAML code |
+- Click the state control to simulate ON/OFF behavior.
+- Use the palette menu to match the dashboard background.
+- Select **Blur Test Pattern** and lower card background opacity to inspect backdrop blur.
+- Use layout and zoom controls to test different card sizes.
 
-### Creating Your First Button
+## Version 3 builder scope
 
-#### Step 1: Select an Entity
-
-1. In the **Core Configuration** section, click the Entity dropdown
-2. Search or browse your entities
-3. Select an entity (e.g., `light.living_room`)
-4. The name and icon will auto-fill based on the entity
-
-#### Step 2: Choose a Style
-
-1. Click **Presets** in the header
-2. Browse categories: Minimal, Glass, Neon, Gradient, etc.
-3. Click any preset to apply it instantly
-
-#### Step 3: Customize
-
-Adjust any settings you want:
-- **Colors** - Background, icon, text colors
-- **Layout** - Vertical, horizontal, icon positions
-- **Visibility** - Show/hide name, state, icon, label
-
-#### Step 4: Copy the YAML
-
-1. Look at the YAML panel on the right
-2. Click **Copy** to copy the generated code
-3. Paste it into your Home Assistant dashboard
-
----
-
-## Bubble Card Builder (Beta)
-
-See the dedicated [[Bubble Card Builder]] page for detailed documentation.
-
-### Quick Start
-
-1. Switch to **custom:bubble-card** using the card type selector
-2. Choose a **Card Type** (Button, Separator, Pop-up, etc.)
-3. Configure the options for your chosen card type
-4. Copy the generated YAML
-
----
-
-## Using the Generated YAML
-
-### In Dashboard UI
-
-1. Go to your Home Assistant dashboard
-2. Click the **⋮** menu → **Edit Dashboard**
-3. Click **+ Add Card**
-4. Scroll down and select **Manual**
-5. Paste your copied YAML
-6. Click **Save**
-
-### In YAML Mode
-
-If you edit dashboards in YAML mode, paste the button configuration directly into your view's `cards:` section.
-
-## Tips
-
-- **Preview Size**: Use the gear icon in the preview to adjust card size and see how it looks in different dashboard layouts
-- **Click Preview**: Click the preview button to toggle between ON/OFF states
-- **Canvas Color**: Change the preview background to match your dashboard theme
+Bubble Card, Tile Card, and other builders are planned as separate integrations. They are no longer selected inside this integration.

@@ -6,11 +6,15 @@ import { ConfigPanel } from './components/ConfigPanel';
 import { PreviewCard } from './components/PreviewCard';
 import { YamlViewer } from './components/YamlViewer';
 import { MagicBuilder } from './components/MagicBuilder';
-import { ButtonConfig, DEFAULT_CONFIG, StateStyleConfig, StateAppearanceConfig, DEFAULT_STATE_APPEARANCE, SavedButtonRecord } from './types';
+import { ButtonConfig, DEFAULT_CONFIG, StateAppearanceConfig, SavedButtonRecord } from './types';
 import { generateYaml } from './utils/yamlGenerator';
+import { mergeStateAppearance, appearanceFromConfig, appearanceToStateStyle, extractAppearance, migrateLegacyStateColors } from './utils/stateAppearance';
+import { SavedTheme } from './types';
+import { loadThemes, persistThemes, buildThemeValues, expandThemeKeys } from './utils/themes';
+import { ThemeChooserModal } from './components/ThemeChooserModal';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, AlertTriangle } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, AlertTriangle, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, MoreHorizontal, Copy, Check, Key, ArrowRightLeft, Eraser, Palette } from 'lucide-react';
 import { hasOnOffState } from './utils/entityCapabilities';
 import { checkButtonBuilderEnvironment, ButtonBuilderEnvironmentReport } from './services/dashboardService';
 import { APP_VERSION_LABEL } from './version';
@@ -18,20 +22,55 @@ import { cloneSnapshot, useToast, Toast, useResetConfirm, SaveRecordMetadata } f
 import { SaveRecordModal } from './shared/SaveRecordModal';
 import { LibraryModal } from './shared/LibraryModal';
 
-export type PresetCondition = 'always' | 'on' | 'off';
-
-export interface PresetState {
-  preset: Preset | null;
-  condition: PresetCondition;
-  offStatePreset: Preset | null;
-  onStatePreset: Preset | null;
-}
-
 import logo from './assets/logo.png';
 
 const STORAGE_KEY = 'button-builder-config';
+const STATE_DESIGN_STORAGE_KEY = 'button-builder-state-design';
 const CUSTOM_PRESETS_STORAGE_KEY = 'button-builder-custom-presets';
 const SAVED_BUTTONS_STORAGE_KEY = 'button-builder-saved-buttons';
+const ADVANCED_MODE_STORAGE_KEY = 'button-builder-advanced-mode';
+
+const buildDefaultOffAppearance = (config: ButtonConfig): Partial<StateAppearanceConfig> => {
+  const color = config.backgroundColor;
+  if (!color) return { backgroundColorOpacity: 55 };
+
+  const match = color.match(/^#([0-9a-f]{6})$/i);
+  if (!match) {
+    return {
+      backgroundColor: color,
+      backgroundColorOpacity: Math.max(20, Math.round((config.backgroundColorOpacity ?? 100) * 0.55)),
+    };
+  }
+
+  const value = match[1];
+  const channel = (offset: number) => Math.round(parseInt(value.slice(offset, offset + 2), 16) * 0.4)
+    .toString(16)
+    .padStart(2, '0');
+  return { backgroundColor: `#${channel(0)}${channel(2)}${channel(4)}` };
+};
+
+const loadStateDesign = (): {
+  editingState: 'on' | 'off';
+  onAppearance: Partial<StateAppearanceConfig>;
+  offAppearance: Partial<StateAppearanceConfig>;
+  hasSavedDesign: boolean;
+} => {
+  try {
+    const saved = localStorage.getItem(STATE_DESIGN_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        editingState: parsed.editingState === 'off' ? 'off' : 'on',
+        onAppearance: parsed.onAppearance && typeof parsed.onAppearance === 'object' ? parsed.onAppearance : {},
+        offAppearance: parsed.offAppearance && typeof parsed.offAppearance === 'object' ? parsed.offAppearance : {},
+        hasSavedDesign: true,
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to load state design:', error);
+  }
+  return { editingState: 'on', onAppearance: {}, offAppearance: {}, hasSavedDesign: false };
+};
 
 const deriveButtonName = (config: ButtonConfig, fallbackIndex?: number): string => {
   const fromName = config.name.trim();
@@ -106,11 +145,11 @@ const loadSavedButtons = (): SavedButtonRecord[] => {
         tags: Array.isArray(button.tags) ? button.tags.filter((tag: unknown) => typeof tag === 'string') : [],
         yaml: typeof button.yaml === 'string' ? button.yaml : '',
         config: { ...DEFAULT_CONFIG, ...(button.config || {}) },
-        presetCondition: button.presetCondition === 'on' || button.presetCondition === 'off' ? button.presetCondition : 'always',
         useAutoDarkMode: button.useAutoDarkMode !== false,
         activePresetId: typeof button.activePresetId === 'string' ? button.activePresetId : null,
-        offStatePresetId: typeof button.offStatePresetId === 'string' ? button.offStatePresetId : null,
-        onStatePresetId: typeof button.onStatePresetId === 'string' ? button.onStatePresetId : null,
+        legacyPresetCondition: button.presetCondition === 'on' || button.presetCondition === 'off' ? button.presetCondition : 'always',
+        legacyOffStatePresetId: typeof button.offStatePresetId === 'string' ? button.offStatePresetId : null,
+        legacyOnStatePresetId: typeof button.onStatePresetId === 'string' ? button.onStatePresetId : null,
         onStateAppearance: button.onStateAppearance && typeof button.onStateAppearance === 'object' ? button.onStateAppearance : {},
         offStateAppearance: button.offStateAppearance && typeof button.offStateAppearance === 'object' ? button.offStateAppearance : {},
         createdAt: typeof button.createdAt === 'number' ? button.createdAt : Date.now(),
@@ -129,19 +168,46 @@ const isSamePreset = (a: Preset | null, b: Preset | null): boolean => {
 };
 
 export const ButtonCardApp: React.FC = () => {
-  const [config, setConfigInternal] = useState<ButtonConfig>(loadSavedConfig);
+  // Migrate legacy state-color / icon-spin fields from persisted config into the
+  // per-state appearance model on first load, so old buttons keep their look.
+  const initialStateDesign = useMemo(loadStateDesign, []);
+  const initialMigrated = useMemo(() => {
+    const loadedConfig = loadSavedConfig();
+    const migrated = migrateLegacyStateColors(
+      loadedConfig,
+      initialStateDesign.onAppearance,
+      initialStateDesign.offAppearance,
+    );
+    if (!initialStateDesign.hasSavedDesign && hasOnOffState(loadedConfig.entity)) {
+      migrated.offApp = { ...buildDefaultOffAppearance(loadedConfig), ...migrated.offApp };
+    }
+    return migrated;
+  }, [initialStateDesign]);
+  const [config, setConfigInternal] = useState<ButtonConfig>(initialMigrated.config);
   const [isMagicOpen, setIsMagicOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importYaml, setImportYaml] = useState('');
   const [importError, setImportError] = useState('');
   const [mobileTab, setMobileTab] = useState<'preview' | 'config' | 'yaml'>('preview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [simulatedState, setSimulatedState] = useState<'on' | 'off'>('on');
+  const [desktopConfigOpen, setDesktopConfigOpen] = useState(true);
+  const [desktopYamlOpen, setDesktopYamlOpen] = useState(false);
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
+  const [desktopConfigWidth, setDesktopConfigWidth] = useState(() =>
+    Math.max(620, Math.round(window.innerWidth * 0.62))
+  );
+  const [yamlCopied, setYamlCopied] = useState(false);
+  const [openMagicToApiKey, setOpenMagicToApiKey] = useState(false);
+  const [simulatedState, setSimulatedState] = useState<'on' | 'off'>(initialStateDesign.editingState);
   const [activePreset, setActivePreset] = useState<Preset | null>(null);
-  const [presetCondition, setPresetCondition] = useState<PresetCondition>('always');
-  const [offStatePreset, setOffStatePreset] = useState<Preset | null>(null);
-  const [onStatePreset, setOnStatePreset] = useState<Preset | null>(null);
   const [customPresets, setCustomPresets] = useState<Preset[]>(loadCustomPresets);
+  const [themes, setThemes] = useState<SavedTheme[]>(loadThemes);
+  const [themeChooserOpen, setThemeChooserOpen] = useState(
+    () => !initialStateDesign.hasSavedDesign && !localStorage.getItem(STORAGE_KEY)
+  );
+  const [advancedMode, setAdvancedMode] = useState(
+    () => localStorage.getItem(ADVANCED_MODE_STORAGE_KEY) === 'true'
+  );
   const [savedButtons, setSavedButtons] = useState<SavedButtonRecord[]>(loadSavedButtons);
   const [queuedButtons, setQueuedButtons] = useState<SavedButtonRecord[]>([]);
   const [showButtonLibrary, setShowButtonLibrary] = useState(false);
@@ -149,8 +215,8 @@ export const ButtonCardApp: React.FC = () => {
   const [showRequirementsPrompt, setShowRequirementsPrompt] = useState(false);
   const [saveModalState, setSaveModalState] = useState<SaveModalState>(null);
   const [useAutoDarkMode, setUseAutoDarkMode] = useState<boolean>(true);
-  const [onStateAppearance, setOnStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
-  const [offStateAppearance, setOffStateAppearance] = useState<Partial<StateAppearanceConfig>>({});
+  const [onStateAppearance, setOnStateAppearance] = useState<Partial<StateAppearanceConfig>>(initialMigrated.onApp);
+  const [offStateAppearance, setOffStateAppearance] = useState<Partial<StateAppearanceConfig>>(initialMigrated.offApp);
   const { toastMessage, showToast } = useToast();
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
@@ -207,6 +273,8 @@ export const ButtonCardApp: React.FC = () => {
   // Keyboard listener registered once — stable because handleUndo/handleRedo never change.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
       if ((e.ctrlKey || e.metaKey) && !e.altKey) {
         if (e.key === 'z' && !e.shiftKey) {
           e.preventDefault();
@@ -244,23 +312,6 @@ export const ButtonCardApp: React.FC = () => {
   const setConfig: React.Dispatch<React.SetStateAction<ButtonConfig>> = (action) => {
     if (!isApplyingPresetRef.current && activePreset) {
       setActivePreset(null);
-      if (presetCondition !== 'always' && activePreset.config.extraStyles) {
-        setConfigInternal(prev => {
-          const result = typeof action === 'function' ? action(prev) : action;
-          if (!isUndoRedoRef.current) {
-            if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
-            historyDebounceRef.current = setTimeout(() => {
-              if (JSON.stringify(result) !== JSON.stringify(lastSavedConfigRef.current)) {
-                setHistoryPast(p => [...p, lastSavedConfigRef.current].slice(-MAX_HISTORY));
-                setHistoryFuture([]);
-                lastSavedConfigRef.current = result;
-              }
-            }, 500);
-          }
-          return { ...result, extraStyles: '' };
-        });
-        return;
-      }
     }
 
     setConfigInternal(prev => {
@@ -293,6 +344,21 @@ export const ButtonCardApp: React.FC = () => {
   }, [config]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(STATE_DESIGN_STORAGE_KEY, JSON.stringify({
+          editingState: simulatedState,
+          onAppearance: onStateAppearance,
+          offAppearance: offStateAppearance,
+        }));
+      } catch (error) {
+        console.warn('Failed to save state design:', error);
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [simulatedState, onStateAppearance, offStateAppearance]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(customPresets));
     } catch (e) {
@@ -302,11 +368,23 @@ export const ButtonCardApp: React.FC = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(SAVED_BUTTONS_STORAGE_KEY, JSON.stringify(savedButtons));
+      const recordsWithoutLegacyPresetMetadata = savedButtons.map(({
+        legacyPresetCondition: _legacyCondition,
+        legacyOffStatePresetId: _legacyOff,
+        legacyOnStatePresetId: _legacyOn,
+        ...record
+      }) => record);
+      localStorage.setItem(SAVED_BUTTONS_STORAGE_KEY, JSON.stringify(recordsWithoutLegacyPresetMetadata));
     } catch (e) {
       console.warn('Failed to save button library:', e);
     }
   }, [savedButtons]);
+
+  useEffect(() => { persistThemes(themes); }, [themes]);
+
+  useEffect(() => {
+    localStorage.setItem(ADVANCED_MODE_STORAGE_KEY, String(advancedMode));
+  }, [advancedMode]);
 
   // Only re-check when the entity changes, not on every config keypress.
   useEffect(() => {
@@ -332,193 +410,48 @@ export const ButtonCardApp: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.entity]);
 
-  const configWithPresetConditions = useMemo(() => {
-    const supportsBinaryPresetConditions = hasOnOffState(config.entity);
-    if (!supportsBinaryPresetConditions || presetCondition === 'always' || !activePreset) {
-      return config;
-    }
-
-    const newConfig = { ...config };
-    const newStateStyles = [...(config.stateStyles || [])];
-
-    const presetBgColor = activePreset.config.backgroundColor || '';
-    const activePresetUsesAdvancedBackground =
-      !!activePreset.config.extraStyles || !!activePreset.config.gradientEnabled;
-    const secondaryPreset = presetCondition === 'on' ? offStatePreset : onStatePreset;
-    const secondaryBgColor = secondaryPreset?.config.backgroundColor || '';
-    const secondaryPresetUsesAdvancedBackground =
-      !!secondaryPreset?.config.extraStyles || !!secondaryPreset?.config.gradientEnabled;
-
-    if (presetCondition === 'on') {
-      if (!config.stateOnColor && presetBgColor && !activePresetUsesAdvancedBackground) {
-        newConfig.stateOnColor = presetBgColor;
-        newConfig.stateOnOpacity = activePreset.config.backgroundColorOpacity ?? 100;
-      }
-      if (secondaryPreset && !config.stateOffColor && secondaryBgColor && !secondaryPresetUsesAdvancedBackground) {
-        newConfig.stateOffColor = secondaryBgColor;
-        newConfig.stateOffOpacity = secondaryPreset.config.backgroundColorOpacity ?? 100;
-      }
-    } else {
-      if (!config.stateOffColor && presetBgColor && !activePresetUsesAdvancedBackground) {
-        newConfig.stateOffColor = presetBgColor;
-        newConfig.stateOffOpacity = activePreset.config.backgroundColorOpacity ?? 100;
-      }
-      if (secondaryPreset && !config.stateOnColor && secondaryBgColor && !secondaryPresetUsesAdvancedBackground) {
-        newConfig.stateOnColor = secondaryBgColor;
-        newConfig.stateOnOpacity = secondaryPreset.config.backgroundColorOpacity ?? 100;
-      }
-    }
-
-    newConfig.extraStyles = '';
-
-    if (newConfig.cardAnimation && newConfig.cardAnimation !== 'none') {
-      newConfig.cardAnimationTrigger = presetCondition;
-    }
-    if (newConfig.iconAnimation && newConfig.iconAnimation !== 'none') {
-      newConfig.iconAnimationTrigger = presetCondition;
-    }
-
-    const mainStyle: StateStyleConfig = {
-      id: `preset-main-${presetCondition}`,
-      operator: 'equals',
-      value: presetCondition,
-      name: '',
-      icon: activePreset.config.icon || '',
-      color: '',
-      entityPicture: '',
-      label: '',
-      stateDisplay: '',
-      spin: false,
-      styles: activePreset.config.extraStyles || '',
-      backgroundColor: '',
-      iconColor: activePreset.config.iconColor || '',
-      nameColor: activePreset.config.nameColor || '',
-      stateColor: '',
-      labelColor: activePreset.config.labelColor || '',
-      borderColor: activePreset.config.borderColor || '',
-      cardAnimation: activePreset.config.cardAnimation || 'none',
-      cardAnimationSpeed: activePreset.config.cardAnimationSpeed || '2s',
-      iconAnimation: activePreset.config.iconAnimation || 'none',
-      iconAnimationSpeed: activePreset.config.iconAnimationSpeed || '2s',
+  // Merged ON/OFF appearances: base-config appearance (shared/theme look) as the seed,
+  // overlaid with the per-state manual override buffers. `null` for non-binary entities
+  // (appearance lives entirely on the base config there).
+  const mergedStateAppearances = useMemo(() => {
+    if (!hasOnOffState(config.entity)) return null;
+    const seed = appearanceFromConfig(config);
+    return {
+      on: mergeStateAppearance(seed, onStateAppearance),
+      off: mergeStateAppearance(seed, offStateAppearance),
     };
-    newStateStyles.push(mainStyle);
-
-    if (secondaryPreset) {
-      const oppositeState = presetCondition === 'on' ? 'off' : 'on';
-      const secondaryStyle: StateStyleConfig = {
-        id: `preset-secondary-${oppositeState}`,
-        operator: 'equals',
-        value: oppositeState,
-        name: '',
-        icon: secondaryPreset.config.icon || '',
-        color: '',
-        entityPicture: '',
-        label: '',
-        stateDisplay: '',
-        spin: false,
-        styles: secondaryPreset.config.extraStyles || '',
-        backgroundColor: '',
-        iconColor: secondaryPreset.config.iconColor || '',
-        nameColor: secondaryPreset.config.nameColor || '',
-        stateColor: '',
-        labelColor: secondaryPreset.config.labelColor || '',
-        borderColor: secondaryPreset.config.borderColor || '',
-        cardAnimation: secondaryPreset.config.cardAnimation || 'none',
-        cardAnimationSpeed: secondaryPreset.config.cardAnimationSpeed || '2s',
-        iconAnimation: secondaryPreset.config.iconAnimation || 'none',
-        iconAnimationSpeed: secondaryPreset.config.iconAnimationSpeed || '2s',
-      };
-      newStateStyles.push(secondaryStyle);
-    }
-
-    newConfig.stateStyles = newStateStyles;
-    return newConfig;
-  }, [config, presetCondition, activePreset, offStatePreset, onStatePreset]);
+  }, [config, onStateAppearance, offStateAppearance]);
 
   const finalConfig = useMemo(() => {
-    let result = { ...configWithPresetConditions };
-    const stateStyles = [...(result.stateStyles || [])];
-    const supportsBinaryStateAppearance = hasOnOffState(configWithPresetConditions.entity);
+    const result = { ...config };
+    // Drop any legacy synthetic state records (preset-generated or prior
+    // state-appearance-*). The user's advanced Conditional Styles are preserved.
+    const userStyles = (result.stateStyles || []).filter(
+      s => !String(s.id || '').startsWith('state-appearance-') && !String(s.id || '').startsWith('preset-')
+    );
 
-    const hasAppearanceValues = (appearance: Partial<StateAppearanceConfig>): boolean => {
-      return Object.entries(appearance).some(([key, value]) => {
-        if (key === 'backgroundColorOpacity' || key === 'gradientOpacity') {
-          return value !== undefined && value !== 100;
-        }
-        if (key === 'shadowOpacity' || key === 'gradientAngle') {
-          return false;
-        }
-        if (key === 'gradientEnabled' || key === 'gradientColor3Enabled') {
-          return value === true;
-        }
-        return value !== '' && value !== 'none' && value !== undefined && value !== null;
-      });
-    };
-
-    const createStateStyle = (appearance: Partial<StateAppearanceConfig>, stateValue: 'on' | 'off'): StateStyleConfig => {
-      return {
-        id: `state-appearance-${stateValue}`,
-        operator: 'equals',
-        value: stateValue,
-        name: '',
-        icon: '',
-        color: appearance.color || '',
-        entityPicture: '',
-        label: '',
-        stateDisplay: '',
-        spin: false,
-        styles: appearance.extraStyles || '',
-        backgroundColor: appearance.backgroundColor || '',
-        backgroundColorOpacity: appearance.backgroundColorOpacity ?? 100,
-        iconColor: appearance.iconColor || '',
-        nameColor: appearance.nameColor || '',
-        stateColor: appearance.stateColor || '',
-        labelColor: appearance.labelColor || '',
-        borderColor: appearance.borderColor || '',
-        cardAnimation: appearance.cardAnimation || 'none',
-        cardAnimationSpeed: appearance.cardAnimationSpeed || '2s',
-        iconAnimation: appearance.iconAnimation || 'none',
-        iconAnimationSpeed: appearance.iconAnimationSpeed || '2s',
-        gradientEnabled: appearance.gradientEnabled || false,
-        gradientType: appearance.gradientType || DEFAULT_STATE_APPEARANCE.gradientType,
-        gradientAngle: appearance.gradientAngle ?? DEFAULT_STATE_APPEARANCE.gradientAngle,
-        gradientColor1: appearance.gradientColor1 || DEFAULT_STATE_APPEARANCE.gradientColor1,
-        gradientColor2: appearance.gradientColor2 || DEFAULT_STATE_APPEARANCE.gradientColor2,
-        gradientColor3: appearance.gradientColor3 || DEFAULT_STATE_APPEARANCE.gradientColor3,
-        gradientColor3Enabled: appearance.gradientColor3Enabled || false,
-        gradientOpacity: appearance.gradientOpacity ?? DEFAULT_STATE_APPEARANCE.gradientOpacity,
-      };
-    };
-
-    if (supportsBinaryStateAppearance && hasAppearanceValues(onStateAppearance)) {
-      const filtered = stateStyles.filter(s => !s.id.startsWith('state-appearance-on'));
-      filtered.push(createStateStyle(onStateAppearance, 'on'));
-      result.stateStyles = filtered;
-    }
-
-    if (supportsBinaryStateAppearance && hasAppearanceValues(offStateAppearance)) {
-      const currentStyles = result.stateStyles || stateStyles;
-      const filtered = currentStyles.filter(s => !s.id.startsWith('state-appearance-off'));
-      filtered.push(createStateStyle(offStateAppearance, 'off'));
-      result.stateStyles = filtered;
-    }
-
-    if (!supportsBinaryStateAppearance) {
-      result.stateStyles = (result.stateStyles || stateStyles).filter(
-        s => !s.id.startsWith('state-appearance-on') && !s.id.startsWith('state-appearance-off')
-      );
-      if (result.cardAnimationTrigger !== 'always') {
-        result.cardAnimationTrigger = 'always';
-      }
-      if (result.iconAnimationTrigger !== 'always') {
-        result.iconAnimationTrigger = 'always';
-      }
+    if (mergedStateAppearances) {
+      // Inject synthetic merged ON/OFF entries so the live preview (which resolves
+      // per-state styling from config.stateStyles) reflects the merged appearance.
+      // The YAML generator emits from mergedStateAppearances and skips these.
+      result.stateStyles = [
+        ...userStyles,
+        appearanceToStateStyle(mergedStateAppearances.on, 'on'),
+        appearanceToStateStyle(mergedStateAppearances.off, 'off'),
+      ];
+    } else {
+      result.stateStyles = userStyles;
+      if (result.cardAnimationTrigger !== 'always') result.cardAnimationTrigger = 'always';
+      if (result.iconAnimationTrigger !== 'always') result.iconAnimationTrigger = 'always';
     }
 
     return result;
-  }, [configWithPresetConditions, onStateAppearance, offStateAppearance]);
+  }, [config, mergedStateAppearances]);
 
-  const yamlOutput = useMemo(() => generateYaml(finalConfig), [finalConfig]);
+  const yamlOutput = useMemo(
+    () => generateYaml(finalConfig, mergedStateAppearances),
+    [finalConfig, mergedStateAppearances]
+  );
 
   const createButtonRecord = (metadata?: Partial<SaveRecordMetadata>): SavedButtonRecord => {
     const timestamp = Date.now();
@@ -529,11 +462,8 @@ export const ButtonCardApp: React.FC = () => {
       tags: metadata?.tags || [],
       yaml: yamlOutput,
       config: cloneSnapshot(config),
-      presetCondition,
       useAutoDarkMode,
       activePresetId: activePreset?.id || null,
-      offStatePresetId: offStatePreset?.id || null,
-      onStatePresetId: onStatePreset?.id || null,
       onStateAppearance: cloneSnapshot(onStateAppearance),
       offStateAppearance: cloneSnapshot(offStateAppearance),
       createdAt: timestamp,
@@ -558,18 +488,37 @@ export const ButtonCardApp: React.FC = () => {
   };
 
   const handleLoadButtonRecord = (record: SavedButtonRecord) => {
-    const nextConfig = cloneSnapshot(record.config);
+    // Migrate legacy state colors / icon spin into the per-state model on load.
+    const migrated = migrateLegacyStateColors(
+      cloneSnapshot(record.config),
+      cloneSnapshot(record.onStateAppearance || {}),
+      cloneSnapshot(record.offStateAppearance || {}),
+    );
+    const active = resolveSavedPreset(record.activePresetId);
+    const legacyCondition = record.legacyPresetCondition;
+    if (legacyCondition === 'on' && Object.keys(migrated.onApp).length === 0 && active) {
+      migrated.onApp = extractAppearance(active.config);
+    } else if (legacyCondition === 'off' && Object.keys(migrated.offApp).length === 0 && active) {
+      migrated.offApp = extractAppearance(active.config);
+    }
+    if (Object.keys(migrated.offApp).length === 0) {
+      const legacyOffPreset = resolveSavedPreset(record.legacyOffStatePresetId || null);
+      if (legacyOffPreset) migrated.offApp = extractAppearance(legacyOffPreset.config);
+    }
+    if (Object.keys(migrated.onApp).length === 0) {
+      const legacyOnPreset = resolveSavedPreset(record.legacyOnStatePresetId || null);
+      if (legacyOnPreset) migrated.onApp = extractAppearance(legacyOnPreset.config);
+    }
+
+    const nextConfig = migrated.config;
     setConfigInternal(nextConfig);
     lastSavedConfigRef.current = nextConfig;
     setHistoryPast([]);
     setHistoryFuture([]);
-    setActivePreset(resolveSavedPreset(record.activePresetId));
-    setPresetCondition(record.presetCondition);
-    setOffStatePreset(resolveSavedPreset(record.offStatePresetId));
-    setOnStatePreset(resolveSavedPreset(record.onStatePresetId));
+    setActivePreset(active);
     setUseAutoDarkMode(record.useAutoDarkMode);
-    setOnStateAppearance(cloneSnapshot(record.onStateAppearance || {}));
-    setOffStateAppearance(cloneSnapshot(record.offStateAppearance || {}));
+    setOnStateAppearance(migrated.onApp);
+    setOffStateAppearance(migrated.offApp);
     setShowButtonLibrary(false);
   };
 
@@ -642,64 +591,93 @@ export const ButtonCardApp: React.FC = () => {
   const { resetConfirmPending, handleReset } = useResetConfirm(() => {
     setConfig(DEFAULT_CONFIG);
     setActivePreset(null);
-    setPresetCondition('always');
-    setOffStatePreset(null);
-    setOnStatePreset(null);
     setUseAutoDarkMode(true);
     setOnStateAppearance({});
-    setOffStateAppearance({});
+    setOffStateAppearance(buildDefaultOffAppearance(DEFAULT_CONFIG));
+    setSimulatedState('on');
     localStorage.removeItem(STORAGE_KEY);
+    // New button: prompt the theme chooser so the user can pick which appearance
+    // controls stay global for this build.
+    setThemeChooserOpen(true);
   });
 
-  const handleApplyPreset = (preset: Preset, forState?: 'on' | 'off') => {
-    const supportsBinaryPresetConditions = hasOnOffState(config.entity);
-    if (forState === 'off') {
-      setOffStatePreset(preset);
-      setUseAutoDarkMode(false);
-    } else if (forState === 'on') {
-      setOnStatePreset(preset);
-    } else {
-      isApplyingPresetRef.current = true;
-      setConfigInternal(prev => ({
-        ...DEFAULT_CONFIG,
-        entity: prev.entity,
-        name: prev.name,
-        label: prev.label,
-        icon: prev.icon,
-        stateOnColor: '',
-        stateOffColor: '',
-        ...preset.config
-      }));
-      setActivePreset(preset);
-      setPresetCondition('always');
-      isApplyingPresetRef.current = false;
+  const handleApplyPreset = (preset: Preset) => {
+    const isBinary = hasOnOffState(config.entity);
+    // Split the preset into appearance (per-state) vs. non-appearance (base config).
+    const presetAppearance = extractAppearance(preset.config);
+    const applyBaseFields = (base: Partial<StateAppearanceConfig>) => {
+      // Non-appearance fields (layout/content/behavior + templates) go to base config.
+      const nonAppearance: Partial<ButtonConfig> = { ...preset.config };
+      Object.keys(base).forEach(k => { delete (nonAppearance as Record<string, unknown>)[k]; });
+      return nonAppearance;
+    };
 
-      if (useAutoDarkMode && supportsBinaryPresetConditions) {
-        const darkPreset = generateDarkModePreset(preset);
-        setOffStatePreset(darkPreset);
-      } else if (!supportsBinaryPresetConditions) {
-        setPresetCondition('always');
-        setOffStatePreset(null);
-        setOnStatePreset(null);
+    // Appearance goes to the currently-active editing state; the
+    // non-appearance fields refresh the base config.
+    isApplyingPresetRef.current = true;
+    setConfigInternal(prev => ({
+      ...prev,
+      ...(isBinary ? applyBaseFields(presetAppearance) : preset.config),
+    }));
+    setActivePreset(preset);
+    isApplyingPresetRef.current = false;
+
+    const targetState = simulatedState;
+    if (isBinary) {
+      if (targetState === 'on') {
+        setOnStateAppearance(prev => ({ ...prev, ...presetAppearance }));
+      } else {
+        setOffStateAppearance(prev => ({ ...prev, ...presetAppearance }));
       }
+    }
 
-      setOnStatePreset(null);
+    // Auto-dark seeds the OFF appearance from the preset when editing ON.
+    if (isBinary && useAutoDarkMode && targetState === 'on') {
+      const darkPreset = generateDarkModePreset(preset);
+      setOffStateAppearance(prev => ({ ...prev, ...extractAppearance(darkPreset.config) }));
     }
   };
 
   const handleResetToPreset = () => {
-    if (activePreset) {
-      isApplyingPresetRef.current = true;
-      setConfigInternal(prev => ({ ...prev, ...activePreset.config }));
-      isApplyingPresetRef.current = false;
+    if (!activePreset) return;
+    const isBinary = hasOnOffState(config.entity);
+    const presetAppearance = extractAppearance(activePreset.config);
+    const nonAppearance: Partial<ButtonConfig> = { ...activePreset.config };
+    Object.keys(presetAppearance).forEach(key => {
+      delete (nonAppearance as Record<string, unknown>)[key];
+    });
+    isApplyingPresetRef.current = true;
+    setConfigInternal(prev => ({ ...prev, ...(isBinary ? nonAppearance : activePreset.config) }));
+    isApplyingPresetRef.current = false;
+    if (isBinary && simulatedState === 'on') {
+      setOnStateAppearance(prev => ({ ...prev, ...presetAppearance }));
+      if (useAutoDarkMode) {
+        setOffStateAppearance(prev => ({
+          ...prev,
+          ...extractAppearance(generateDarkModePreset(activePreset).config),
+        }));
+      }
+    } else if (isBinary) {
+      setOffStateAppearance(prev => ({ ...prev, ...presetAppearance }));
     }
   };
 
   const handlePresetConfigChange = (updates: Partial<ButtonConfig>) => {
     if (!activePreset) return;
 
+    const isBinary = hasOnOffState(config.entity);
+    const appearanceUpdates = extractAppearance(updates);
+    const baseUpdates: Partial<ButtonConfig> = { ...updates };
+    Object.keys(appearanceUpdates).forEach(key => {
+      if (isBinary && !(config.themeKeys || []).includes(key)) {
+        delete (baseUpdates as Record<string, unknown>)[key];
+      }
+    });
+
     isApplyingPresetRef.current = true;
-    setConfig(prev => ({ ...prev, ...updates }));
+    if (Object.keys(baseUpdates).length > 0) {
+      setConfig(prev => ({ ...prev, ...baseUpdates }));
+    }
 
     const nextPreset: Preset = {
       ...activePreset,
@@ -707,8 +685,19 @@ export const ButtonCardApp: React.FC = () => {
     };
     setActivePreset(nextPreset);
 
-    if (presetCondition === 'on' && useAutoDarkMode && (offStatePreset?.isAutoDark ?? true)) {
-      setOffStatePreset(generateDarkModePreset(nextPreset));
+    // Live edits to appearance fields also flow into the active state buffer.
+    const stateAppearanceUpdates = Object.fromEntries(
+      Object.entries(appearanceUpdates).filter(([key]) => isBinary && !(config.themeKeys || []).includes(key))
+    ) as Partial<StateAppearanceConfig>;
+    if (Object.keys(stateAppearanceUpdates).length > 0) {
+      if (simulatedState === 'on') {
+        setOnStateAppearance(prev => ({ ...prev, ...stateAppearanceUpdates }));
+        if (useAutoDarkMode) {
+          setOffStateAppearance(prev => ({ ...prev, ...extractAppearance(generateDarkModePreset(nextPreset).config) }));
+        }
+      } else {
+        setOffStateAppearance(prev => ({ ...prev, ...stateAppearanceUpdates }));
+      }
     }
 
     isApplyingPresetRef.current = false;
@@ -724,12 +713,19 @@ export const ButtonCardApp: React.FC = () => {
       return { ok: false, error: `A preset named "${normalizedName}" already exists.` };
     }
 
+    const stateStyleSource = mergedStateAppearances
+      ? {
+          ...config,
+          ...mergedStateAppearances[simulatedState],
+          borderStyle: mergedStateAppearances[simulatedState].borderStyle || config.borderStyle,
+        }
+      : config;
     const preset: Preset = {
       id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: normalizedName,
       description: description.trim() || 'Custom saved style',
       category: 'custom',
-      config: buildStylePresetConfig(config),
+      config: buildStylePresetConfig(stateStyleSource as ButtonConfig),
       isUserPreset: true,
     };
 
@@ -741,9 +737,123 @@ export const ButtonCardApp: React.FC = () => {
     if (!preset.isUserPreset) return;
     setCustomPresets(prev => prev.filter(p => !isSamePreset(p, preset)));
     if (isSamePreset(activePreset, preset)) setActivePreset(null);
-    if (isSamePreset(offStatePreset, preset)) setOffStatePreset(null);
-    if (isSamePreset(onStatePreset, preset)) setOnStatePreset(null);
   };
+
+  // ---- Theme system ----
+
+  // Change which appearance controls are global (theme). Migrates values across the
+  // global<->per-state boundary so nothing visually jumps:
+  //  - becoming global: promote the active editing state's value to base config
+  //  - becoming per-state: seed both ON/OFF buffers from the base value
+  const handleSetThemeKeys = (primaryKeys: string[]) => {
+    const nextKeys = expandThemeKeys(primaryKeys);
+    const prevKeys = config.themeKeys || [];
+    const becameGlobal = nextKeys.filter(k => !prevKeys.includes(k));
+    const becamePerState = prevKeys.filter(k => !nextKeys.includes(k));
+
+    const activeBuffer = simulatedState === 'on' ? onStateAppearance : offStateAppearance;
+    const baseUpdates: Record<string, unknown> = {};
+
+    // Promote active-state overrides to the base config for controls becoming global.
+    becameGlobal.forEach(key => {
+      if (Object.prototype.hasOwnProperty.call(activeBuffer, key)) {
+        baseUpdates[key] = (activeBuffer as Record<string, unknown>)[key];
+      }
+    });
+
+    setConfigInternal(prev => ({ ...prev, ...baseUpdates, themeKeys: nextKeys }));
+
+    if (becameGlobal.length > 0) {
+      const clearPromotedKeys = (previous: Partial<StateAppearanceConfig>) => {
+        const next = { ...previous } as Record<string, unknown>;
+        becameGlobal.forEach(key => { delete next[key]; });
+        return next as Partial<StateAppearanceConfig>;
+      };
+      setOnStateAppearance(clearPromotedKeys);
+      setOffStateAppearance(clearPromotedKeys);
+    }
+
+    // Seed both buffers from the base value for controls returning to per-state,
+    // so ON and OFF start from the former shared/theme look.
+    if (becamePerState.length > 0) {
+      const seed: Record<string, unknown> = {};
+      const baseSrc = config as unknown as Record<string, unknown>;
+      becamePerState.forEach(key => {
+        const v = baseSrc[key];
+        if (v !== undefined && v !== '') seed[key] = v;
+      });
+      const seedFromGlobal = (previous: Partial<StateAppearanceConfig>) => {
+        const next = { ...previous } as Record<string, unknown>;
+        becamePerState.forEach(key => {
+          if (key in seed) next[key] = seed[key];
+          else delete next[key];
+        });
+        return next as Partial<StateAppearanceConfig>;
+      };
+      setOnStateAppearance(seedFromGlobal);
+      setOffStateAppearance(seedFromGlobal);
+    }
+  };
+
+  const handleApplySavedTheme = (theme: SavedTheme) => {
+    const previousKeys = config.themeKeys || [];
+    const nextKeys = theme.themeKeys;
+    const becameGlobal = nextKeys.filter(key => !previousKeys.includes(key));
+    const becamePerState = previousKeys.filter(key => !nextKeys.includes(key));
+
+    if (becamePerState.length > 0) {
+      const base = config as unknown as Record<string, unknown>;
+      const seedFormerGlobals = (previous: Partial<StateAppearanceConfig>) => {
+        const next = { ...previous } as Record<string, unknown>;
+        becamePerState.forEach(key => {
+          if (base[key] !== undefined) next[key] = base[key];
+          else delete next[key];
+        });
+        return next as Partial<StateAppearanceConfig>;
+      };
+      setOnStateAppearance(seedFormerGlobals);
+      setOffStateAppearance(seedFormerGlobals);
+    }
+
+    if (becameGlobal.length > 0) {
+      const clearNewGlobals = (previous: Partial<StateAppearanceConfig>) => {
+        const next = { ...previous } as Record<string, unknown>;
+        becameGlobal.forEach(key => { delete next[key]; });
+        return next as Partial<StateAppearanceConfig>;
+      };
+      setOnStateAppearance(clearNewGlobals);
+      setOffStateAppearance(clearNewGlobals);
+    }
+
+    setConfigInternal(prev => ({ ...prev, ...theme.values, themeKeys: nextKeys }));
+  };
+
+  const handleSaveTheme = (name: string, primaryKeys: string[]): { ok: boolean; error?: string } => {
+    const normalized = name.trim();
+    if (!normalized) return { ok: false, error: 'Theme name is required.' };
+    if (themes.some(t => t.name.toLowerCase() === normalized.toLowerCase())) {
+      return { ok: false, error: `A theme named "${normalized}" already exists.` };
+    }
+    const themeKeys = expandThemeKeys(primaryKeys);
+    if (themeKeys.length === 0) return { ok: false, error: 'Select at least one control to save as a theme.' };
+    const activeBuffer = simulatedState === 'on' ? onStateAppearance : offStateAppearance;
+    const valueSource = { ...config } as ButtonConfig & Record<string, unknown>;
+    themeKeys.forEach(key => {
+      if (!(config.themeKeys || []).includes(key) && Object.prototype.hasOwnProperty.call(activeBuffer, key)) {
+        valueSource[key] = (activeBuffer as Record<string, unknown>)[key];
+      }
+    });
+    const theme: SavedTheme = {
+      id: `theme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: normalized,
+      themeKeys,
+      values: buildThemeValues(valueSource, themeKeys),
+    };
+    setThemes(prev => [theme, ...prev]);
+    return { ok: true };
+  };
+
+  const handleDeleteTheme = (id: string) => setThemes(prev => prev.filter(t => t.id !== id));
 
   const handleImportYaml = () => {
     setImportError('');
@@ -756,13 +866,62 @@ export const ButtonCardApp: React.FC = () => {
         return;
       }
 
-      setConfig(prev => ({ ...prev, ...validated }));
+      // Merge into current config, then migrate legacy state colors / icon spin from
+      // the imported YAML into the per-state appearance buffers.
+      const merged = { ...config, ...validated };
+      const migrated = migrateLegacyStateColors(merged, {}, {});
+      setConfig(migrated.config);
+      setOnStateAppearance(migrated.onApp);
+      setOffStateAppearance(migrated.offApp);
       setIsImportOpen(false);
       setImportYaml('');
     } catch (e: any) {
       console.error('YAML import error:', e);
       setImportError(`Failed to parse YAML: ${e.message || 'Please check the format.'}`);
     }
+  };
+
+  const handleCopyYaml = async () => {
+    try {
+      await navigator.clipboard.writeText(yamlOutput);
+      setYamlCopied(true);
+      showToast('YAML copied');
+      window.setTimeout(() => setYamlCopied(false), 1800);
+    } catch {
+      showToast('Could not copy YAML');
+    }
+  };
+
+  const startConfigResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = desktopConfigWidth;
+    const handleMove = (moveEvent: PointerEvent) => {
+      const maxWidth = window.innerWidth - 360;
+      setDesktopConfigWidth(Math.min(maxWidth, Math.max(520, startWidth + moveEvent.clientX - startX)));
+    };
+    const handleUp = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  const copyCurrentStateAppearance = () => {
+    if (simulatedState === 'on') {
+      setOffStateAppearance(cloneSnapshot(onStateAppearance));
+      showToast('ON appearance copied to OFF');
+    } else {
+      setOnStateAppearance(cloneSnapshot(offStateAppearance));
+      showToast('OFF appearance copied to ON');
+    }
+  };
+
+  const resetCurrentStateAppearance = () => {
+    if (simulatedState === 'on') setOnStateAppearance({});
+    else setOffStateAppearance({});
+    showToast(`${simulatedState.toUpperCase()} appearance reset to base style`);
   };
 
   return (
@@ -783,11 +942,7 @@ export const ButtonCardApp: React.FC = () => {
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-2">
-          <button onClick={() => setShowRequirementsPrompt(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Check Home Assistant requirements">
-            <AlertTriangle size={14} />
-            Check Setup
-          </button>
+        <div className="hidden lg:flex items-center gap-2">
           <button onClick={() => setShowButtonLibrary(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Open button library">
             <FolderOpen size={14} />
             Library
@@ -806,27 +961,43 @@ export const ButtonCardApp: React.FC = () => {
               <Redo2 size={14} />
             </button>
           </div>
-          <button onClick={() => setIsImportOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Import existing YAML">
-            <Upload size={14} />
-            Import
-          </button>
-          <button onClick={handleReset} className={`flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm font-medium transition-all ${resetConfirmPending ? 'bg-red-600 border-red-500 text-white hover:bg-red-500' : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'}`} title={resetConfirmPending ? 'Click again to confirm reset' : 'Reset to defaults'}>
-            <RotateCcw size={14} />
-            {resetConfirmPending ? 'Confirm Reset?' : 'Reset'}
+          <button onClick={handleCopyYaml} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-sm font-medium transition-colors" title="Copy generated YAML">
+            {yamlCopied ? <Check size={14} /> : <Copy size={14} />}
+            {yamlCopied ? 'Copied' : 'Copy YAML'}
           </button>
           <button onClick={() => setIsMagicOpen(true)} className="flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-medium transition-all group">
             <Wand2 size={14} className="group-hover:rotate-12 transition-transform" />
             Magic Build
           </button>
+          <div className="relative">
+            <button
+              onClick={() => setDesktopMenuOpen(!desktopMenuOpen)}
+              className="p-2 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full transition-colors"
+              title="More actions"
+              aria-label="More actions"
+              aria-expanded={desktopMenuOpen}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {desktopMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-gray-700 bg-gray-900 p-1.5 shadow-2xl z-50">
+                <button onClick={() => { setIsImportOpen(true); setDesktopMenuOpen(false); }} className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 text-left"><Upload size={15} /> Import YAML</button>
+                <button onClick={() => { setShowRequirementsPrompt(true); setDesktopMenuOpen(false); }} className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 text-left"><AlertTriangle size={15} /> Check setup</button>
+                <button onClick={() => { setOpenMagicToApiKey(true); setIsMagicOpen(true); setDesktopMenuOpen(false); }} className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 text-left"><Key size={15} /> Manage AI key</button>
+                <div className="my-1 border-t border-gray-800" />
+                <button onClick={() => { handleReset(); if (resetConfirmPending) setDesktopMenuOpen(false); }} className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-left ${resetConfirmPending ? 'bg-red-600 text-white' : 'text-red-300 hover:bg-red-500/10'}`}><RotateCcw size={15} /> {resetConfirmPending ? 'Confirm reset' : 'Reset to defaults'}</button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-gray-400 hover:text-white">
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-gray-400 hover:text-white" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen}>
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </header>
 
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
+        <div className="lg:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
           <button onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left">
             <Wand2 size={18} className="text-indigo-400" />
             <span>Magic Build</span>
@@ -834,6 +1005,10 @@ export const ButtonCardApp: React.FC = () => {
           <button onClick={() => { setIsImportOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
             <Upload size={18} className="text-blue-400" />
             <span>Import YAML</span>
+          </button>
+          <button onClick={() => { handleCopyYaml(); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 rounded-lg text-left text-white">
+            <Copy size={18} />
+            <span>Copy YAML</span>
           </button>
           <div className="flex gap-2">
             <button onClick={() => { handleUndo(); setMobileMenuOpen(false); }} disabled={!canUndo} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
@@ -849,6 +1024,10 @@ export const ButtonCardApp: React.FC = () => {
             <AlertTriangle size={18} className="text-amber-400" />
             <span>Check Setup</span>
           </button>
+          <button onClick={() => { setOpenMagicToApiKey(true); setIsMagicOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
+            <Key size={18} className="text-purple-400" />
+            <span>Manage AI Key</span>
+          </button>
           <button onClick={() => { setShowButtonLibrary(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
             <FolderOpen size={18} className="text-emerald-400" />
             <span>Button Library</span>
@@ -860,8 +1039,8 @@ export const ButtonCardApp: React.FC = () => {
         </div>
       )}
 
-      <main className="hidden md:flex flex-1 min-h-0 overflow-hidden">
-        <aside className="w-80 shrink-0 shadow-xl bg-gray-900 border-r border-gray-800">
+      <main className="hidden lg:flex flex-1 min-h-0 overflow-hidden">
+        {desktopConfigOpen && <aside className="shrink-0 shadow-xl bg-gray-900 border-r border-gray-800 relative" style={{ width: desktopConfigWidth }}>
           <ConfigPanel
             config={config}
             setConfig={setConfig}
@@ -872,12 +1051,6 @@ export const ButtonCardApp: React.FC = () => {
             onSaveCustomPreset={handleSaveCustomPreset}
             onDeleteCustomPreset={handleDeleteCustomPreset}
             onResetToPreset={handleResetToPreset}
-            presetCondition={presetCondition}
-            onSetPresetCondition={setPresetCondition}
-            offStatePreset={offStatePreset}
-            onStatePreset={onStatePreset}
-            onSetOffStatePreset={setOffStatePreset}
-            onSetOnStatePreset={setOnStatePreset}
             useAutoDarkMode={useAutoDarkMode}
             onSetUseAutoDarkMode={setUseAutoDarkMode}
             editingState={simulatedState}
@@ -886,32 +1059,75 @@ export const ButtonCardApp: React.FC = () => {
             offStateAppearance={offStateAppearance}
             onSetOnStateAppearance={setOnStateAppearance}
             onSetOffStateAppearance={setOffStateAppearance}
+            onOpenThemeChooser={() => setThemeChooserOpen(true)}
+            advancedMode={advancedMode}
+            onSetAdvancedMode={setAdvancedMode}
+            layout="workbench"
           />
-        </aside>
+          <div
+            onPointerDown={startConfigResize}
+            className="absolute -right-1.5 top-0 bottom-0 z-30 w-3 cursor-col-resize group"
+            title="Resize configuration panel"
+          >
+            <div className="absolute left-1/2 top-1/2 h-16 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-700 group-hover:bg-blue-500 transition-colors" />
+          </div>
+        </aside>}
 
         <section className="flex-1 flex flex-col min-w-0 min-h-0">
-          <div className="flex-1 min-h-0 flex">
-            <div className="flex-1 bg-[#0a0a0a] relative flex flex-col min-h-0">
+          <div className="flex-1 min-h-0 bg-[#0a0a0a] relative flex flex-col">
               <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
-              <div className="relative z-0 px-6 py-3 flex items-center gap-2 text-gray-500 text-xs font-medium uppercase tracking-wider border-b border-gray-800/50 bg-black/30 backdrop-blur-sm">
-                <Eye size={14} />
-                Live Preview
+              <div className="relative z-10 px-4 py-2.5 flex items-center justify-between gap-3 border-b border-gray-800/70 bg-black/40 backdrop-blur-sm">
+                <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider">
+                  <Eye size={14} />
+                  Live Preview
+                  {config.entity && <span className="normal-case tracking-normal font-mono text-[10px] text-gray-600 max-w-48 truncate">{config.entity}</span>}
+                  {activePreset && <span className="normal-case tracking-normal rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-300">{activePreset.name}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasOnOffState(config.entity) && <div className={`flex items-center gap-1.5 rounded-lg border p-1 ${simulatedState === 'on' ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
+                    <button
+                      type="button"
+                      onClick={() => setSimulatedState(simulatedState === 'on' ? 'off' : 'on')}
+                      className="group px-1.5 py-0.5 text-left"
+                      aria-label={`Editing for ${simulatedState.toUpperCase()} State. Click to change to ${simulatedState === 'on' ? 'OFF' : 'ON'} State`}
+                    >
+                      <span className="flex items-baseline gap-1 font-semibold text-gray-400">
+                        <span className="text-[10px]">Editing for</span>
+                        <span className={`text-sm font-black tracking-wide ${simulatedState === 'on' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                          {simulatedState.toUpperCase()}
+                        </span>
+                        <span className="text-[10px]">State</span>
+                      </span>
+                      <span className="block text-[8px] font-medium text-gray-600 transition-colors group-hover:text-gray-400">Click to change</span>
+                    </button>
+                    <button onClick={copyCurrentStateAppearance} className="p-1.5 text-gray-500 hover:text-blue-300" title={`Copy ${simulatedState.toUpperCase()} appearance to ${simulatedState === 'on' ? 'OFF' : 'ON'}`} aria-label={`Copy current state appearance to ${simulatedState === 'on' ? 'off' : 'on'}`}><ArrowRightLeft size={13} /></button>
+                    <button onClick={resetCurrentStateAppearance} className="p-1.5 text-gray-500 hover:text-red-300" title={`Reset ${simulatedState.toUpperCase()} appearance`} aria-label="Reset current state appearance"><Eraser size={13} /></button>
+                  </div>}
+                  <button onClick={() => setThemeChooserOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/80 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800" title="Choose which appearance controls are global (theme)">
+                    <Palette size={14} className="text-purple-300" /> Theme
+                  </button>
+                  <button onClick={() => setDesktopConfigOpen(!desktopConfigOpen)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/80 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800" title={desktopConfigOpen ? 'Hide configuration' : 'Show configuration'}>
+                    {desktopConfigOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+                    {desktopConfigOpen ? 'Hide controls' : 'Controls'}
+                  </button>
+                  <button onClick={() => setDesktopYamlOpen(!desktopYamlOpen)} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${desktopYamlOpen ? 'border-blue-500/40 bg-blue-500/10 text-blue-300' : 'border-gray-700 bg-gray-900/80 text-gray-300 hover:bg-gray-800'}`} title={desktopYamlOpen ? 'Hide YAML' : 'Show YAML'}>
+                    <Code size={14} /> YAML {desktopYamlOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                  </button>
+                </div>
               </div>
-              <div className="flex-1 relative overflow-hidden z-0 w-full h-full min-h-0 min-w-0">
+              <div className="flex-1 relative overflow-hidden z-0 w-full min-h-0 min-w-0">
                 <PreviewCard config={finalConfig} simulatedState={simulatedState} onSimulatedStateChange={setSimulatedState} />
               </div>
-            </div>
-
-            <div className="w-96 border-l border-gray-800 bg-[#111] flex flex-col shrink-0 min-h-0">
-              <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-4">
+              {desktopYamlOpen && <div className="relative z-10 h-[42%] min-h-64 max-h-[28rem] border-t border-gray-700 bg-[#111] flex flex-col shrink-0 shadow-[0_-12px_35px_rgba(0,0,0,0.35)]">
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-3">
                 <YamlViewer yaml={yamlOutput} config={config} className="flex-1" sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
-              </div>
-            </div>
+                </div>
+              </div>}
           </div>
         </section>
       </main>
 
-      <main className="md:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
+      <main className="lg:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-hidden">
           {mobileTab === 'preview' && (
             <div className="h-full bg-[#0a0a0a] relative flex flex-col">
@@ -934,12 +1150,6 @@ export const ButtonCardApp: React.FC = () => {
                 onSaveCustomPreset={handleSaveCustomPreset}
                 onDeleteCustomPreset={handleDeleteCustomPreset}
                 onResetToPreset={handleResetToPreset}
-                presetCondition={presetCondition}
-                onSetPresetCondition={setPresetCondition}
-                offStatePreset={offStatePreset}
-                onStatePreset={onStatePreset}
-                onSetOffStatePreset={setOffStatePreset}
-                onSetOnStatePreset={setOnStatePreset}
                 useAutoDarkMode={useAutoDarkMode}
                 onSetUseAutoDarkMode={setUseAutoDarkMode}
                 editingState={simulatedState}
@@ -948,6 +1158,8 @@ export const ButtonCardApp: React.FC = () => {
                 offStateAppearance={offStateAppearance}
                 onSetOnStateAppearance={setOnStateAppearance}
                 onSetOffStateAppearance={setOffStateAppearance}
+                advancedMode={advancedMode}
+                onSetAdvancedMode={setAdvancedMode}
               />
             </div>
           )}
@@ -959,23 +1171,23 @@ export const ButtonCardApp: React.FC = () => {
           )}
         </div>
 
-        <nav className="shrink-0 border-t border-gray-800 bg-gray-900 flex">
-          <button onClick={() => setMobileTab('preview')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'preview' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
+        <nav className="shrink-0 border-t border-gray-800 bg-gray-900 flex" aria-label="Builder workspace">
+          <button onClick={() => setMobileTab('preview')} aria-current={mobileTab === 'preview' ? 'page' : undefined} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'preview' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
             <Eye size={20} />
             <span className="text-[10px] font-medium">Preview</span>
           </button>
-          <button onClick={() => setMobileTab('config')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'config' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
+          <button onClick={() => setMobileTab('config')} aria-current={mobileTab === 'config' ? 'page' : undefined} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'config' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
             <Settings size={20} />
             <span className="text-[10px] font-medium">Configure</span>
           </button>
-          <button onClick={() => setMobileTab('yaml')} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'yaml' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
+          <button onClick={() => setMobileTab('yaml')} aria-current={mobileTab === 'yaml' ? 'page' : undefined} className={`flex-1 py-3 flex flex-col items-center gap-1 transition-colors ${mobileTab === 'yaml' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}>
             <Code size={20} />
             <span className="text-[10px] font-medium">YAML</span>
           </button>
         </nav>
       </main>
 
-      <MagicBuilder isOpen={isMagicOpen} onClose={() => setIsMagicOpen(false)} onApply={(newConfig) => setConfig(prev => ({ ...prev, ...newConfig }))} />
+      <MagicBuilder isOpen={isMagicOpen} manageApiKey={openMagicToApiKey} onClose={() => { setIsMagicOpen(false); setOpenMagicToApiKey(false); }} onApply={(newConfig) => setConfig(prev => ({ ...prev, ...newConfig }))} />
 
       {showRequirementsPrompt && environmentReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -1050,6 +1262,18 @@ export const ButtonCardApp: React.FC = () => {
           existingNames={savedButtons.map((button) => button.name)}
           onConfirm={handleConfirmSaveModal}
           onClose={() => setSaveModalState(null)}
+        />
+      )}
+
+      {themeChooserOpen && (
+        <ThemeChooserModal
+          currentThemeKeys={config.themeKeys || []}
+          savedThemes={themes}
+          onApplyKeys={handleSetThemeKeys}
+          onApplySavedTheme={handleApplySavedTheme}
+          onSaveTheme={handleSaveTheme}
+          onDeleteTheme={handleDeleteTheme}
+          onClose={() => setThemeChooserOpen(false)}
         />
       )}
 

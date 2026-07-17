@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2026-07-17
+
+### Breaking changes
+
+- **Focused Button Builder integration**: Removed the Bubble Card and Tile Card builders and their Home Assistant sidebar panels. Version 3 registers one `Button Builder` panel at `/button-builder` and focuses exclusively on `custom:button-card`. Bubble Card, Tile Card, and other builders are planned as separate integrations so each can evolve and release independently.
+- **Panel URL changed**: The former `/button-card-builder`, `/bubble-card-builder`, and `/tile-card-builder` panel routes are replaced by `/button-builder`. Restart Home Assistant after upgrading so the old panels are removed and the new panel is registered.
+
+### Added
+
+- **State-aware design workflow**: ON and OFF appearance editing, state copy/reset tools, legacy state-color migration, and synchronized preview/YAML generation.
+- **Theme system**: Choose which appearance controls remain global, save reusable themes, and move controls between theme and per-state scopes without visual jumps.
+- **Redesigned workbench**: Searchable category navigation, advanced-mode filtering, resizable desktop configuration panel, collapsible YAML workspace, and improved mobile navigation.
+- **Expanded preset gallery**: Curated backdrop pairings, improved preset thumbnails, reusable custom style presets, and automatic dark-state styling.
+- **Extended visual effects**: Aurora, comet, energy charge, neon current, liquid and mesh gradients, plasma, particles, radar/sonar, glitch, frost, heat haze, state morph, progress border, threshold pulse, and more.
+- **Effect intensity**: State-aware 25–200% controls adjust each supported effect's defining reach, movement, distortion, corner deformation, ring travel, glow, or border width. Preview and generated YAML share the same amplitude variables.
+- **Home Assistant AI Tasks**: Magic Builder can use configured Home Assistant AI providers without reading or storing their credentials, while direct Gemini remains available.
+- **Preview tooling**: Dashboard background support, custom image backdrops, a blur-test pattern, layout sizing, zoom controls, and improved state simulation.
+
+### Changed
+
+- **YAML generation and import**: Reworked merged ON/OFF state output, animation keyframes, marquee/progress effects, generated-style round trips, and legacy configuration migration.
+- **Picker reliability**: Entity and icon dropdowns render through portals to avoid clipping inside the redesigned workbench.
+- **Runtime assets**: Removed the Tailwind CDN dependency from the Home Assistant panel; all required styles ship in the compiled HACS package.
+- **Cache busting**: The Home Assistant panel URL continues to derive its cache key from the integration manifest version.
+
+### Upgrade notes
+
+1. Update through HACS and restart Home Assistant.
+2. Remove any manually pinned sidebar references to the former builder routes.
+3. Open the new **Button Builder** panel and hard-refresh once if an older bundle is cached.
+4. Bubble Card and Tile Card configurations already copied to dashboards continue to work; only their visual builders were removed from this integration. Their builders are planned to return as separate integrations.
+
 ## [2.2.10] - 2026-03-27
 
 ### Fixed

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, ChevronDown } from 'lucide-react';
 import { haService, EntityInfo } from '../services/homeAssistantService';
 
@@ -66,6 +67,9 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
   const [loading, setLoading] = useState(false);
   const [showAllDomains, setShowAllDomains] = useState(false);
   const [connectionFailed, setConnectionFailed] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0, maxHeight: 384 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,7 +78,11 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        (!containerRef.current || !containerRef.current.contains(target)) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(target))
+      ) {
         setIsOpen(false);
       }
     };
@@ -84,6 +92,20 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
+
+  const openDropdown = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const MAX_H = 384;
+      const openDown = spaceBelow >= 200 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.min(MAX_H, openDown ? spaceBelow : spaceAbove);
+      const top = openDown ? rect.bottom + 4 : rect.top - maxHeight - 4;
+      setDropdownPos({ top, left: rect.left, width: rect.width, maxHeight });
+    }
+    setIsOpen(true);
+  };
 
   const loadEntities = async () => {
     setLoading(true);
@@ -179,7 +201,7 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div ref={containerRef}>
       {label && (
         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
           {label}
@@ -194,26 +216,29 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative" ref={triggerRef}>
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setIsOpen(true)}
+          onFocus={openDropdown}
           placeholder={placeholder}
           className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-blue-500 pr-8"
         />
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => isOpen ? setIsOpen(false) : openDropdown()}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
         >
           <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
       </div>
 
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-2xl max-h-96 overflow-hidden flex flex-col">
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, maxHeight: dropdownPos.maxHeight, zIndex: 9999 }}
+          className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col">
           {/* Search */}
           <div className="p-2 border-b border-gray-700">
             <div className="relative">
@@ -311,7 +336,7 @@ export const EntitySelector: React.FC<Props> = ({ value, onChange, onEntitySelec
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };

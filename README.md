@@ -44,26 +44,31 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 
 ---
 
+## Version 3 upgrade notice
+
+Version 3 replaces the former Button, Bubble, and Tile sidebar panels with one **Button Builder** panel at `/button-builder`. After updating from v2, restart Home Assistant so it removes the old panel registrations and registers the new route.
+
+Bubble Card, Tile Card, and other builders are planned as separate integrations. Existing YAML already installed on dashboards continues to work; this change only removes those editors from this integration. See the [v3.0.0 release notes](docs/RELEASE_NOTES_3.0.0.md) for the complete migration guide.
+
 ## ✨ Features
 
-**Three builders, three sidebar panels:**
+Button Builder designs cards for [custom:button-card](https://github.com/custom-cards/button-card), which must be installed separately through HACS.
 
-| Panel | Designs cards for | Requires |
-|-------|-------------------|----------|
-| 🎯 Button Card Builder | [custom:button-card](https://github.com/custom-cards/button-card) | button-card via HACS |
-| 🫧 Bubble Card Builder | [custom:bubble-card](https://github.com/Clooos/Bubble-Card) | Bubble Card via HACS |
-| 🟦 Tile Card Builder | Home Assistant's built-in Tile card | Nothing extra! |
+> [!IMPORTANT]
+> Version 3 focuses this integration on `custom:button-card`. Bubble Card, Tile Card, and other builders are planned as separate integrations so they can be installed and released independently. Existing YAML already used on dashboards is unaffected.
 
-- 🎯 **Visual Editors**: Real-time preview as you configure your cards
-- 🤖 **AI-Powered Design**: Generate complete button configurations from natural language descriptions
+- 🎯 **State-Aware Visual Editor**: Design ON and OFF appearances independently with a synchronized live preview
+- 🤖 **AI-Powered Design**: Use Home Assistant AI Tasks or a direct Gemini API key to generate designs from natural language
 - 💾 **Save & Library**: Save designs with folders and tags, search, duplicate, export backups, undo/redo
+- 🧩 **Themes & Presets**: Choose global controls, save themes, browse curated style/backdrop pairings, and save custom styles
 - 🎨 **Full Style Control**: Colors, gradients, opacity, borders, shadows, glassmorphism effects
-- ⚡ **Animations**: 10+ animation types (pulse, flash, spin, shake, bounce, etc.)
+- ⚡ **Advanced Effects**: More than two dozen visual effects with state-aware speed, trigger, and 25–200% intensity
 - 📐 **Layout Options**: Multiple layout presets for icon, name, state, and label positioning
 - 📥 **YAML Import**: Paste existing card YAML to edit it visually
 - 📋 **YAML Export**: Copy generated YAML directly to your Home Assistant configuration
-- 🔧 **Full Option Coverage**: Comprehensive support for button-card, bubble-card, and tile card options (including all 37+ tile features)
-- 📱 **Mobile Friendly**: Dedicated phone layout with bottom-tab navigation
+- 🔧 **Full Option Coverage**: Comprehensive support for custom:button-card options
+- 🖼️ **Dashboard-Aware Preview**: Dashboard/custom backdrops, a blur-test pattern, zoom, and layout sizing
+- 📱 **Responsive Workbench**: Resizable desktop panels and dedicated phone navigation
 
 ## 📦 Installation
 
@@ -76,7 +81,7 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 5. Click "Download"
 6. Restart Home Assistant
 7. Go to Settings → Devices & Services → Add Integration → Search "Button Builder"
-8. Three panels appear in your sidebar: **Button Card Builder**, **Bubble Card Builder**, and **Tile Card Builder**
+8. The **Button Builder** panel appears in your sidebar
 
 ### Manual Installation
 
@@ -90,13 +95,13 @@ Happy automating — and thanks in advance to anyone willing to play with this t
    ```
 4. Restart Home Assistant
 5. Go to Settings → Devices & Services → Add Integration → Search "Button Builder"
-6. Three panels appear in your sidebar: **Button Card Builder**, **Bubble Card Builder**, and **Tile Card Builder**
+6. The **Button Builder** panel appears in your sidebar
 
 ## 🚀 Usage
 
 ### Basic Workflow
 
-1. Click the builder you want in your Home Assistant sidebar (Button Card, Bubble Card, or Tile Card)
+1. Click **Button Builder** in your Home Assistant sidebar
 2. Use the left panel to configure your button:
    - Set entity ID, name, icon, and label
    - Choose layout and visibility options
@@ -109,17 +114,17 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 ### AI Magic Builder
 
 1. Click the "Magic Build" button in the top right
-2. **First time?** You'll be prompted to enter your free Gemini API key:
+2. Choose **Home Assistant AI** to use an existing AI Task provider without exposing its credentials, or choose **Gemini** for a direct browser-stored API key.
+3. If using Gemini for the first time, enter your API key:
    - Click the link to [Google AI Studio](https://aistudio.google.com/apikey)
    - Create a free API key (takes 30 seconds)
    - Paste it into the app — it's kept only for your current browser session, never sent anywhere except Google's API
-3. Describe your ideal button in plain English:
+4. Describe your ideal button in plain English:
    - Example: *"A futuristic cyan button for a bedroom fan that glows when on"*
    - Example: *"Glassmorphism style button for living room lights with purple accent"*
    - Example: *"Minimal dark button for garage door with red color when open"*
-4. Click "Generate Design"
-5. The AI will create a complete button configuration matching your description
-6. Fine-tune the design using the visual editor if needed
+5. Click "Generate Design"
+6. Fine-tune the generated configuration using the visual editor if needed
 
 > **Note**: Your API key is stored in your browser's localStorage and never leaves your device. You can manage or remove it by clicking the key icon in the Magic Builder dialog.
 
@@ -127,10 +132,7 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 
 **Important**: This tool generates YAML for the [custom:button-card](https://github.com/custom-cards/button-card) integration. You must install button-card separately through HACS or manually.
 
-**For AI Features**: The Magic Builder requires a free Gemini API key:
-1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey) (free tier, no credit card required)
-2. Enter it when prompted in the Magic Builder dialog
-3. Your key is stored locally in your browser — we never see it
+**For AI Features**: Configure a Home Assistant AI Task provider or supply a direct Gemini API key. AI is optional; the visual editor works without it.
 
 ## 🎨 Design Features
 
@@ -151,9 +153,10 @@ Happy automating — and thanks in advance to anyone willing to play with this t
 - And more...
 
 ### Animations
-Choose from 10+ animations for both the card and icon:
-- Flash, Pulse, Jiggle, Marquee, Spin, Blink, Shake, Bounce, Rotate
-- Trigger animations based on state (on/off) or run continuously
+Choose from motion and visual effects for the card and icon:
+- Core motion: flash, pulse, spin, shake, bounce, float, swing, wobble, breathe, and ripple
+- Visual effects: liquid and mesh gradients, energy charge, neon current, plasma, particles, radar/sonar, glitch, frost, heat haze, state morph, and more
+- Trigger effects by state or continuously, set their duration, and adjust defining intensity from 25–200%
 
 ### Actions
 - **Tap Action**: toggle, more-info, call-service, navigate, url, none
@@ -206,8 +209,6 @@ button-builder/
 │   ├── components/         # React components
 │   ├── services/           # API services
 │   ├── utils/              # Utility functions
-│   ├── bubble-card/        # Bubble Card builder
-│   ├── tile-card/          # Tile Card builder
 │   ├── shared/             # Shared UI (library, save modal, history)
 │   └── assets/             # Images & assets
 ├── docs/                   # Documentation

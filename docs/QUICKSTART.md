@@ -1,139 +1,49 @@
 # Quick Start Guide
 
-This guide will help you get Button Builder up and running in minutes.
+## Install
 
-## 🚀 Quick Installation
+1. Install [`custom:button-card`](https://github.com/custom-cards/button-card).
+2. Install **Button Builder** from **HACS → Integrations**.
+3. Restart Home Assistant and add the Button Builder integration.
+4. Open **Button Builder** from the sidebar.
 
-### Option 1: HACS (Easiest)
-1. Open HACS → Integrations → "+" → Search "Button Builder" → Download
-2. Restart Home Assistant
-3. Find "Button Architect" in your sidebar
+## Build your first button
 
-### Option 2: Manual (5 minutes)
-1. Download the [latest release](https://github.com/aspenrt78/button-builder/releases)
-2. Extract and copy `custom_components/button_builder` to your HA config folder
-3. Restart Home Assistant
+1. Select an entity such as `light.living_room`.
+2. Open **Appearance → Style Presets** and choose a starting style.
+3. Use the ON/OFF state switch to edit each binary-state appearance independently.
+4. Choose **Theme options** if some appearance controls should stay global across both states.
+5. Adjust layout, colors, glass effects, animation, and effect intensity.
+6. Check the live preview, then open the YAML panel and copy the result.
+7. Add a **Manual** card to a Home Assistant dashboard and paste the YAML.
 
-## 📋 Before You Start
+## Effect intensity
 
-**Required:**
-- ✅ [custom:button-card](https://github.com/custom-cards/button-card) installed (via HACS)
+Supported visual effects expose a 25–200% intensity slider. It adjusts the defining amplitude of the selected effect, including liquid corner deformation, glow reach, ripple travel, particle movement, glitch displacement, haze distortion, and animated border width. A value of 100% preserves the original effect.
 
-**Optional:**
-- 🤖 [Gemini API Key](https://aistudio.google.com/apikey) (for AI features - free tier available)
+## Previewing glass blur
 
-## 🎨 Your First Button
+Backdrop blur requires a translucent card and visible detail behind it:
 
-### Method 1: Visual Design (No API Key Needed)
+1. Lower the card background opacity.
+2. Open the preview palette.
+3. Select **Blur Test Pattern**, a dashboard background, or a custom image.
+4. Increase **Backdrop Blur** under the Glass appearance controls.
 
-1. Click **"Button Architect"** in your sidebar
-2. In the **Core Configuration** section:
-   - **Entity ID**: `light.living_room` (use your actual entity)
-   - **Name**: `Living Room`
-   - **Icon**: `mdi:lightbulb`
-3. Explore the sections:
-   - **Colors & Theming**: Change background and text colors
-   - **Layout & Dimensions**: Adjust size and layout
-   - **Glass & Depth**: Add blur and shadows for glassmorphism
-   - **Animations**: Add pulse, flash, or spin effects
-4. Watch the **live preview** update as you design
-5. Copy the **YAML** from the right panel
-6. Paste into your Lovelace dashboard
+## Magic Builder
 
-### Method 2: AI Magic Builder (Requires API Key)
+1. Open **Magic Build**.
+2. Choose a Home Assistant AI Task provider or direct Gemini.
+3. Describe the button you want.
+4. Apply the result and fine-tune it in the visual editor.
 
-1. Click **"Magic Build"** button (top right)
-2. Enter a description like:
-   - *"Cyan glassmorphism button for bedroom lights with soft glow"*
-   - *"Minimal dark button for garage door, red when open"*
-3. Click **"Generate Design"**
-4. AI creates a complete design instantly
-5. Fine-tune with the visual editor if needed
-6. Copy YAML and paste to dashboard
+## Version 3 note
 
-## 📝 Example Configurations
+Button Builder v3 focuses on `custom:button-card`. Bubble Card, Tile Card, and other builders are planned as separate integrations. Existing YAML already installed on dashboards is unaffected.
 
-### Glassmorphism Light Button
-```yaml
-type: custom:button-card
-entity: light.living_room
-name: Living Room
-icon: mdi:lightbulb
-color_type: card
-color: auto
-styles:
-  card:
-    - background-color: rgba(255, 255, 255, 0.1)
-    - backdrop-filter: blur(10px)
-    - border-radius: 16px
-    - box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37)
-```
+## Troubleshooting
 
-### Animated Fan Button
-```yaml
-type: custom:button-card
-entity: fan.bedroom
-name: Bedroom Fan
-icon: mdi:fan
-state:
-  - value: 'on'
-    icon: mdi:fan
-    styles:
-      icon:
-        - animation: spin 2s linear infinite
-```
-
-## 🎯 Tips & Tricks
-
-### 1. Use Auto Colors
-- Enable **"Auto Color"** or **"Match Entity"** to inherit colors from lights/switches
-- Perfect for lights that change color
-
-### 2. Glassmorphism Effect
-- Set background opacity to 10-30%
-- Add backdrop blur (10-20px)
-- Add subtle shadow with low opacity
-
-### 3. State-Based Styling
-- Configure different colors for ON/OFF states
-- Use animations that trigger on state change
-- Example: Red when garage door is open
-
-### 4. Layout Options
-- **Vertical**: Icon on top, name below (default)
-- **Icon + State**: Horizontal layout
-- **Icon + Label**: Great for displaying sensor values
-
-### 5. Marquee Border Effect
-- Set card animation to "marquee"
-- Trigger: "on" for state-based rotation
-- Creates a rotating border effect
-
-## 🔧 Troubleshooting
-
-**Panel not showing?**
-- Restart Home Assistant
-- Check logs: Configuration → Logs
-
-**AI not working?**
-- Verify your API key is correct
-- Check you have internet connection
-- Free tier has rate limits - wait a few minutes
-
-**Preview not updating?**
-- Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
-
-**Button not working in dashboard?**
-- Ensure custom:button-card is installed
-- Check entity ID is correct
-- Verify YAML syntax
-
-## 📚 Learn More
-
-- [Full Documentation](README.md)
-- [Detailed Installation Guide](INSTALLATION.md)
-- [Report Issues](https://github.com/aspenrt78/button-builder/issues)
-
-## 🎉 You're Ready!
-
-Start designing beautiful button cards for your Home Assistant dashboard. Have fun! 🚀
+- Restart Home Assistant after installing or upgrading.
+- Hard-refresh the browser if the panel looks stale.
+- Confirm `custom:button-card` is installed when generated cards do not render.
+- See the complete [installation guide](INSTALLATION.md) and [v3 release notes](RELEASE_NOTES_3.0.0.md).

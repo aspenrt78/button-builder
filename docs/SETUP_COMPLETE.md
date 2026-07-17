@@ -1,237 +1,51 @@
-# 🎉 Button Card Architect - Setup Complete!
+# HACS Integration Setup
 
-Your app is now fully configured as a HACS integration for Home Assistant!
+Button Builder is packaged as a standard Home Assistant custom integration.
 
-## ✅ What's Been Set Up
+## Included integration files
 
-### 1. **HACS Integration Structure**
-- ✅ `custom_components/button_builder/` directory created
-- ✅ `manifest.json` - Integration metadata
-- ✅ `__init__.py` - Home Assistant integration code
-- ✅ `hacs.json` - HACS configuration
-- ✅ `www/` directory with built assets
+- `custom_components/button_builder/manifest.json`
+- `custom_components/button_builder/config_flow.py`
+- `custom_components/button_builder/__init__.py`
+- Translations and self-hosted brand assets
+- Compiled frontend files under `custom_components/button_builder/www/`
+- Root `hacs.json` metadata
+- HACS and hassfest validation workflow
 
-### 2. **Build Configuration**
-- ✅ Vite configured to output to `custom_components/button_builder/www/`
-- ✅ Production build successful
-- ✅ Assets compiled: `index.js`, `index.css`, `panel.html`
+## Local development
 
-### 3. **Documentation**
-- ✅ `README.md` - Comprehensive project documentation
-- ✅ `INSTALLATION.md` - Detailed installation guide
-- ✅ `QUICKSTART.md` - Quick start guide for users
-- ✅ `PROJECT_STRUCTURE.md` - Development documentation
-- ✅ `CONTRIBUTING.md` - Contribution guidelines
-- ✅ `CHANGELOG.md` - Version history
-
-### 4. **Repository Files**
-- ✅ `LICENSE` - MIT License
-- ✅ `.github/workflows/validate.yaml` - HACS validation
-- ✅ `.gitignore` - Updated for HA integration
-- ✅ `build.ps1` - Build script for Windows
-
-### 5. **Improvements Made**
-- ✅ Better error handling in AI Magic Builder
-- ✅ Example prompts for AI features
-- ✅ Improved error messages
-- ✅ CSS file with animations
-- ✅ Environment variable template
-
-## 🚀 Next Steps
-
-### For Local Development
-
-1. **Install Dependencies** (already done):
-   ```powershell
-   npm install
-   ```
-
-2. **Run Development Server**:
-   ```powershell
-   npm run dev
-   ```
-   Opens at http://localhost:3000
-
-3. **Build for Production**:
-   ```powershell
-   npm run build
-   ```
-   Or use the provided script:
-   ```powershell
-   .\build.ps1
-   ```
-
-### For Testing in Home Assistant
-
-1. **Build the app**:
-   ```powershell
-   npm run build
-   ```
-
-2. **Copy to Home Assistant**:
-   Copy the entire `custom_components/button_builder` folder to your Home Assistant `config/custom_components/` directory.
-
-3. **Restart Home Assistant**
-
-4. **Access the panel**:
-   Look for "Button Architect" in your Home Assistant sidebar
-
-### For GitHub Repository Setup
-
-1. **Initialize Git** (if not already done):
-   ```powershell
-   git init
-   git add .
-   git commit -m "Initial commit - Button Card Architect v1.0.0"
-   ```
-
-2. **Create GitHub Repository**:
-   - Go to GitHub and create a new repository
-   - Name it: `ha-custom-button-architect`
-   - Don't initialize with README (we have one)
-
-3. **Push to GitHub**:
-   ```powershell
-   git remote add origin https://github.com/YOUR_USERNAME/ha-custom-button-architect.git
-   git branch -M main
-   git push -u origin main
-   ```
-
-4. **Create First Release**:
-   ```powershell
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-   Then create a GitHub Release from the tag
-
-### For HACS Submission
-
-1. **Ensure your repo meets HACS requirements**:
-   - ✅ Repository is public
-   - ✅ Has `hacs.json` in root
-   - ✅ Has `custom_components/button_builder/`
-   - ✅ Has `manifest.json` with correct format
-   - ✅ Has README.md
-   - ✅ Has a release/tag
-
-2. **Submit to HACS**:
-   - Go to https://github.com/hacs/default
-   - Fork the repository
-   - Add your repository to the appropriate category file
-   - Create a pull request
-
-3. **Wait for approval**:
-   - HACS team will review your integration
-   - Address any feedback
-   - Once approved, users can install via HACS
-
-## 📋 Pre-Release Checklist
-
-Before creating your first release:
-
-- [ ] Test the app locally (`npm run dev`)
-- [ ] Build successfully (`npm run build`)
-- [ ] Test in Home Assistant
-- [ ] Update `manifest.json` with your GitHub username
-- [ ] Update `README.md` with your GitHub username
-- [ ] Update all documentation links
-- [ ] Set up Gemini API key (optional, for testing AI)
-- [ ] Test all features:
-  - [ ] Visual editor
-  - [ ] Live preview
-  - [ ] YAML export
-  - [ ] AI Magic Builder (if API key configured)
-  - [ ] All configuration options
-  - [ ] Animations
-  - [ ] State simulation
-- [ ] Check for console errors
-- [ ] Verify panel loads in HA sidebar
-
-## 🔧 Configuration Files to Update
-
-Before pushing to GitHub, update these files with your information:
-
-1. **`custom_components/button_builder/manifest.json`**:
-   ```json
-   "codeowners": ["@YOUR_GITHUB_USERNAME"],
-   "documentation": "https://github.com/YOUR_USERNAME/ha-custom-button-architect",
-   "issue_tracker": "https://github.com/YOUR_USERNAME/ha-custom-button-architect/issues"
-   ```
-
-2. **`README.md`** - Replace all instances of:
-   - `aspen` → `YOUR_GITHUB_USERNAME`
-   - Update badges and links
-
-3. **All Documentation Files** - Update GitHub URLs
-
-## 📦 Project Structure
-
-```
-ha-custom-button-architect/
-├── custom_components/
-│   └── button_builder/     ← This goes to Home Assistant
-│       ├── __init__.py
-│       ├── manifest.json
-│       └── www/
-│           ├── panel.html
-│           ├── index.js           ← Built by npm run build
-│           └── index.css          ← Built by npm run build
-├── components/                    ← Source code
-├── services/
-├── utils/
-├── App.tsx
-├── index.tsx
-└── ... (other source files)
+```powershell
+npm install
+npm run dev
 ```
 
-## 🎨 Features Ready to Use
+The development server runs at `http://localhost:3000`.
 
-- ✅ Visual button card designer
-- ✅ Live preview with state simulation
-- ✅ AI-powered design generation (Gemini)
-- ✅ Comprehensive styling options
-- ✅ Animations (10+ types)
-- ✅ Glassmorphism effects
-- ✅ Auto color matching
-- ✅ YAML export
-- ✅ Responsive layout
-- ✅ Dark theme
-- ✅ Canvas background customization
+## Production build
 
-## 📚 Documentation Available
+```powershell
+npx tsc --noEmit
+npm run build
+```
 
-- `README.md` - Main documentation
-- `INSTALLATION.md` - Installation guide  
-- `QUICKSTART.md` - Quick start for users
-- `PROJECT_STRUCTURE.md` - Developer documentation
-- `CONTRIBUTING.md` - How to contribute
-- `CHANGELOG.md` - Version history
+The build writes `index.js`, `index.css`, and `index.html` into the integration's `www` directory. Home Assistant loads the compiled app through `panel.html`.
 
-## 🐛 Known Issues / Notes
+## Home Assistant test
 
-1. **AI Features**: Require Gemini API key (free tier available)
-2. **Dependencies**: Requires `custom:button-card` to be installed separately
-3. **Browser Support**: Modern browsers (Chrome, Firefox, Safari, Edge)
+1. Copy `custom_components/button_builder` into the Home Assistant configuration directory.
+2. Restart Home Assistant.
+3. Add Button Builder from **Settings → Devices & services**.
+4. Open **Button Builder** in the sidebar.
+5. Verify preview, YAML import/export, state switching, presets, themes, and at least one generated effect.
 
-## 🎯 Tips
+## Version 3 scope
 
-- Use `npm run dev` for rapid development
-- Test in Home Assistant after each major feature
-- Keep the `panel.html` file - it's required for HA
-- The build process creates `index.html` but HA uses `panel.html`
-- Environment variables in `.env.local` for API keys
+The integration now contains only the `custom:button-card` builder. Bubble Card, Tile Card, and other builders are planned as separate integrations so each can be installed and released independently.
 
-## 📞 Need Help?
+## Release requirements
 
-- Check `PROJECT_STRUCTURE.md` for development details
-- Read `INSTALLATION.md` for setup issues
-- Open an issue on GitHub for bugs
-- See `CONTRIBUTING.md` for contribution guidelines
-
-## 🎉 Congratulations!
-
-Your app is now a fully-configured HACS integration ready to be published and shared with the Home Assistant community!
-
----
-
-**Ready to go?** Run `npm run build` and test in Home Assistant! 🚀
+- Package, lockfile, and manifest versions match.
+- Changelog and release notes describe breaking changes.
+- Production assets are rebuilt from the tagged source.
+- TypeScript, Python, JSON, HACS, and hassfest checks pass.
+- The release commit is tagged with the same `vX.Y.Z` version and published as a GitHub release.

@@ -5,14 +5,11 @@
 - [[Installation]]
 - [[Getting Started]]
 
-**Button Card**
+**Button Builder**
 - [[Configuration Options]]
 - [[Style Presets]]
 - [[Actions and Interactions]]
 - [[Advanced Features]]
-
-**Bubble Card**
-- [[Bubble Card Builder]]
 
 **Help**
 - [[FAQ]]
