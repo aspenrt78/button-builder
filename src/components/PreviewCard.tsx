@@ -1018,7 +1018,7 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
           <button
             type="button"
             onClick={() => setSimulatedState(simulatedState === 'on' ? 'off' : 'on')}
-            className={`group lg:hidden rounded-xl border bg-gray-900/90 px-3 py-1.5 text-left shadow-lg backdrop-blur ${simulatedState === 'on' ? 'border-emerald-500/40' : 'border-amber-500/40'}`}
+            className={`group xl:hidden rounded-xl border bg-gray-900/90 px-3 py-1.5 text-left shadow-lg backdrop-blur ${simulatedState === 'on' ? 'border-emerald-500/40' : 'border-amber-500/40'}`}
             aria-label={`Editing for ${simulatedState.toUpperCase()} State. Click to change to ${simulatedState === 'on' ? 'OFF' : 'ON'} State`}
           >
             <span className="flex items-baseline gap-1 font-semibold text-gray-400">

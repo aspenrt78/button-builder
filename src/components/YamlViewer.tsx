@@ -327,40 +327,40 @@ export const YamlViewer: React.FC<Props> = ({
   };
 
   return (
-    <div className={`flex flex-col h-full min-h-0 bg-[#1e1e1e] text-gray-300 rounded-lg border border-gray-700 shadow-xl ${className}`}>
-      <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-gray-700 shrink-0">
-        <span className="text-xs font-mono text-gray-400">button-card-config.yaml</span>
-        <div className="flex items-center gap-2">
+    <div className={`yaml-viewer flex flex-col h-full min-h-0 bg-[#1e1e1e] text-gray-300 rounded-lg border border-gray-700 shadow-xl ${className}`}>
+      <div className="yaml-viewer__toolbar px-4 py-2 bg-[#252526] border-b border-gray-700 shrink-0">
+        <span className="min-w-0 truncate text-xs font-mono text-gray-400" title="button-card-config.yaml">button-card-config.yaml</span>
+        <div className="yaml-viewer__actions">
           {onQueueCurrent && (
-            <button onClick={handleQueueCurrentClick} className="flex items-center gap-1 text-xs text-gray-400 hover:text-cyan-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Add the current button to this session's export queue">
+            <button onClick={handleQueueCurrentClick} className="flex shrink-0 items-center gap-1 text-xs text-gray-400 hover:text-cyan-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Add the current button to this session's export queue" aria-label={queuedCurrent ? 'Current button queued' : `Queue current button. ${sessionButtons.length} queued`}>
               {queuedCurrent ? <Check size={14} className="text-cyan-400" /> : <Layers3 size={14} />}
-              <span className="hidden sm:inline">{queuedCurrent ? 'Queued!' : `Queue (${sessionButtons.length})`}</span>
+              <span className="yaml-viewer__action-label">{queuedCurrent ? 'Queued!' : `Queue (${sessionButtons.length})`}</span>
             </button>
           )}
           {onSaveCurrent && (
-            <button onClick={handleSaveCurrentClick} className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Save the current button so you can return to it later">
+            <button onClick={handleSaveCurrentClick} className="flex shrink-0 items-center gap-1 text-xs text-gray-400 hover:text-amber-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Save the current button so you can return to it later" aria-label={savedCurrent ? 'Current button saved' : `Save current button. ${savedButtons.length} saved`}>
               {savedCurrent ? <Check size={14} className="text-amber-400" /> : <Save size={14} />}
-              <span className="hidden sm:inline">{savedCurrent ? 'Saved!' : `Save (${savedButtons.length})`}</span>
+              <span className="yaml-viewer__action-label">{savedCurrent ? 'Saved!' : `Save (${savedButtons.length})`}</span>
             </button>
           )}
           {inHomeAssistant && (
-            <button onClick={handleOpenAddModal} className="flex items-center gap-1 text-xs text-gray-400 hover:text-emerald-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Add the current button to a Home Assistant dashboard">
+            <button onClick={handleOpenAddModal} className="flex shrink-0 items-center gap-1 text-xs text-gray-400 hover:text-emerald-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Add the current button to a Home Assistant dashboard" aria-label={dashboardAdded ? 'Added to dashboard' : 'Add to dashboard'}>
               {dashboardAdded ? <Check size={14} className="text-emerald-400" /> : <LayoutDashboard size={14} />}
-              <span className="hidden sm:inline">{dashboardAdded ? 'Added!' : 'Add to Dashboard'}</span>
+              <span className="yaml-viewer__action-label">{dashboardAdded ? 'Added!' : 'Add to Dashboard'}</span>
             </button>
           )}
           {config && (
-            <button onClick={() => setShowTemplateModal(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Create Global Template">
+            <button onClick={() => setShowTemplateModal(true)} className="flex shrink-0 items-center gap-1 text-xs text-gray-400 hover:text-purple-400 transition-colors p-1 hover:bg-gray-700 rounded" title="Create Global Template" aria-label="Create global template">
               <FileCode2 size={14} />
-              <span className="hidden sm:inline">Global Template</span>
+              <span className="yaml-viewer__action-label">Global Template</span>
             </button>
           )}
-          <button onClick={handleDownload} className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors p-1 hover:bg-gray-700 rounded" title="Download YAML">
+          <button onClick={handleDownload} className="flex shrink-0 items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors p-1 hover:bg-gray-700 rounded" title="Download YAML" aria-label="Download YAML">
             <Download size={14} />
           </button>
-          <button onClick={handleCopy} className="flex items-center gap-2 text-xs hover:text-white transition-colors">
+          <button onClick={handleCopy} className="flex shrink-0 items-center gap-1 rounded p-1 text-xs hover:bg-gray-700 hover:text-white transition-colors" title="Copy YAML" aria-label={copied ? 'YAML copied' : 'Copy YAML'}>
             {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-            {copied ? 'Copied!' : 'Copy'}
+            <span className="yaml-viewer__action-label">{copied ? 'Copied!' : 'Copy'}</span>
           </button>
         </div>
       </div>

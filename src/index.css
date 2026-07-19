@@ -294,3 +294,68 @@ html, body, #root {
 .slide-in-from-bottom-2 {
   animation: slideInFromBottom 0.2s ease-out;
 }
+
+/* The preview pane can be much narrower than the browser when the controls
+   pane is open. Let its toolbar respond to that real pane width. */
+.preview-workbench {
+  container-name: preview-workbench;
+  container-type: inline-size;
+}
+
+@container preview-workbench (max-width: 40rem) {
+  .preview-toolbar {
+    align-items: flex-start;
+  }
+
+  .preview-toolbar__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* The YAML viewer can live inside a much narrower pane than the viewport.
+   Container queries keep its toolbar responsive to the pane itself instead
+   of incorrectly using page-level breakpoints. */
+.yaml-viewer {
+  container-name: yaml-viewer;
+  container-type: inline-size;
+}
+
+.yaml-viewer__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.yaml-viewer__actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@container yaml-viewer (max-width: 46rem) {
+  .yaml-viewer__actions {
+    gap: 0.25rem;
+  }
+
+  .yaml-viewer__action-label {
+    display: none;
+  }
+}
+
+@container yaml-viewer (max-width: 26rem) {
+  .yaml-viewer__toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .yaml-viewer__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

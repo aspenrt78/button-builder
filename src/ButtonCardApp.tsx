@@ -29,6 +29,14 @@ const STATE_DESIGN_STORAGE_KEY = 'button-builder-state-design';
 const CUSTOM_PRESETS_STORAGE_KEY = 'button-builder-custom-presets';
 const SAVED_BUTTONS_STORAGE_KEY = 'button-builder-saved-buttons';
 const ADVANCED_MODE_STORAGE_KEY = 'button-builder-advanced-mode';
+const DESKTOP_CONFIG_MIN_WIDTH = 600;
+const DESKTOP_PREVIEW_MIN_WIDTH = 480;
+
+const getResponsiveConfigWidth = (viewportWidth: number): number => {
+  const preferredWidth = Math.round(viewportWidth * 0.52);
+  const maxWidth = Math.max(DESKTOP_CONFIG_MIN_WIDTH, viewportWidth - DESKTOP_PREVIEW_MIN_WIDTH);
+  return Math.min(maxWidth, Math.max(DESKTOP_CONFIG_MIN_WIDTH, preferredWidth));
+};
 
 const buildDefaultOffAppearance = (config: ButtonConfig): Partial<StateAppearanceConfig> => {
   const color = config.backgroundColor;
@@ -193,9 +201,7 @@ export const ButtonCardApp: React.FC = () => {
   const [desktopConfigOpen, setDesktopConfigOpen] = useState(true);
   const [desktopYamlOpen, setDesktopYamlOpen] = useState(false);
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
-  const [desktopConfigWidth, setDesktopConfigWidth] = useState(() =>
-    Math.max(620, Math.round(window.innerWidth * 0.62))
-  );
+  const [desktopConfigWidth, setDesktopConfigWidth] = useState(() => getResponsiveConfigWidth(window.innerWidth));
   const [yamlCopied, setYamlCopied] = useState(false);
   const [openMagicToApiKey, setOpenMagicToApiKey] = useState(false);
   const [simulatedState, setSimulatedState] = useState<'on' | 'off'>(initialStateDesign.editingState);
@@ -294,6 +300,22 @@ export const ButtonCardApp: React.FC = () => {
     return () => {
       if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
     };
+  }, []);
+
+  // Keep both desktop panes usable when the Home Assistant panel or browser is resized.
+  useEffect(() => {
+    const handleResize = () => {
+      setDesktopConfigWidth(currentWidth => {
+        const maxWidth = Math.max(
+          DESKTOP_CONFIG_MIN_WIDTH,
+          window.innerWidth - DESKTOP_PREVIEW_MIN_WIDTH,
+        );
+        return Math.min(maxWidth, Math.max(DESKTOP_CONFIG_MIN_WIDTH, currentWidth));
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Warn before closing if there are unsaved session-queue items.
@@ -897,8 +919,14 @@ export const ButtonCardApp: React.FC = () => {
     const startX = event.clientX;
     const startWidth = desktopConfigWidth;
     const handleMove = (moveEvent: PointerEvent) => {
-      const maxWidth = window.innerWidth - 360;
-      setDesktopConfigWidth(Math.min(maxWidth, Math.max(520, startWidth + moveEvent.clientX - startX)));
+      const maxWidth = Math.max(
+        DESKTOP_CONFIG_MIN_WIDTH,
+        window.innerWidth - DESKTOP_PREVIEW_MIN_WIDTH,
+      );
+      setDesktopConfigWidth(Math.min(
+        maxWidth,
+        Math.max(DESKTOP_CONFIG_MIN_WIDTH, startWidth + moveEvent.clientX - startX),
+      ));
     };
     const handleUp = () => {
       window.removeEventListener('pointermove', handleMove);
@@ -925,7 +953,7 @@ export const ButtonCardApp: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-white font-sans overflow-hidden selection:bg-blue-500/30">
+    <div className="flex min-w-0 flex-col h-full bg-black text-white font-sans overflow-hidden selection:bg-blue-500/30">
       <header className="h-12 md:h-14 border-b border-gray-800 flex items-center justify-between px-3 md:px-6 bg-gray-900/50 backdrop-blur-md shrink-0 relative z-50">
         <div className="flex items-center gap-2 md:gap-3">
           <img src={logo} alt="Button Builder logo" className="w-7 h-7 md:w-9 md:h-9 rounded-lg object-contain border border-gray-800 bg-black/40" />
@@ -942,7 +970,7 @@ export const ButtonCardApp: React.FC = () => {
           </div>
         </div>
 
-        <div className="hidden lg:flex items-center gap-2">
+        <div className="hidden xl:flex items-center gap-2">
           <button onClick={() => setShowButtonLibrary(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Open button library">
             <FolderOpen size={14} />
             Library
@@ -991,13 +1019,13 @@ export const ButtonCardApp: React.FC = () => {
           </div>
         </div>
 
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-gray-400 hover:text-white" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen}>
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="xl:hidden p-2 text-gray-400 hover:text-white" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen}>
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </header>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-12 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
+        <div className="xl:hidden absolute top-12 md:top-14 left-0 right-0 bg-gray-900 border-b border-gray-800 z-40 p-3 space-y-2 animate-in slide-in-from-top-2">
           <button onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left">
             <Wand2 size={18} className="text-indigo-400" />
             <span>Magic Build</span>
@@ -1039,7 +1067,7 @@ export const ButtonCardApp: React.FC = () => {
         </div>
       )}
 
-      <main className="hidden lg:flex flex-1 min-h-0 overflow-hidden">
+      <main className="hidden xl:flex flex-1 min-h-0 overflow-hidden">
         {desktopConfigOpen && <aside className="shrink-0 shadow-xl bg-gray-900 border-r border-gray-800 relative" style={{ width: desktopConfigWidth }}>
           <ConfigPanel
             config={config}
@@ -1074,16 +1102,16 @@ export const ButtonCardApp: React.FC = () => {
         </aside>}
 
         <section className="flex-1 flex flex-col min-w-0 min-h-0">
-          <div className="flex-1 min-h-0 bg-[#0a0a0a] relative flex flex-col">
+          <div className="preview-workbench flex-1 min-h-0 bg-[#0a0a0a] relative flex flex-col">
               <div className="absolute inset-0 bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] opacity-50 pointer-events-none" />
-              <div className="relative z-10 px-4 py-2.5 flex items-center justify-between gap-3 border-b border-gray-800/70 bg-black/40 backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider">
+              <div className="preview-toolbar relative z-10 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-gray-800/70 bg-black/40 backdrop-blur-sm">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider">
                   <Eye size={14} />
                   Live Preview
                   {config.entity && <span className="normal-case tracking-normal font-mono text-[10px] text-gray-600 max-w-48 truncate">{config.entity}</span>}
                   {activePreset && <span className="normal-case tracking-normal rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-300">{activePreset.name}</span>}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="preview-toolbar__actions flex min-w-0 flex-wrap items-center justify-end gap-2">
                   {hasOnOffState(config.entity) && <div className={`flex items-center gap-1.5 rounded-lg border p-1 ${simulatedState === 'on' ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
                     <button
                       type="button"
@@ -1118,7 +1146,7 @@ export const ButtonCardApp: React.FC = () => {
               <div className="flex-1 relative overflow-hidden z-0 w-full min-h-0 min-w-0">
                 <PreviewCard config={finalConfig} simulatedState={simulatedState} onSimulatedStateChange={setSimulatedState} />
               </div>
-              {desktopYamlOpen && <div className="relative z-10 h-[42%] min-h-64 max-h-[28rem] border-t border-gray-700 bg-[#111] flex flex-col shrink-0 shadow-[0_-12px_35px_rgba(0,0,0,0.35)]">
+              {desktopYamlOpen && <div className="relative z-10 h-[42%] min-h-40 max-h-[28rem] border-t border-gray-700 bg-[#111] flex flex-col shrink-0 shadow-[0_-12px_35px_rgba(0,0,0,0.35)]">
                 <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-3">
                 <YamlViewer yaml={yamlOutput} config={config} className="flex-1" sessionButtons={queuedButtons} savedButtons={savedButtons} onQueueCurrent={handleQueueCurrentButton} onSaveCurrent={handleSaveCurrentButton} />
                 </div>
@@ -1127,7 +1155,7 @@ export const ButtonCardApp: React.FC = () => {
         </section>
       </main>
 
-      <main className="lg:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
+      <main className="xl:hidden flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-hidden">
           {mobileTab === 'preview' && (
             <div className="h-full bg-[#0a0a0a] relative flex flex-col">
