@@ -13,7 +13,7 @@ import { SavedTheme } from './types';
 import { loadThemes, persistThemes, buildThemeValues, expandThemeKeys } from './utils/themes';
 import { ThemeChooserModal } from './components/ThemeChooserModal';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
-import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig } from './presets';
+import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig, applyPreset } from './presets';
 import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, AlertTriangle, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, MoreHorizontal, Copy, Check, Key, ArrowRightLeft, Eraser, Palette } from 'lucide-react';
 import { hasOnOffState } from './utils/entityCapabilities';
 import { checkButtonBuilderEnvironment, ButtonBuilderEnvironmentReport } from './services/dashboardService';
@@ -625,21 +625,16 @@ export const ButtonCardApp: React.FC = () => {
 
   const handleApplyPreset = (preset: Preset) => {
     const isBinary = hasOnOffState(config.entity);
-    // Split the preset into appearance (per-state) vs. non-appearance (base config).
-    const presetAppearance = extractAppearance(preset.config);
-    const applyBaseFields = (base: Partial<StateAppearanceConfig>) => {
-      // Non-appearance fields (layout/content/behavior + templates) go to base config.
-      const nonAppearance: Partial<ButtonConfig> = { ...preset.config };
-      Object.keys(base).forEach(k => { delete (nonAppearance as Record<string, unknown>)[k]; });
-      return nonAppearance;
-    };
+    // A preset is a complete visual baseline. Reset every style field to its
+    // default before applying the preset's explicit values so no visual setting
+    // from the previous design can leak into the selected preset.
+    const presetBaseline = applyPreset(preset);
+    const presetAppearance = extractAppearance(presetBaseline);
 
-    // Appearance goes to the currently-active editing state; the
-    // non-appearance fields refresh the base config.
     isApplyingPresetRef.current = true;
     setConfigInternal(prev => ({
       ...prev,
-      ...(isBinary ? applyBaseFields(presetAppearance) : preset.config),
+      ...presetBaseline,
     }));
     setActivePreset(preset);
     isApplyingPresetRef.current = false;
@@ -647,41 +642,22 @@ export const ButtonCardApp: React.FC = () => {
     const targetState = simulatedState;
     if (isBinary) {
       if (targetState === 'on') {
-        setOnStateAppearance(prev => ({ ...prev, ...presetAppearance }));
+        setOnStateAppearance(presetAppearance);
       } else {
-        setOffStateAppearance(prev => ({ ...prev, ...presetAppearance }));
+        setOffStateAppearance(presetAppearance);
       }
     }
 
-    // Auto-dark seeds the OFF appearance from the preset when editing ON.
+    // Auto-dark replaces the OFF appearance from the same complete baseline.
     if (isBinary && useAutoDarkMode && targetState === 'on') {
-      const darkPreset = generateDarkModePreset(preset);
-      setOffStateAppearance(prev => ({ ...prev, ...extractAppearance(darkPreset.config) }));
+      const darkPreset = generateDarkModePreset({ ...preset, config: presetBaseline });
+      setOffStateAppearance(extractAppearance(darkPreset.config));
     }
   };
 
   const handleResetToPreset = () => {
     if (!activePreset) return;
-    const isBinary = hasOnOffState(config.entity);
-    const presetAppearance = extractAppearance(activePreset.config);
-    const nonAppearance: Partial<ButtonConfig> = { ...activePreset.config };
-    Object.keys(presetAppearance).forEach(key => {
-      delete (nonAppearance as Record<string, unknown>)[key];
-    });
-    isApplyingPresetRef.current = true;
-    setConfigInternal(prev => ({ ...prev, ...(isBinary ? nonAppearance : activePreset.config) }));
-    isApplyingPresetRef.current = false;
-    if (isBinary && simulatedState === 'on') {
-      setOnStateAppearance(prev => ({ ...prev, ...presetAppearance }));
-      if (useAutoDarkMode) {
-        setOffStateAppearance(prev => ({
-          ...prev,
-          ...extractAppearance(generateDarkModePreset(activePreset).config),
-        }));
-      }
-    } else if (isBinary) {
-      setOffStateAppearance(prev => ({ ...prev, ...presetAppearance }));
-    }
+    handleApplyPreset(activePreset);
   };
 
   const handlePresetConfigChange = (updates: Partial<ButtonConfig>) => {

@@ -132,6 +132,16 @@ export const buildStylePresetConfig = (config: ButtonConfig): Partial<ButtonConf
 };
 
 /**
+ * Build the complete visual baseline for a preset. Presets are intentionally
+ * partial, so every omitted style field must return to its normal default
+ * instead of leaking through from the previously selected preset.
+ */
+export const buildPresetBaseline = (preset: Preset): Partial<ButtonConfig> => ({
+  ...buildStylePresetConfig(DEFAULT_CONFIG),
+  ...preset.config,
+});
+
+/**
  * Helper function to darken a hex color
  */
 const darkenColor = (hex: string, amount: number = 0.5): string => {
@@ -2162,5 +2172,5 @@ padding-left: 8px`,
 ];
 
 export const applyPreset = (preset: Preset): Partial<ButtonConfig> => {
-  return { ...DEFAULT_CONFIG, ...preset.config };
+  return buildPresetBaseline(preset);
 };
