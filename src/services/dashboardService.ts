@@ -306,47 +306,6 @@ export const checkButtonBuilderEnvironment = async (config?: ButtonConfigSnapsho
   };
 };
 
-/**
- * Environment check for the Bubble Card builder: verifies that the
- * custom:bubble-card resource is installed in Lovelace.
- */
-export const checkBubbleCardEnvironment = async (): Promise<ButtonBuilderEnvironmentReport> => {
-  const requirements: BuilderRequirementStatus[] = [];
-
-  if (!getHass()) {
-    requirements.push({
-      id: 'ha-context',
-      label: 'Home Assistant context',
-      required: true,
-      status: 'unavailable',
-      details: 'The panel is running in a restricted context, so Home Assistant checks are unavailable.',
-    });
-    return { checkedAt: Date.now(), requirements };
-  }
-
-  const resources = await fetchLovelaceResources();
-  const resourceInstalled = resources.some((resource) => matchesResourceNeedle(resource.url, 'bubble-card'));
-  const registered = getParentCustomCards().some((entry) => {
-    const type = (entry?.type || '').toString().toLowerCase();
-    return type === 'bubble-card' || type === 'custom:bubble-card';
-  });
-  const installed = resourceInstalled || registered;
-
-  requirements.push({
-    id: 'bubble-card',
-    label: 'custom:bubble-card',
-    required: true,
-    status: installed ? 'ok' : 'missing',
-    details: installed
-      ? 'Bubble Card appears to be installed and available in Lovelace.'
-      : 'This builder generates custom:bubble-card YAML, which requires the Bubble Card custom card to be installed in Home Assistant (available via HACS).',
-    actionLabel: installed ? undefined : 'Install Bubble Card',
-    actionUrl: installed ? undefined : 'https://github.com/Clooos/Bubble-Card',
-  });
-
-  return { checkedAt: Date.now(), requirements };
-};
-
 const callHassWS = async (type: string, data?: any): Promise<any | null> => {
   const hass = getHass();
 
