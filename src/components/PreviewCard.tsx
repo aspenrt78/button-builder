@@ -915,8 +915,18 @@ export const PreviewCard: React.FC<Props> = ({ config, simulatedState, onSimulat
   // Check if extraStyles has a background property to avoid React warning about conflicting styles
   const hasExtraBackground = 'background' in effectiveExtraStyles || 'backgroundImage' in effectiveExtraStyles;
   
-  // Check if user explicitly set a backgroundColor via state appearance (should override preset background)
-  const userSetBackgroundColor = matchingStateStyle?.backgroundColor && matchingStateStyle.backgroundColor !== '';
+  // A merged ON/OFF appearance always carries a backgroundColor, including when
+  // that color came from the preset itself. Do not mistake that synthetic value
+  // for a manual override or animated extraStyles backgrounds (Scanner, Plasma,
+  // Holographic, etc.) get stripped. A real color edit differs from the base
+  // color while retaining the base extraStyles; auto-dark variants change both.
+  const isSyntheticStateAppearance = matchingStateStyle?.id?.startsWith('state-appearance-') ?? false;
+  const stateUsesBaseExtraStyles = (matchingStateStyle?.styles || '') === (config.extraStyles || '');
+  const hasDistinctStateBackground = matchingStateStyle?.backgroundColor !== config.backgroundColor;
+  const userSetBackgroundColor = Boolean(
+    matchingStateStyle?.backgroundColor
+      && (!isSyntheticStateAppearance || (hasDistinctStateBackground && stateUsesBaseExtraStyles))
+  );
   
   // Filter out background/backgroundImage from extraStyles if user explicitly set a backgroundColor
   // This allows user's backgroundColor to take precedence over preset animations/gradients
