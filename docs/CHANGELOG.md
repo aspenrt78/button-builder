@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.3] - 2026-07-25
+
+### Fixed
+
+- **Animated preset backgrounds**: Preserved preset-provided animated gradients when ON/OFF state appearances are merged, restoring Holographic, Lava Lamp, Scanner, Liquid Gradient, Plasma, and related live previews.
+
 ## [3.0.0] - 2026-07-17
 
 ### Breaking changes
