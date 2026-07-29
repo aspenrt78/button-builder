@@ -21,7 +21,7 @@ Triggered by a single tap/click.
 
 **Default**: `toggle`
 
-### Hold Action  
+### Hold Action
 Triggered by pressing and holding.
 
 **Default**: `more-info`

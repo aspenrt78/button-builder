@@ -75,9 +75,10 @@ data:
 ## Troubleshooting
 
 ### Button Builder won't load
-- Clear browser cache
+- Hard-refresh with **Ctrl+Shift+R** (Windows/Linux) or **Cmd+Shift+R** (macOS)
 - Check Home Assistant logs for errors
 - Verify the integration is installed correctly
+- Confirm the sidebar link uses `/button-builder`, not a former v2 route
 
 ### YAML has errors when pasted
 - Make sure you're adding a "Manual" card, not putting it in existing card YAML
@@ -88,6 +89,7 @@ data:
 - Some animations only trigger on specific states (on/off)
 - Check the Animation Trigger setting
 - Ensure the animation speed isn't set too slow
+- If an animated preset background is static, update to Button Builder 3.0.3 or newer
 
 ### Preview doesn't match dashboard
 - Dashboard layouts affect card sizing

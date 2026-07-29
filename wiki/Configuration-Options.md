@@ -59,7 +59,7 @@ Control what elements appear on the button:
 Each element can have its own color with "Match Entity" option:
 
 - Icon Color
-- Name Color  
+- Name Color
 - State Color
 - Label Color
 
@@ -103,7 +103,7 @@ Enable gradient backgrounds with:
 ### Card Animation
 Animate the entire button card.
 
-### Icon Animation  
+### Icon Animation
 Animate just the icon.
 
 **Animation Types**: flash, pulse, jiggle, shake, bounce, spin, glow, float, swing, heartbeat, flip, wobble, breathe, ripple

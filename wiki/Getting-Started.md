@@ -10,6 +10,8 @@ Button Builder has three working areas:
 | Preview | Live state simulation on a configurable dashboard backdrop |
 | YAML | Generated `custom:button-card` configuration ready to copy |
 
+![Style preset browser, live state preview, and generated YAML workspace](images/generated-yaml-workspace.png)
+
 ## Create a button
 
 1. Select a Home Assistant entity.

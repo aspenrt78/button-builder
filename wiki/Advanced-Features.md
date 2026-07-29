@@ -1,5 +1,13 @@
 # Advanced Features
 
+## Reusable themes
+
+Use **Theme** above the live preview to choose which appearance controls remain
+global across a button's ON and OFF states. You can save the selected controls
+as a named theme and reuse them in later designs.
+
+![Theme options for selecting global appearance controls](images/theme-options.png)
+
 ## Magic Builder (AI)
 
 Generate button configurations using natural language descriptions.

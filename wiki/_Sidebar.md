@@ -2,6 +2,7 @@
 
 **Getting Started**
 - [[Home]]
+- [[What's New]]
 - [[Installation]]
 - [[Getting Started]]
 
@@ -12,4 +13,5 @@
 - [[Advanced Features]]
 
 **Help**
+- [[Credits]]
 - [[FAQ]]

@@ -2,14 +2,27 @@
 
 Button Builder is a visual Home Assistant editor for creating `custom:button-card` YAML without hand-writing the full configuration.
 
+![Button Builder v3 workbench with the Holographic preset and live preview](images/button-builder-workbench.png)
+
+Button Builder creates configurations for
+[`custom:button-card`](https://github.com/custom-cards/button-card), created by
+[RomRider](https://github.com/RomRider). Button Builder is a separate visual
+configuration tool and would not exist without the flexibility of the original
+button-card project.
+
+> **Current release: 3.0.3** — This maintenance release restores animated
+> preset backgrounds when ON/OFF state appearances are merged.
+
 ## Quick links
 
 - [[Installation]]
 - [[Getting Started]]
+- [[What's New]]
 - [[Configuration Options]]
 - [[Style Presets]]
 - [[Actions and Interactions]]
 - [[Advanced Features]]
+- [[Credits]]
 - [[FAQ]]
 
 ## Version 3 highlights

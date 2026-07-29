@@ -18,6 +18,13 @@ So here's the deal — I built **Button Builder** because I got tired of hand-wr
 
 Button Builder gives you a **visual UI** for designing buttons. Pick your style, set up tap actions, choose icons, define states, tweak colors, add animations — all the fun stuff — and the app spits out the YAML for you. Copy it, paste it into your dashboard, and *boom*: your button looks exactly how you imagined.
 
+> [!NOTE]
+> Button Builder creates configurations for
+> [custom:button-card](https://github.com/custom-cards/button-card), created by
+> [RomRider](https://github.com/RomRider). Button Builder is a separate visual
+> configuration tool and would not exist without the flexibility of the
+> original button-card project.
+
 Oh, and there's an **AI-powered button creator** too. Just describe what you want — something like *"Give me a button that glows red when the garage is open and pulses blue when it's closed"* — and it'll try to build that YAML for you. Sometimes it nails it. Sometimes it creates a Frankenstein monster. But honestly? That's half the fun.
 
 ---
@@ -69,6 +76,20 @@ Button Builder designs cards for [custom:button-card](https://github.com/custom-
 - 🔧 **Full Option Coverage**: Comprehensive support for custom:button-card options
 - 🖼️ **Dashboard-Aware Preview**: Dashboard/custom backdrops, a blur-test pattern, zoom, and layout sizing
 - 📱 **Responsive Workbench**: Resizable desktop panels and dedicated phone navigation
+
+## Screenshots
+
+### Visual workbench and live preview
+
+![Button Builder v3 workbench with the Holographic preset and live preview](https://raw.githubusercontent.com/aspenrt78/button-builder/main/wiki/images/button-builder-workbench.png)
+
+### Generated YAML workspace
+
+![Style preset browser, live state preview, and generated YAML workspace](https://raw.githubusercontent.com/aspenrt78/button-builder/main/wiki/images/generated-yaml-workspace.png)
+
+### Reusable theme controls
+
+![Theme options for selecting global appearance controls](https://raw.githubusercontent.com/aspenrt78/button-builder/main/wiki/images/theme-options.png)
 
 ## 📦 Installation
 
@@ -232,7 +253,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with React, TypeScript, and Vite
 - AI powered by Google Gemini
-- Designed for [custom:button-card](https://github.com/custom-cards/button-card) by [@RomRider](https://github.com/RomRider)
+- Designed for [custom:button-card](https://github.com/custom-cards/button-card),
+  created and maintained by [RomRider](https://github.com/RomRider) and its
+  contributors
 - Icons by [Lucide](https://lucide.dev)
 
 ## 🐛 Issues & Support
