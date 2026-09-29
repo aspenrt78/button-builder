@@ -14,7 +14,7 @@ import { loadThemes, persistThemes, buildThemeValues, expandThemeKeys } from './
 import { ThemeChooserModal } from './components/ThemeChooserModal';
 import { parseButtonCardYaml, validateImportedConfig } from './utils/yamlImporter';
 import { PRESETS, Preset, generateDarkModePreset, buildStylePresetConfig, applyPreset } from './presets';
-import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, AlertTriangle, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, MoreHorizontal, Copy, Check, Key, ArrowRightLeft, Eraser, Palette } from 'lucide-react';
+import { Wand2, Eye, RotateCcw, Upload, Settings, Code, Menu, X, Undo2, Redo2, FolderOpen, AlertTriangle, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, MoreHorizontal, Copy, Check, Key, ArrowRightLeft, Eraser, Palette, Moon, Sun } from 'lucide-react';
 import { hasOnOffState } from './utils/entityCapabilities';
 import { checkButtonBuilderEnvironment, ButtonBuilderEnvironmentReport } from './services/dashboardService';
 import { APP_VERSION_LABEL } from './version';
@@ -29,6 +29,7 @@ const STATE_DESIGN_STORAGE_KEY = 'button-builder-state-design';
 const CUSTOM_PRESETS_STORAGE_KEY = 'button-builder-custom-presets';
 const SAVED_BUTTONS_STORAGE_KEY = 'button-builder-saved-buttons';
 const ADVANCED_MODE_STORAGE_KEY = 'button-builder-advanced-mode';
+const UI_COLOR_MODE_STORAGE_KEY = 'button-builder-ui-color-mode';
 const DESKTOP_CONFIG_MIN_WIDTH = 600;
 const DESKTOP_PREVIEW_MIN_WIDTH = 480;
 
@@ -213,6 +214,9 @@ export const ButtonCardApp: React.FC = () => {
   );
   const [advancedMode, setAdvancedMode] = useState(
     () => localStorage.getItem(ADVANCED_MODE_STORAGE_KEY) === 'true'
+  );
+  const [uiColorMode, setUiColorMode] = useState<'dark' | 'light'>(
+    () => localStorage.getItem(UI_COLOR_MODE_STORAGE_KEY) === 'light' ? 'light' : 'dark'
   );
   const [savedButtons, setSavedButtons] = useState<SavedButtonRecord[]>(loadSavedButtons);
   const [queuedButtons, setQueuedButtons] = useState<SavedButtonRecord[]>([]);
@@ -407,6 +411,13 @@ export const ButtonCardApp: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(ADVANCED_MODE_STORAGE_KEY, String(advancedMode));
   }, [advancedMode]);
+
+  useEffect(() => {
+    const lightMode = uiColorMode === 'light';
+    document.documentElement.classList.toggle('bb-light', lightMode);
+    document.documentElement.style.colorScheme = lightMode ? 'light' : 'dark';
+    localStorage.setItem(UI_COLOR_MODE_STORAGE_KEY, uiColorMode);
+  }, [uiColorMode]);
 
   // Only re-check when the entity changes, not on every config keypress.
   useEffect(() => {
@@ -947,6 +958,16 @@ export const ButtonCardApp: React.FC = () => {
         </div>
 
         <div className="hidden xl:flex items-center gap-2">
+          <button
+            onClick={() => setUiColorMode((mode) => mode === 'dark' ? 'light' : 'dark')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all"
+            title={`Switch to ${uiColorMode === 'dark' ? 'light' : 'dark'} mode`}
+            aria-label={`Switch to ${uiColorMode === 'dark' ? 'light' : 'dark'} mode`}
+            aria-pressed={uiColorMode === 'light'}
+          >
+            {uiColorMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {uiColorMode === 'dark' ? 'Light' : 'Dark'}
+          </button>
           <button onClick={() => setShowButtonLibrary(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 rounded-full text-sm font-medium transition-all" title="Open button library">
             <FolderOpen size={14} />
             Library
@@ -1005,6 +1026,14 @@ export const ButtonCardApp: React.FC = () => {
           <button onClick={() => { setIsMagicOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-left">
             <Wand2 size={18} className="text-indigo-400" />
             <span>Magic Build</span>
+          </button>
+          <button
+            onClick={() => setUiColorMode((mode) => mode === 'dark' ? 'light' : 'dark')}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left"
+            aria-pressed={uiColorMode === 'light'}
+          >
+            {uiColorMode === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-blue-500" />}
+            <span>Switch to {uiColorMode === 'dark' ? 'light' : 'dark'} mode</span>
           </button>
           <button onClick={() => { setIsImportOpen(true); setMobileMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg text-left">
             <Upload size={18} className="text-blue-400" />

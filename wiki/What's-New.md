@@ -1,5 +1,15 @@
 # What's New
 
+## Version 3.0.4
+
+Version 3.0.4 adds a persistent light interface mode to Button Builder. Use the
+Light/Dark control in the desktop toolbar or mobile menu to switch the complete
+builder interface, including dialogs and the icon picker. The card preview
+continues to show the colors configured for the button itself.
+
+Update through HACS, restart Home Assistant, and hard-refresh the Button Builder
+panel if an older frontend bundle remains cached.
+
 ## Version 3.0.3
 
 Version 3.0.3 fixes animated backgrounds supplied by style presets. Holographic,

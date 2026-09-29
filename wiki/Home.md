@@ -10,8 +10,8 @@ Button Builder creates configurations for
 configuration tool and would not exist without the flexibility of the original
 button-card project.
 
-> **Current release: 3.0.3** — This maintenance release restores animated
-> preset backgrounds when ON/OFF state appearances are merged.
+> **Current release: 3.0.4** — This release adds a persistent light interface
+> mode across the builder, dialogs, mobile menu, and icon picker.
 
 ## Quick links
 

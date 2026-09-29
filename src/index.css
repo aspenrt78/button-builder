@@ -359,3 +359,77 @@ html, body, #root {
     justify-content: flex-start;
   }
 }
+
+/* Light UI mode. The builder historically used dark Tailwind utilities
+   directly, so these document-scoped mappings also cover portaled dialogs and
+   pickers without changing the colors of the card being designed. */
+html.bb-light body,
+html.bb-light #root {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.bb-light .bg-black { background-color: #f8fafc; }
+html.bb-light .bg-black\/30 { background-color: rgb(248 250 252 / 0.88); }
+html.bb-light .bg-black\/40 { background-color: rgb(248 250 252 / 0.92); }
+html.bb-light .bg-black\/50 { background-color: rgb(248 250 252 / 0.95); }
+html.bb-light .bg-gray-950,
+html.bb-light .bg-gray-950\/70,
+html.bb-light .bg-gray-950\/75,
+html.bb-light .bg-gray-950\/80,
+html.bb-light .bg-gray-950\/90 { background-color: #f1f5f9; }
+html.bb-light .bg-gray-900,
+html.bb-light .bg-gray-900\/50,
+html.bb-light .bg-gray-900\/60,
+html.bb-light .bg-gray-900\/80,
+html.bb-light .bg-gray-900\/90 { background-color: #ffffff; }
+html.bb-light .bg-gray-800,
+html.bb-light .bg-gray-800\/40,
+html.bb-light .bg-gray-800\/50,
+html.bb-light .bg-gray-800\/60,
+html.bb-light .bg-gray-800\/90 { background-color: #f1f5f9; }
+html.bb-light .bg-gray-700,
+html.bb-light .bg-gray-700\/50 { background-color: #e2e8f0; }
+
+html.bb-light .bg-\[\#0a0a0a\],
+html.bb-light .bg-\[\#111\],
+html.bb-light .bg-\[\#1e1e1e\],
+html.bb-light .bg-\[\#252526\],
+html.bb-light .bg-\[\#0d0d0d\] { background-color: #f8fafc; }
+
+html.bb-light .border-gray-800,
+html.bb-light .border-gray-800\/50,
+html.bb-light .border-gray-800\/70,
+html.bb-light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+html.bb-light .border-gray-700,
+html.bb-light .border-gray-700\/60 { border-color: #cbd5e1; }
+html.bb-light .border-gray-600 { border-color: #94a3b8; }
+html.bb-light .border-gray-500 { border-color: #64748b; }
+html.bb-light .border-white,
+html.bb-light .border-white\/10,
+html.bb-light .border-white\/20 { border-color: rgb(100 116 139 / 0.35); }
+
+html.bb-light .text-white,
+html.bb-light .text-white\/70,
+html.bb-light .text-white\/80,
+html.bb-light .text-gray-200 { color: #0f172a; }
+html.bb-light .text-gray-300 { color: #1e293b; }
+html.bb-light .text-gray-400 { color: #334155; }
+html.bb-light .text-gray-500 { color: #475569; }
+html.bb-light .text-gray-600 { color: #64748b; }
+html.bb-light .placeholder-gray-500::placeholder,
+html.bb-light .placeholder-gray-600::placeholder { color: #64748b; }
+
+html.bb-light .hover\:bg-gray-800:hover { background-color: #e2e8f0; }
+html.bb-light .hover\:bg-gray-700:hover { background-color: #cbd5e1; }
+html.bb-light .hover\:text-white:hover { color: #0f172a; }
+
+/* Text on solid action colors must remain white in light mode. */
+html.bb-light :is(.bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-red-600, .bg-red-700, .bg-green-600, .bg-green-700, .bg-emerald-500, .bg-emerald-600, .bg-emerald-700, .bg-purple-500, .bg-purple-600).text-white,
+html.bb-light :is(.bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-red-600, .bg-red-700, .bg-green-600, .bg-green-700, .bg-emerald-500, .bg-emerald-600, .bg-emerald-700, .bg-purple-500, .bg-purple-600) .text-white {
+  color: #ffffff;
+}
+
+html.bb-light .custom-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; }
+html.bb-light .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; }
+html.bb-light .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }

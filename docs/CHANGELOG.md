@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.4] - 2026-09-29
+
+### Added
+
+- **Light interface mode**: Added a persistent light/dark appearance toggle to the desktop toolbar and mobile menu.
+- **Complete light-theme coverage**: Updated the builder workbench, forms, menus, dialogs, YAML workspace, scrollbars, and portaled icon picker for readable light-mode contrast while preserving the configured card preview.
+
 ## [3.0.3] - 2026-07-25
 
 ### Fixed
