@@ -66,7 +66,7 @@ Button Builder designs cards for [custom:button-card](https://github.com/custom-
 
 - 🎯 **State-Aware Visual Editor**: Design ON and OFF appearances independently with a synchronized live preview
 - 🤖 **AI-Powered Design**: Use Home Assistant AI Tasks or a direct Gemini API key to generate designs from natural language
-- 💾 **Save & Library**: Save designs with folders and tags, search, duplicate, export backups, undo/redo
+- 💾 **Shared Library**: Save designs with folders and tags, sync them through Home Assistant across browsers, and expose interoperable button-style presets to compatible cards
 - 🧩 **Themes & Presets**: Choose global controls, save themes, browse curated style/backdrop pairings, and save custom styles
 - 🎨 **Full Style Control**: Colors, gradients, opacity, borders, shadows, glassmorphism effects
 - ⚡ **Advanced Effects**: More than two dozen visual effects with state-aware speed, trigger, and 25–200% intensity

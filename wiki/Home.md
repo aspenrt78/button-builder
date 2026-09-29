@@ -10,8 +10,8 @@ Button Builder creates configurations for
 configuration tool and would not exist without the flexibility of the original
 button-card project.
 
-> **Current release: 3.0.4** — This release adds a persistent light interface
-> mode across the builder, dialogs, mobile menu, and icon picker.
+> **Current release: 3.1.0** — This release synchronizes saved designs through
+> Home Assistant and publishes interoperable button-style presets for compatible cards.
 
 ## Quick links
 

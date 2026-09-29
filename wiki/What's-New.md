@@ -1,5 +1,21 @@
 # What's New
 
+## Version 3.1.0
+
+Version 3.1 moves saved button designs into Home Assistant's shared system
+storage. Libraries now synchronize across browsers and sessions, update live,
+and expose compatible layered button-style presets that other cards can read.
+Existing browser-saved designs migrate automatically the first time an
+administrator opens the updated builder.
+
+Button Builder is now an administrator-only panel, matching Home Assistant's
+permissions for editing dashboards and writing shared system data. Standalone
+development continues to use browser storage as a fallback.
+
+Update through HACS and restart Home Assistant. Open Button Builder once in the
+browser that holds your existing saved designs to migrate them, then hard-refresh
+the panel if an older frontend bundle remains cached.
+
 ## Version 3.0.4
 
 Version 3.0.4 adds a persistent light interface mode to Button Builder. Use the

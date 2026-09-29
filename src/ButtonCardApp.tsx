@@ -21,6 +21,8 @@ import { APP_VERSION_LABEL } from './version';
 import { cloneSnapshot, useToast, Toast, useResetConfirm, SaveRecordMetadata } from './shared/libraryUtils';
 import { SaveRecordModal } from './shared/SaveRecordModal';
 import { LibraryModal } from './shared/LibraryModal';
+import { parseLocalButtonRecords } from './services/buttonLibraryService';
+import { useSharedButtonLibrary } from './hooks/useSharedButtonLibrary';
 
 import logo from './assets/logo.png';
 
@@ -142,28 +144,7 @@ const loadSavedButtons = (): SavedButtonRecord[] => {
   try {
     const saved = localStorage.getItem(SAVED_BUTTONS_STORAGE_KEY);
     if (!saved) return [];
-    const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((button: any) => button && typeof button === 'object' && typeof button.id === 'string')
-      .map((button: any) => ({
-        id: button.id,
-        name: typeof button.name === 'string' ? button.name : 'Saved Button',
-        folder: typeof button.folder === 'string' ? button.folder : '',
-        tags: Array.isArray(button.tags) ? button.tags.filter((tag: unknown) => typeof tag === 'string') : [],
-        yaml: typeof button.yaml === 'string' ? button.yaml : '',
-        config: { ...DEFAULT_CONFIG, ...(button.config || {}) },
-        useAutoDarkMode: button.useAutoDarkMode !== false,
-        activePresetId: typeof button.activePresetId === 'string' ? button.activePresetId : null,
-        legacyPresetCondition: button.presetCondition === 'on' || button.presetCondition === 'off' ? button.presetCondition : 'always',
-        legacyOffStatePresetId: typeof button.offStatePresetId === 'string' ? button.offStatePresetId : null,
-        legacyOnStatePresetId: typeof button.onStatePresetId === 'string' ? button.onStatePresetId : null,
-        onStateAppearance: button.onStateAppearance && typeof button.onStateAppearance === 'object' ? button.onStateAppearance : {},
-        offStateAppearance: button.offStateAppearance && typeof button.offStateAppearance === 'object' ? button.offStateAppearance : {},
-        createdAt: typeof button.createdAt === 'number' ? button.createdAt : Date.now(),
-        updatedAt: typeof button.updatedAt === 'number' ? button.updatedAt : Date.now(),
-      }));
+    return parseLocalButtonRecords(JSON.parse(saved));
   } catch (e) {
     console.warn('Failed to load saved buttons:', e);
     return [];
@@ -219,6 +200,7 @@ export const ButtonCardApp: React.FC = () => {
     () => localStorage.getItem(UI_COLOR_MODE_STORAGE_KEY) === 'light' ? 'light' : 'dark'
   );
   const [savedButtons, setSavedButtons] = useState<SavedButtonRecord[]>(loadSavedButtons);
+  const libraryStorageStatus = useSharedButtonLibrary(savedButtons, setSavedButtons);
   const [queuedButtons, setQueuedButtons] = useState<SavedButtonRecord[]>([]);
   const [showButtonLibrary, setShowButtonLibrary] = useState(false);
   const [environmentReport, setEnvironmentReport] = useState<ButtonBuilderEnvironmentReport | null>(null);
@@ -1276,6 +1258,15 @@ export const ButtonCardApp: React.FC = () => {
         <LibraryModal
           queuedRecords={queuedButtons}
           savedRecords={savedButtons}
+          storageLabel={
+            libraryStorageStatus === 'shared'
+              ? 'Synced with Home Assistant'
+              : libraryStorageStatus === 'syncing'
+                ? 'Connecting to Home Assistant…'
+                : libraryStorageStatus === 'error'
+                  ? 'Browser fallback · sync unavailable'
+                  : 'Stored in this browser'
+          }
           exportFilenamePrefix="button-card"
           onClose={() => setShowButtonLibrary(false)}
           onLoad={handleLoadButtonRecord}

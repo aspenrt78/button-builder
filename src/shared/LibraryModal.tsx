@@ -12,6 +12,7 @@ interface Props<R extends LibraryRecordBase> {
   emptySavedText?: string;
   /** Filename prefix for the Export All backup; the button is hidden when omitted. */
   exportFilenamePrefix?: string;
+  storageLabel?: string;
   onClose: () => void;
   onLoad: (record: R) => void;
   onSaveQueued: (id: string) => void;
@@ -30,6 +31,7 @@ export function LibraryModal<R extends LibraryRecordBase>({
   emptyQueueText,
   emptySavedText,
   exportFilenamePrefix,
+  storageLabel = 'Stored in this browser',
   onClose,
   onLoad,
   onSaveQueued,
@@ -162,7 +164,7 @@ export function LibraryModal<R extends LibraryRecordBase>({
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Saved {itemNoun.charAt(0).toUpperCase()}{itemNoun.slice(1)}s</h4>
-              <div className="text-xs text-gray-500">Stored in browser</div>
+              <div className="text-xs text-gray-500">{storageLabel}</div>
             </div>
             <input
               type="text"

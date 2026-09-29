@@ -35,7 +35,7 @@ const canAccessParent = (): boolean => {
  * Get the Home Assistant hass object from parent window
  * This is the most reliable method for iOS companion app
  */
-const getHass = (): any | null => {
+export const getHass = (): any | null => {
   try {
     if (!canAccessParent()) {
       return null;

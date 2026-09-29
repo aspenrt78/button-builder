@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] - 2026-09-29
+
+### Added
+
+- **Home Assistant shared library**: Saved button designs now use Home Assistant's system frontend store and synchronize live across browsers and sessions.
+- **Compatible button-style presets**: Each saved design publishes a versioned `button_builder_library` preset using the shared layered `groups` format for compatible third-party cards.
+- **Lossless native payload**: Shared presets retain the complete Button Builder record, including YAML, structured configuration, folders, tags, and ON/OFF appearances.
+- **Safe migration and fallback**: Existing browser libraries migrate once to system storage; local storage remains available for standalone development or unavailable HA connections.
+- **Library status**: The library identifies whether it is synchronized, connecting, or using browser fallback storage.
+
+### Changed
+
+- **Administrator-only panel**: Button Builder now follows Home Assistant's dashboard and system-storage permissions and is visible only to administrator accounts.
+
 ## [3.0.4] - 2026-09-29
 
 ### Added

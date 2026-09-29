@@ -108,7 +108,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         config={
             "url": f"/button_builder/panel.html?v={version}"
         },
-        require_admin=False,
+        require_admin=True,
     )
 
     hass.data[DOMAIN][DATA_PANEL_REGISTERED] = True
