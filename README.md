@@ -48,6 +48,12 @@ Customize layouts, colors, icons, actions, animations, and on/off states in a li
 
 ![Theme options](wiki/images/theme-options.png)
 
+## Share Button Builder
+
+If Button Builder helps you create a dashboard, consider sharing a screenshot or a short demo with the Home Assistant community. A real before-and-after example helps others see what the editor does.
+
+Want to showcase it or introduce it to a creator? See the [showcase and outreach kit](docs/SHOWCASE.md) for a recording checklist, project description, and links. Feedback and bug reports are welcome in [GitHub Issues](https://github.com/aspenrt78/button-builder/issues).
+
 ## Version 3 upgrade notice
 
 Version 3 replaces the former Button, Bubble, and Tile sidebar panels with one **Button Builder** panel at `/button-builder`. After updating from v2, restart Home Assistant so it removes the old panel registrations and registers the new route.
