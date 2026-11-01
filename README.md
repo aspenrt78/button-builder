@@ -1,55 +1,52 @@
 <div align="center">
-<img width="200" alt="Button Builder" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/bbthumb.png" />
-<img width="600" alt="Button Builder Banner" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/.github/header.jpg" />
+
+<img width="170" alt="Button Builder logo" src="https://raw.githubusercontent.com/aspenrt78/button-builder/main/bbthumb.png" />
+
+# Button Builder for Home Assistant
+
+**Design custom Home Assistant buttons visually — without hand-writing YAML.**
+
+Customize layouts, colors, icons, actions, animations, and on/off states in a live editor. Import an existing `custom:button-card` configuration or start with a preset, then export the YAML for your dashboard.
+
+[![GitHub Release](https://img.shields.io/github/v/release/aspenrt78/button-builder)](https://github.com/aspenrt78/button-builder/releases)
+[![License](https://img.shields.io/github/license/aspenrt78/button-builder)](LICENSE)
+[![HACS](https://img.shields.io/badge/HACS-integration-41BDF5)](docs/INSTALLATION.md)
+[![Support development](https://img.shields.io/badge/Support-Buy%20Me%20a%20Coffee-yellow?logo=buymeacoffee)](https://www.buymeacoffee.com/aspenrt78)
+
+[**Install Button Builder**](docs/INSTALLATION.md) · [**Build your first button**](docs/QUICKSTART.md) · [**Report an issue**](https://github.com/aspenrt78/button-builder/issues)
+
 </div>
 
-# 🎨 Button Builder for Home Assistant
+![Button Builder visual workbench showing live preview and editing controls](wiki/images/button-builder-workbench.png)
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/aspenrt78/button-builder.svg)](https://github.com/aspenrt78/button-builder/releases)
-[![License](https://img.shields.io/github/license/aspenrt78/button-builder.svg)](LICENSE)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/aspenrt78)
+## What you can do
 
----
+- **Design visually:** Change layout, typography, icons, color, gradients, borders, shadows, and visual effects with a live preview.
+- **Style by state:** Configure on/off appearances independently, including state-aware animation.
+- **Start from what you have:** Import existing button-card YAML, edit in the workbench, then export the result.
+- **Reuse your work:** Save designs and presets in a shared library available across your Home Assistant browsers.
+- **Generate with AI (optional):** Describe a design using Home Assistant AI Tasks or your own Gemini API key.
+- **Preview in context:** Use dashboard backgrounds and sizing controls before copying your configuration.
 
-## 👋 Hey there!
+**Important:** Button Builder is a visual editor for [RomRider's `custom:button-card`](https://github.com/custom-cards/button-card), which must be installed separately. It does not replace the card itself.
 
-So here's the deal — I built **Button Builder** because I got tired of hand-writing YAML for [custom:button-card](https://github.com/custom-cards/button-card). Don't get me wrong, button-card is amazing, but staring at indentation errors at 2am isn't my idea of a good time.
+## Get started in a few steps
 
-Button Builder gives you a **visual UI** for designing buttons. Pick your style, set up tap actions, choose icons, define states, tweak colors, add animations — all the fun stuff — and the app spits out the YAML for you. Copy it, paste it into your dashboard, and *boom*: your button looks exactly how you imagined.
+1. Install [`custom:button-card`](https://github.com/custom-cards/button-card).
+2. Install **Button Builder** from HACS, or follow the [manual installation guide](docs/INSTALLATION.md).
+3. Restart Home Assistant and add the **Button Builder** integration under **Settings → Devices & services**.
+4. Open **Button Builder** from the sidebar; choose an entity and style.
+5. Copy the resulting YAML into a Home Assistant **Manual** card.
 
-> [!NOTE]
-> Button Builder creates configurations for
-> [custom:button-card](https://github.com/custom-cards/button-card), created by
-> [RomRider](https://github.com/RomRider). Button Builder is a separate visual
-> configuration tool and would not exist without the flexibility of the
-> original button-card project.
+[Full quick start →](docs/QUICKSTART.md) | [Installation and troubleshooting →](docs/INSTALLATION.md)
 
-Oh, and there's an **AI-powered button creator** too. Just describe what you want — something like *"Give me a button that glows red when the garage is open and pulses blue when it's closed"* — and it'll try to build that YAML for you. Sometimes it nails it. Sometimes it creates a Frankenstein monster. But honestly? That's half the fun.
+## See it in action
 
----
+| Design with a live preview | Inspect and copy YAML |
+| --- | --- |
+| ![Button design workspace](wiki/images/button-builder-workbench.png) | ![Generated YAML workspace](wiki/images/generated-yaml-workspace.png) |
 
-## ⚠️ A Few Honest Disclaimers
-
-- **This thing is nowhere near finished.** I'm sure it's carrying more bugs than a backyard garden.
-- **I've literally never coded a day in my life.** Every single line of this project was built through back-and-forth sessions with AI tools. Yes, really.
-- **It takes real time (and money) to build** — especially the AI features. If you end up liking the idea and want to support it, my [Buy Me a Coffee](https://www.buymeacoffee.com/aspenrt78) is open and very much appreciated. Totally optional, of course.
-
----
-
-## 🙏 What I Actually Need Right Now
-
-- **Feedback** — Tell me what works and what doesn't
-- **Suggestions** — Features you'd love to see
-- **Bug reports** — Things will break, I promise
-- **Tips & tricks** — I'm learning as I go
-- **Pull requests** — Especially from actual developers who won't cry reading my AI-generated code
-
-If you're into dashboards, custom controls, or you just like experimenting with new toys in Home Assistant, give this a shot and let me know what breaks.
-
-Happy automating — and thanks in advance to anyone willing to play with this thing! 🚀
-
----
+![Theme options](wiki/images/theme-options.png)
 
 ## Version 3 upgrade notice
 
@@ -147,7 +144,7 @@ Button Builder designs cards for [custom:button-card](https://github.com/custom-
 5. Click "Generate Design"
 6. Fine-tune the generated configuration using the visual editor if needed
 
-> **Note**: Your API key is stored in your browser's localStorage and never leaves your device. You can manage or remove it by clicking the key icon in the Magic Builder dialog.
+> **Note:** A direct Gemini API key is stored in browser `sessionStorage` for the current tab session, and older stored keys are cleared from `localStorage`. You can remove the session key using the Magic Builder key controls. Direct Gemini requests are sent to Google's API.
 
 ### Prerequisites
 
@@ -201,11 +198,7 @@ Choose from motion and visual effects for the card and icon:
    npm install
    ```
 
-3. ~~Set up your Gemini API key (optional, for AI features):~~
-   ~~- Create a `.env.local` file~~
-   ~~- Add: `GEMINI_API_KEY=your_api_key_here`~~
-   
-   *Note: API keys are now entered directly in the app UI — no environment setup needed!*
+3. **Optional AI:** Enter your Gemini API key in Magic Builder, or use a configured Home Assistant AI Task provider. No `.env.local` key is needed.
 
 4. Run the development server:
    ```bash
