@@ -51,7 +51,7 @@ If Home Assistant exposes an AI Task provider, Magic Builder lists it automatica
 
 ### Direct Gemini
 
-Choose **Gemini API key (direct)** in Magic Builder and enter a key from [Google AI Studio](https://aistudio.google.com/apikey). The key is stored in that browser's local storage and can be removed from the Magic Builder key controls.
+Choose **Gemini API key (direct)** in Magic Builder and enter a key from [Google AI Studio](https://aistudio.google.com/apikey). The key is stored in the browser's `sessionStorage` for the current tab session (not persistent `localStorage`) and can be cleared using the Magic Builder key controls. Direct Gemini requests are sent to Google's API.
 
 ## Troubleshooting
 
