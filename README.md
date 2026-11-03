@@ -11,15 +11,13 @@ A Home Assistant sidebar editor with live previews, state-based styling, presets
 [![Latest release](https://img.shields.io/github/v/release/aspenrt78/button-builder)](https://github.com/aspenrt78/button-builder/releases)
 [![License](https://img.shields.io/github/license/aspenrt78/button-builder)](LICENSE)
 
-[**Install**](docs/INSTALLATION.md) · [**Quick start**](docs/QUICKSTART.md) · [**Watch the video**](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4) · [**Report a problem**](https://github.com/aspenrt78/button-builder/issues)
+[**Install**](docs/INSTALLATION.md) · [**Quick start**](docs/QUICKSTART.md) · [**Report a problem**](https://github.com/aspenrt78/button-builder/issues)
 
 </div>
 
-## See the editor
+## Watch the video
 
-[![Button Builder editor with a live card preview](wiki/images/button-builder-workbench.png)](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4)
-
-**[Watch the video](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4)**
+https://github.com/user-attachments/assets/4cb0e832-6299-4419-9f23-0eb6893e0efa
 
 ## What you can build
 
