@@ -11,7 +11,7 @@ A Home Assistant sidebar editor with live previews, state-based styling, presets
 [![Latest release](https://img.shields.io/github/v/release/aspenrt78/button-builder)](https://github.com/aspenrt78/button-builder/releases)
 [![License](https://img.shields.io/github/license/aspenrt78/button-builder)](LICENSE)
 
-[**Install**](docs/INSTALLATION.md) · [**Quick start**](docs/QUICKSTART.md) · [**Watch the unedited demo**](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4) · [**Report a problem**](https://github.com/aspenrt78/button-builder/issues)
+[**Install**](docs/INSTALLATION.md) · [**Quick start**](docs/QUICKSTART.md) · [**Watch the video**](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4) · [**Report a problem**](https://github.com/aspenrt78/button-builder/issues)
 
 </div>
 
@@ -19,9 +19,7 @@ A Home Assistant sidebar editor with live previews, state-based styling, presets
 
 [![Button Builder editor with a live card preview](wiki/images/button-builder-workbench.png)](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4)
 
-**[Open the original 55-second MP4 recording](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4)**
-
-The image above is a screenshot linked to the real, unedited recording. GitHub does not render repository-committed MP4 files as inline README players. For an inline player, the video must be uploaded as a GitHub media attachment and its attachment URL used here.
+**[Watch the video](https://raw.githubusercontent.com/aspenrt78/button-builder/main/final4.mp4)**
 
 ## What you can build
 
