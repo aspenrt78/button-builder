@@ -17,6 +17,12 @@ Customize layouts, colors, icons, actions, animations, and on/off states in a li
 
 </div>
 
+## Watch Button Builder in action
+
+[![Watch the unedited Button Builder demo — click to play](wiki/images/button-builder-workbench.png)](final4.mp4)
+
+**[Watch the original Button Builder walkthrough (MP4)](final4.mp4)** · 54-second real application recording, presented without cuts, captions, or other edits.
+
 ![Button Builder visual workbench showing live preview and editing controls](wiki/images/button-builder-workbench.png)
 
 ## What you can do
