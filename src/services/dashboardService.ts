@@ -155,10 +155,6 @@ const getParentWindow = (): any | null => {
 };
 
 const getHass = (): any | null => {
-  if (hassAvailabilityChecked && !hassAvailable) {
-    return null;
-  }
-
   try {
     if (!canAccessParent()) {
       hassAvailabilityChecked = true;
@@ -463,8 +459,9 @@ const saveDashboardConfig = async (urlPath: string | null, config: any): Promise
       await hass.connection.sendMessagePromise(payload);
       return;
     }
-  } catch {
-    throw new Error('Failed to save the dashboard configuration.');
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to save the dashboard configuration: ${detail}`);
   }
 
   throw new Error('Home Assistant dashboard editing is not supported in this environment.');
@@ -475,19 +472,8 @@ export const fetchStorageDashboardTargets = async (): Promise<DashboardWriteTarg
   const seen = new Set<string>();
 
   try {
-    if (getDefaultDashboardMode() === 'storage') {
-      const defaultConfig = await fetchDashboardConfig(null);
-      if (defaultConfig) {
-        targets.push({
-          dashboardId: 'lovelace',
-          title: defaultConfig.title || 'Default Dashboard',
-          urlPath: null,
-          views: extractViewOptions(defaultConfig),
-        });
-        seen.add('lovelace');
-      }
-    }
-
+    // Discover registered dashboards first. Home Assistant can now expose the
+    // default dashboard with url_path="lovelace" rather than a null path.
     const dashboards = await fetchDashboards();
     for (const dashboard of dashboards) {
       if (dashboard.mode !== 'storage') {
@@ -512,8 +498,22 @@ export const fetchStorageDashboardTargets = async (): Promise<DashboardWriteTarg
       });
       seen.add(dashboardId);
     }
-  } catch {
-    return [];
+
+    // Legacy Home Assistant installs may keep the default dashboard at null.
+    // Do not add a second copy when it already appears in the dashboard list.
+    if (!seen.has('lovelace') && getDefaultDashboardMode() === 'storage') {
+      const defaultConfig = await fetchDashboardConfig(null);
+      if (defaultConfig) {
+        targets.unshift({
+          dashboardId: '__default__',
+          title: defaultConfig.title || 'Default Dashboard',
+          urlPath: null,
+          views: extractViewOptions(defaultConfig),
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Button Builder: Failed to discover dashboards', error);
   }
 
   return targets.filter(target => target.views.length > 0);
@@ -568,7 +568,7 @@ export const addCardsToDashboard = async ({
     throw new Error('No button cards were selected to add to the dashboard.');
   }
 
-  const urlPath = dashboardId === 'lovelace' ? null : dashboardId;
+  const urlPath = dashboardId === '__default__' ? null : dashboardId;
   const config = await fetchDashboardConfig(urlPath);
   const nextConfig = appendCardsToDashboardConfig(config, viewIndex, sectionIndex, cardConfigs);
   await saveDashboardConfig(urlPath, nextConfig);
