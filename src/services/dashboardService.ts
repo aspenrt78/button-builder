@@ -460,7 +460,9 @@ const saveDashboardConfig = async (urlPath: string | null, config: any): Promise
       return;
     }
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = error && typeof error === 'object' && 'message' in error
+      ? String(error.message)
+      : String(error);
     throw new Error(`Failed to save the dashboard configuration: ${detail}`);
   }
 
