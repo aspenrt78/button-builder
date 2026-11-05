@@ -143,7 +143,6 @@ export function validateCss(css: string): CssValidationResult {
       if (funcMatch) {
         const func = funcMatch[1].toLowerCase();
         const typoSuggestions: Record<string, string> = {
-          'rgb': 'rgb/rgba',
           'rgbs': 'rgba',
           'linerar': 'linear',
           'radail': 'radial',
