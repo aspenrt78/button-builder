@@ -37,12 +37,5 @@ jobs:
         run: |
           npm audit --json > npm-audit.json || true
           node -e "const a = require('./npm-audit.json'); for (const [name,v] of Object.entries(a.vulnerabilities || {})) { console.log(JSON.stringify({name,severity:v.severity,isDirect:v.isDirect,range:v.range,via:v.via,fixAvailable:v.fixAvailable,effects:v.effects,nodes:v.nodes})); } console.log('TOTALS', JSON.stringify(a.metadata?.vulnerabilities || {}));"
-      - name: Resolve fixable advisories (temporary)
-        run: |
-          npm audit fix --package-lock-only --ignore-scripts
-          npm ci
       - run: npm test
       - run: npm run build
-      - name: Export resolved lockfile for review (temporary)
-        run: |
-          node -e 'const fs=require("fs"); for (const p of ["package.json","package-lock.json"]) { const s=fs.readFileSync(p,"utf8"); for(let i=0;i<s.length;i+=1800) console.log("FILECHUNK|"+p+"|"+i+"|"+JSON.stringify(s.slice(i,i+1800))); }'
