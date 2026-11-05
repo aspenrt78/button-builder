@@ -33,5 +33,9 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: Dependency audit (report only)
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e "const a = require('./npm-audit.json'); for (const [name,v] of Object.entries(a.vulnerabilities || {})) { console.log(JSON.stringify({name,severity:v.severity,isDirect:v.isDirect,range:v.range,via:v.via,fixAvailable:v.fixAvailable,effects:v.effects,nodes:v.nodes})); } console.log('TOTALS', JSON.stringify(a.metadata?.vulnerabilities || {}));"
       - run: npm test
       - run: npm run build
