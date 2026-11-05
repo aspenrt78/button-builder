@@ -15,9 +15,9 @@ const compiled = ts.transpileModule(source, {
 });
 const diagnostics = (compiled.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error);
 assert.equal(diagnostics.length, 0, 'CSS validator must transpile');
-const module = { exports: {} };
-vm.runInNewContext(compiled.outputText, { module, exports: module.exports }, { filename: 'cssValidator.js' });
-const { validateCss, formatValidationResults, hasObviousErrors } = module.exports;
+const sandboxModule = { exports: {} };
+vm.runInNewContext(compiled.outputText, { module: sandboxModule, exports: sandboxModule.exports }, { filename: 'cssValidator.js' });
+const { validateCss, formatValidationResults, hasObviousErrors } = sandboxModule.exports;
 
 test('accepts a valid rgb() color without false typo warnings', () => {
   const result = validateCss('card {\n  background-color: rgb(255, 0, 128);\n}');
