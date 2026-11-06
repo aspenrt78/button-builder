@@ -140,7 +140,7 @@ export const parseButtonCardYaml = (yamlString: string): Partial<ButtonConfig> =
   if (parsed.variables && typeof parsed.variables === 'object') {
     config.variables = Object.entries(parsed.variables).map(([name, value]) => ({
       name,
-      value: String(value)
+      value: value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value)
     }));
   }
   
