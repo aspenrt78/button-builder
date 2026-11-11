@@ -40,6 +40,9 @@ async function ready() {
     // The standalone preview can show the first-run requirements dialog.
     // Dismiss it through the same Continue control a user would press.
     const requirements = page.getByRole('heading', { name: 'Home Assistant Requirements Check' });
+    await requirements.waitFor({ state: 'visible', timeout: 5000 }).catch(error => {
+      if (error.name !== 'TimeoutError') throw error;
+    });
     if (await requirements.isVisible()) {
       await page.getByRole('button', { name: 'Continue' }).click();
     }
