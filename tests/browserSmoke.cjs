@@ -37,6 +37,11 @@ async function ready() {
     await page.locator('.preview-workbench .preview-toolbar').first().waitFor({ timeout: 15000 });
     assert.equal(errors.length, 0, 'Uncaught browser exceptions: ' + errors.join('; '));
     assert.equal(await page.getByText('Button Builder failed to load:', { exact: false }).count(), 0);
+    // On a fresh browser profile, Button Builder first asks about theme defaults.
+    const themeDialog = page.getByRole('heading', { name: 'Theme options' });
+    if (await themeDialog.isVisible()) {
+      await page.getByRole('button', { name: 'Start with no theme' }).click();
+    }
     // The standalone preview can show the first-run requirements dialog.
     // Dismiss it through the same Continue control a user would press.
     const requirements = page.getByRole('heading', { name: 'Home Assistant Requirements Check' });
