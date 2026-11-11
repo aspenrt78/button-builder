@@ -37,6 +37,12 @@ async function ready() {
     await page.locator('.preview-workbench .preview-toolbar').first().waitFor({ timeout: 15000 });
     assert.equal(errors.length, 0, 'Uncaught browser exceptions: ' + errors.join('; '));
     assert.equal(await page.getByText('Button Builder failed to load:', { exact: false }).count(), 0);
+    // The standalone preview can show the first-run requirements dialog.
+    // Dismiss it through the same Continue control a user would press.
+    const requirements = page.getByRole('heading', { name: 'Home Assistant Requirements Check' });
+    if (await requirements.isVisible()) {
+      await page.getByRole('button', { name: 'Continue' }).click();
+    }
     await page.getByRole('button', { name: 'Switch to light mode' }).click();
     assert.equal(await page.locator('html.bb-light').count(), 1, 'Theme toggle must apply light mode');
     console.log('Browser smoke passed: editor, preview, no runtime crash, theme toggle.');
