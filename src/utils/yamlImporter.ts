@@ -693,7 +693,13 @@ function parseStyles(styles: any, config: Partial<ButtonConfig>): void {
       for (const field of config.customFields) {
         if (styles.custom_fields[field.name] && Array.isArray(styles.custom_fields[field.name])) {
           field.styles = styles.custom_fields[field.name]
-            .filter((s: any) => typeof s === 'string')
+            .flatMap((style: any) => {
+              if (typeof style === 'string') return [style];
+              if (style && typeof style === 'object' && !Array.isArray(style)) {
+                return Object.entries(style).map(([property, value]) => `${property}: ${String(value ?? '')}`);
+              }
+              return [];
+            })
             .join('\n');
         }
       }

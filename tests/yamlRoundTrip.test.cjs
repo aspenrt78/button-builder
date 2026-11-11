@@ -86,3 +86,52 @@ test('retains JavaScript action templates', () => {
 test('rejects invalid YAML instead of fabricating an empty configuration', () => {
   assert.throws(() => parseButtonCardYaml('entity: [unterminated'), /./);
 });
+
+test('preserves template custom fields and their style declarations', () => {
+  const value = '[[[ return entity.state === "on" ? "Active" : "Idle"; ]]]';
+  const { imported, parsed } = roundTrip({
+    type: 'custom:button-card',
+    entity: 'switch.desk',
+    custom_fields: { status: value },
+    styles: { custom_fields: { status: ['color: #33cc66', 'font-weight: bold'] } },
+  });
+  assert.equal(imported.customFields[0].type, 'template');
+  assert.equal(parsed.custom_fields.status.trim(), value);
+  assert.deepEqual(parsed.styles.custom_fields.status, [{ color: '#33cc66' }, { 'font-weight': 'bold' }]);
+});
+
+test('retains a regex state override with its icon and label', () => {
+  const { imported, parsed } = roundTrip({
+    type: 'custom:button-card',
+    entity: 'sensor.machine',
+    state: [{ operator: 'regex', value: '^error', icon: 'mdi:alert', label: 'Needs attention' }],
+  });
+  assert.equal(imported.stateStyles.length, 1);
+  const state = parsed.state.find(x => x.operator === 'regex');
+  assert.ok(state);
+  assert.equal(state.value, '^error');
+  assert.equal(state.icon, 'mdi:alert');
+  assert.equal(state.label, 'Needs attention');
+});
+
+test('preserves the default-state fallback after import and export', () => {
+  const { parsed } = roundTrip({
+    type: 'custom:button-card',
+    entity: 'sensor.machine',
+    state: [{ operator: 'default', name: 'Normal operation', icon: 'mdi:check' }],
+  });
+  const fallback = parsed.state.find(x => x.operator === 'default');
+  assert.ok(fallback);
+  assert.equal(fallback.name, 'Normal operation');
+  assert.equal(fallback.icon, 'mdi:check');
+});
+
+test('preserves custom-field text with YAML-special characters', () => {
+  const value = 'Floor 2: "Office" #1';
+  const { parsed } = roundTrip({
+    type: 'custom:button-card',
+    entity: 'switch.office',
+    custom_fields: { location: value },
+  });
+  assert.equal(parsed.custom_fields.location, value);
+});
