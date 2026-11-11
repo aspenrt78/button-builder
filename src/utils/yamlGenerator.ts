@@ -1438,7 +1438,7 @@ export const generateYaml = (
         if (field.styles) {
           field.styles.split('\n').forEach(line => {
             if (line.trim()) {
-              yaml += `      - ${line.trim()}\n`;
+              yaml += `      - ${formatStyleForYaml(line.trim())}\n`;
             }
           });
         }
