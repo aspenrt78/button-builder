@@ -34,7 +34,7 @@ async function ready() {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(address, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'Button Card Builder' }).waitFor({ timeout: 20000 });
-    await page.getByText('Live Preview', { exact: true }).first().waitFor({ timeout: 15000 });
+    await page.locator('.preview-workbench .preview-toolbar').first().waitFor({ timeout: 15000 });
     assert.equal(errors.length, 0, 'Uncaught browser exceptions: ' + errors.join('; '));
     assert.equal(await page.getByText('Button Builder failed to load:', { exact: false }).count(), 0);
     await page.getByRole('button', { name: 'Switch to light mode' }).click();
