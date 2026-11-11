@@ -5,9 +5,8 @@ const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
 
 const address = 'http://127.0.0.1:4173/button_builder/';
-const server = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
   stdio: ['ignore', 'pipe', 'pipe'],
-  shell: process.platform === 'win32',
 });
 let logs = '';
 server.stdout.on('data', chunk => { logs += chunk.toString(); });
