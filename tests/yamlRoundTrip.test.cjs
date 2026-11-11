@@ -97,7 +97,7 @@ test('preserves template custom fields and their style declarations', () => {
   });
   assert.equal(imported.customFields[0].type, 'template');
   assert.equal(parsed.custom_fields.status.trim(), value);
-  assert.deepEqual(parsed.styles.custom_fields.status, ['color: #33cc66', 'font-weight: bold']);
+  assert.deepEqual(parsed.styles.custom_fields.status, [{ color: '#33cc66' }, { 'font-weight': 'bold' }]);
 });
 
 test('retains a regex state override with its icon and label', () => {
